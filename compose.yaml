@@ -107,7 +107,19 @@ services:
 
   worker-ingest:
     <<: *pipeline-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker-ingest
     command: ["./worker-ingest"]
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      YTDLP_BIN: ${YTDLP_BIN:-yt-dlp}
+      YTDLP_MAX_FILESIZE_MB: ${YTDLP_MAX_FILESIZE_MB:-8000}
+      YTDLP_MAX_DURATION_S: ${YTDLP_MAX_DURATION_S:-14400}
+      YTDLP_COOKIES_FILE: ${YTDLP_COOKIES_FILE:-}
     networks: [egress, backend]
     deploy:
       replicas: 1

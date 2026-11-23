@@ -18,6 +18,11 @@ COPY . .
 # ============================================
 FROM base AS development
 
+RUN apk add --no-cache ffmpeg curl ca-certificates python3 \
+    && curl -fsSL -o /usr/local/bin/yt-dlp \
+      https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp
+
 RUN go install github.com/air-verse/air@v1.67.1
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 ENV PATH="/go/bin:${PATH}"
@@ -96,6 +101,16 @@ COPY --from=builder --chown=appuser:appuser /app/worker-translate .
 
 EXPOSE 3000
 CMD ["./api"]
+
+# Ingest needs ffmpeg + yt-dlp (Python zipapp). Keep them off the API image.
+FROM production AS worker-ingest
+USER root
+RUN apk --no-cache add ffmpeg curl ca-certificates python3 \
+    && curl -fsSL -o /usr/local/bin/yt-dlp \
+      https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp
+USER appuser
+CMD ["./worker-ingest"]
 
 
 FROM production AS api
