@@ -1,24 +1,285 @@
+x-go-prod: &go-prod
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: production
+  restart: unless-stopped
+
+x-s3-env: &s3-env
+  S3_ENDPOINT: ${S3_ENDPOINT}
+  S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+  S3_SECRET_KEY: ${S3_SECRET_KEY}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_BUCKET_MEDIA: ${S3_BUCKET_MEDIA:-media}
+  S3_BUCKET_WORK: ${S3_BUCKET_WORK:-work}
+  S3_BUCKET_RENDERS: ${S3_BUCKET_RENDERS:-renders}
+  S3_BUCKET_ASSETS: ${S3_BUCKET_ASSETS:-assets}
+
+x-app-env: &app-env
+  GO_ENV: ${GO_ENV}
+  PORT: ${PORT}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+  CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS}
+  CORS_ALLOW_METHODS: ${CORS_ALLOW_METHODS}
+  CORS_ALLOW_HEADERS: ${CORS_ALLOW_HEADERS}
+  CORS_MAX_AGE: ${CORS_MAX_AGE}
+  RATE_LIMIT_MAX: ${RATE_LIMIT_MAX}
+  CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET}
+  CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+  CLERK_FRONTEND_API: ${CLERK_FRONTEND_API}
+  CENTRIFUGO_URL: ${CENTRIFUGO_URL}
+  CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY}
+  CENTRIFUGO_TOKEN_SECRET: ${CENTRIFUGO_TOKEN_SECRET}
+  CENTRIFUGO_PUBLIC_WS_URL: ${CENTRIFUGO_PUBLIC_WS_URL}
+  RABBITMQ_URL: ${RABBITMQ_URL}
+  RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE}
+  RABBITMQ_QUEUE: ${RABBITMQ_QUEUE}
+  RABBITMQ_ROUTING_KEY: ${RABBITMQ_ROUTING_KEY}
+  RABBITMQ_RETRY_TTL_MS: ${RABBITMQ_RETRY_TTL_MS}
+
+x-pipeline-worker: &pipeline-worker
+  <<: *go-prod
+  environment:
+    RABBITMQ_URL: ${RABBITMQ_URL}
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    mc:
+      condition: service_completed_successfully
+
 services:
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: api
-    command: ["./api"]
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
+  caddy:
+    image: caddy:2
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    environment:
+      SITE_ADDRESS: ${CADDY_SITE_ADDRESS}
+    networks: [edge]
     restart: unless-stopped
 
+  api:
+    <<: *go-prod
+    command: ["./api"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/livez"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    environment:
+      <<: [*app-env, *s3-env]
+      TRUST_PROXY: "true"
+      DATABASE_URL: ${API_DATABASE_URL:-${DATABASE_URL}}
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      centrifugo:
+        condition: service_started
+    networks: [edge, backend, data]
+    deploy:
+      replicas: 2
+
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    container_name: worker
+    <<: *go-prod
     command: ["./worker"]
-    env_file:
-      - .env
+    environment:
+      <<: *app-env
+      DATABASE_URL: ${WORKER_DATABASE_URL:-${DATABASE_URL}}
+      OUTBOX_POLL_INTERVAL: ${OUTBOX_POLL_INTERVAL}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY}
+      WORKER_MAX_RETRIES: ${WORKER_MAX_RETRIES}
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      centrifugo:
+        condition: service_started
+    networks: [backend, data]
+    deploy:
+      replicas: 2
+
+  worker-ingest:
+    <<: *pipeline-worker
+    command: ["./worker-ingest"]
+    networks: [egress, backend]
+    deploy:
+      replicas: 1
+
+  worker-audio:
+    <<: *pipeline-worker
+    command: ["./worker-audio"]
+    networks: [backend]
+
+  worker-denoise:
+    <<: *pipeline-worker
+    command: ["./worker-denoise"]
+    profiles: [denoise]
+    networks: [backend]
+
+  worker-transcribe:
+    <<: *pipeline-worker
+    command: ["./worker-transcribe"]
+    networks: [egress, backend]
+    deploy:
+      replicas: 2
+
+  worker-scenes:
+    <<: *pipeline-worker
+    command: ["./worker-scenes"]
+    networks: [egress, backend]
+
+  worker-detect:
+    <<: *pipeline-worker
+    command: ["./worker-detect"]
+    networks: [backend]
+
+  worker-analyze:
+    <<: *pipeline-worker
+    command: ["./worker-analyze"]
+    networks: [egress, backend]
+    deploy:
+      replicas: 2
+
+  worker-reframe:
+    <<: *pipeline-worker
+    command: ["./worker-reframe"]
+    networks: [backend]
+
+  worker-render:
+    <<: *pipeline-worker
+    command: ["./worker-render"]
+    networks: [backend]
+
+  worker-translate:
+    <<: *pipeline-worker
+    command: ["./worker-translate"]
+    networks: [egress, backend]
+
+  worker-upscale:
+    <<: *pipeline-worker
+    command: ["./worker-upscale"]
+    profiles: [gpu]
+    networks: [backend]
+
+  worker-dub:
+    <<: *pipeline-worker
+    command: ["./worker-dub"]
+    profiles: [gpu]
+    networks: [backend]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks: [backend]
     restart: unless-stopped
+
+  minio:
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mc alias set local http://127.0.0.1:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" >/dev/null 2>&1 && mc ready local",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks: [backend]
+    restart: unless-stopped
+
+  mc:
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
+    depends_on:
+      minio:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      set -e;
+      echo 'waiting for minio...';
+      until mc alias set myminio http://minio:9000 ${S3_ACCESS_KEY} ${S3_SECRET_KEY}; do sleep 1; done;
+      mc mb myminio/${S3_BUCKET_MEDIA:-media} --ignore-existing;
+      mc mb myminio/${S3_BUCKET_WORK:-work} --ignore-existing;
+      mc mb myminio/${S3_BUCKET_RENDERS:-renders} --ignore-existing;
+      mc mb myminio/${S3_BUCKET_ASSETS:-assets} --ignore-existing;
+      mc ilm rule add --expire-days 3 myminio/${S3_BUCKET_WORK:-work} 2>/dev/null ||
+        mc ilm add --expiry-days 3 myminio/${S3_BUCKET_WORK:-work} 2>/dev/null ||
+        true;
+      mc version enable myminio/${S3_BUCKET_ASSETS:-assets} || true;
+      mc admin config set myminio notify_webhook:media endpoint='http://api:3000/webhooks/minio/object-created' auth_token='${MINIO_WEBHOOK_SECRET:-}';
+      mc admin service restart myminio --json;
+      sleep 5;
+      mc event remove myminio/${S3_BUCKET_MEDIA:-media} --force || true;
+      for ext in jpg jpeg png webp mp4 mov avi mkv m4v mpeg mpg wmv asf flv webm ogg ogv mka wav flac m4a; do
+        mc event add myminio/${S3_BUCKET_MEDIA:-media} arn:minio:sqs::media:webhook --event put --suffix .$$ext -p;
+      done;
+      "
+    networks: [backend]
+
+  centrifugo:
+    image: centrifugo/centrifugo:v5
+    command: ["centrifugo", "-c", "config.json"]
+    volumes:
+      - ./centrifugo:/centrifugo:ro
+    working_dir: /centrifugo
+    environment:
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY}
+      CENTRIFUGO_TOKEN_HMAC_SECRET_KEY: ${CENTRIFUGO_TOKEN_SECRET}
+      CENTRIFUGO_ALLOWED_ORIGINS: ${CENTRIFUGO_ALLOWED_ORIGINS}
+    networks: [edge, backend]
+    restart: unless-stopped
+
+  database:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d \"$$POSTGRES_DB\" -U \"$$POSTGRES_USER\""]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    networks: [data]
+    restart: unless-stopped
+
+networks:
+  edge:
+  backend:
+    internal: true
+  data:
+    internal: true
+  egress:
+
+volumes:
+  rabbitmq_data:
+  minio_data:
+  pgdata:
+  caddy_data:

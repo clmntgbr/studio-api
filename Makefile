@@ -1,5 +1,13 @@
 COMPOSE_DEV := docker compose -f compose.dev.yaml
 
+# Always-on app processes (excludes profile-only denoise/gpu workers)
+APP_SERVICES := api worker \
+	worker-ingest worker-audio worker-transcribe worker-scenes \
+	worker-detect worker-analyze worker-reframe worker-render worker-translate
+
+PIPELINE_WORKERS := worker-ingest worker-audio worker-transcribe worker-scenes \
+	worker-detect worker-analyze worker-reframe worker-render worker-translate
+
 # ============================================
 # Development (compose.dev.yaml)
 # ============================================
@@ -8,8 +16,7 @@ dev:
 	$(COMPOSE_DEV) up -d
 
 restart:
-	$(COMPOSE_DEV) down
-	$(COMPOSE_DEV) up -d
+	$(COMPOSE_DEV) restart $(APP_SERVICES)
 
 build:
 	$(COMPOSE_DEV) up -d --build
@@ -18,7 +25,7 @@ dev-down:
 	$(COMPOSE_DEV) down
 
 dev-logs:
-	$(COMPOSE_DEV) logs -f api worker executor scheduler
+	$(COMPOSE_DEV) logs -f $(APP_SERVICES)
 
 api-logs:
 	$(COMPOSE_DEV) logs -f api
@@ -26,14 +33,54 @@ api-logs:
 worker-logs:
 	$(COMPOSE_DEV) logs -f worker
 
-executor-logs:
-	$(COMPOSE_DEV) logs -f executor
+pipeline-logs:
+	$(COMPOSE_DEV) logs -f $(PIPELINE_WORKERS)
 
-scheduler-logs:
-	$(COMPOSE_DEV) logs -f scheduler
+worker-ingest-logs:
+	$(COMPOSE_DEV) logs -f worker-ingest
+
+worker-audio-logs:
+	$(COMPOSE_DEV) logs -f worker-audio
+
+worker-denoise-logs:
+	$(COMPOSE_DEV) --profile denoise logs -f worker-denoise
+
+worker-transcribe-logs:
+	$(COMPOSE_DEV) logs -f worker-transcribe
+
+worker-scenes-logs:
+	$(COMPOSE_DEV) logs -f worker-scenes
+
+worker-detect-logs:
+	$(COMPOSE_DEV) logs -f worker-detect
+
+worker-analyze-logs:
+	$(COMPOSE_DEV) logs -f worker-analyze
+
+worker-reframe-logs:
+	$(COMPOSE_DEV) logs -f worker-reframe
+
+worker-render-logs:
+	$(COMPOSE_DEV) logs -f worker-render
+
+worker-translate-logs:
+	$(COMPOSE_DEV) logs -f worker-translate
+
+worker-upscale-logs:
+	$(COMPOSE_DEV) --profile gpu logs -f worker-upscale
+
+worker-dub-logs:
+	$(COMPOSE_DEV) --profile gpu logs -f worker-dub
 
 dev-restart:
-	$(COMPOSE_DEV) restart api worker executor scheduler
+	$(COMPOSE_DEV) restart $(APP_SERVICES)
+
+# Optional profile workers
+dev-denoise:
+	$(COMPOSE_DEV) --profile denoise up -d worker-denoise
+
+dev-gpu:
+	$(COMPOSE_DEV) --profile gpu up -d worker-upscale worker-dub
 
 lint:
 	$(COMPOSE_DEV) exec api golangci-lint run --fix
@@ -50,6 +97,9 @@ coverage:
 
 coverage-html: coverage
 	$(COMPOSE_DEV) exec api go tool cover -html=coverage.out -o coverage.html
+
+unit-tests:
+	$(COMPOSE_DEV) exec api go test ./internal/domain/... ./internal/application/... ./internal/infrastructure/... ./internal/workerstub/... ./cmd/... -race -count=1
 
 # ============================================
 # CLI Commands (via Docker)

@@ -38,7 +38,10 @@ type Config struct {
 }
 
 func Load() *Config {
-	if err := godotenv.Load(); err != nil {
+	// Fill only missing/empty keys from .env. Docker env_file can inject an
+	// empty string for a key; godotenv.Load() would not override it, so a
+	// later edit to the mounted .env would be ignored until recreate.
+	if err := loadDotEnvFillEmpty(); err != nil {
 		log.Println("no .env file found, using environment variables")
 	}
 
@@ -68,6 +71,19 @@ func Load() *Config {
 		CentrifugoTokenSecret: getEnv("CENTRIFUGO_TOKEN_SECRET"),
 		CentrifugoPublicWSURL: getEnvOrDefault("CENTRIFUGO_PUBLIC_WS_URL", ""),
 	}
+}
+
+func loadDotEnvFillEmpty() error {
+	envMap, err := godotenv.Read()
+	if err != nil {
+		return err
+	}
+	for key, value := range envMap {
+		if os.Getenv(key) == "" {
+			_ = os.Setenv(key, value)
+		}
+	}
+	return nil
 }
 
 func getEnv(key string) string {
