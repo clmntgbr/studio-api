@@ -125,3 +125,13 @@ migrate-check: cli-build
 
 shell:
 	$(COMPOSE_DEV) exec api sh
+
+# ============================================
+# MinIO
+# ============================================
+
+minio-init:
+	$(COMPOSE_DEV) up mc --force-recreate
+
+minio-ls:
+	@$(COMPOSE_DEV) exec minio sh -c 'mc alias set local http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc ls local'

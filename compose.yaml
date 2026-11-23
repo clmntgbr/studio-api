@@ -45,8 +45,8 @@ x-pipeline-worker: &pipeline-worker
   depends_on:
     rabbitmq:
       condition: service_healthy
-    mc:
-      condition: service_completed_successfully
+    minio:
+      condition: service_healthy
 
 services:
   caddy:
@@ -216,8 +216,6 @@ services:
     depends_on:
       minio:
         condition: service_healthy
-      api:
-        condition: service_healthy
     entrypoint: >
       /bin/sh -c "
       set -e;
@@ -231,13 +229,14 @@ services:
         mc ilm add --expiry-days 3 myminio/${S3_BUCKET_WORK:-work} 2>/dev/null ||
         true;
       mc version enable myminio/${S3_BUCKET_ASSETS:-assets} || true;
-      mc admin config set myminio notify_webhook:media endpoint='http://api:3000/webhooks/minio/object-created' auth_token='${MINIO_WEBHOOK_SECRET:-}';
-      mc admin service restart myminio --json;
+      mc admin config set myminio notify_webhook:media endpoint='http://api:3000/webhooks/minio/object-created' auth_token='${MINIO_WEBHOOK_SECRET:-}' || true;
+      mc admin service restart myminio --json || true;
       sleep 5;
       mc event remove myminio/${S3_BUCKET_MEDIA:-media} --force || true;
       for ext in jpg jpeg png webp mp4 mov avi mkv m4v mpeg mpg wmv asf flv webm ogg ogv mka wav flac m4a; do
-        mc event add myminio/${S3_BUCKET_MEDIA:-media} arn:minio:sqs::media:webhook --event put --suffix .$$ext -p;
+        mc event add myminio/${S3_BUCKET_MEDIA:-media} arn:minio:sqs::media:webhook --event put --suffix .$$ext -p || true;
       done;
+      echo 'minio init done';
       "
     networks: [backend]
 
