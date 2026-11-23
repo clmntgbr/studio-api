@@ -39,7 +39,12 @@ func (p *Pipeline) Run(ctx context.Context, mediaID string, req *Request, onProg
 	if mediaID == "" {
 		return nil, fmt.Errorf("media_id is required")
 	}
+	devLogs := isDev()
+	startedAt := time.Now()
 	report := func(pct float64, stage, msg string) {
+		if devLogs {
+			log.Printf("ingest[%s] %5.1f%% %-18s %s (+%s)", mediaID, pct, stage, msg, time.Since(startedAt).Round(time.Millisecond))
+		}
 		if onProgress != nil {
 			onProgress(pct, stage, msg)
 		}
@@ -114,17 +119,7 @@ func (p *Pipeline) Run(ctx context.Context, mediaID string, req *Request, onProg
 		probe.VFR = false
 	}
 
-	report(45, "proxy", "Encoding proxy")
-	proxyPath := filepath.Join(workDir, "proxy_720p.mp4")
-	if err := MakeProxy(ctx, working, proxyPath, req.Proxy); err != nil {
-		return nil, err
-	}
-	proxyKey := fmt.Sprintf("derived/%s/proxy_720p.mp4", mediaID)
-	if err := p.cfg.Storage.UploadFile(ctx, p.cfg.MediaBucket, proxyKey, proxyPath, "video/mp4"); err != nil {
-		return nil, err
-	}
-
-	report(60, "audio_analysis", "Extracting analysis audio")
+	report(45, "audio_analysis", "Extracting analysis audio")
 	analysisPath := filepath.Join(workDir, "audio_16k_mono.wav")
 	if err := ExtractAnalysisAudio(ctx, working, analysisPath, req.Audio.Analysis); err != nil {
 		return nil, err
@@ -134,7 +129,7 @@ func (p *Pipeline) Run(ctx context.Context, mediaID string, req *Request, onProg
 		return nil, err
 	}
 
-	report(70, "audio_transcription", "Extracting transcription audio")
+	report(60, "audio_transcription", "Extracting transcription audio")
 	txPath := filepath.Join(workDir, "audio_transcription.m4a")
 	if err := ExtractTranscriptionAudio(ctx, working, txPath, req.Audio.Transcription); err != nil {
 		return nil, err
@@ -144,7 +139,7 @@ func (p *Pipeline) Run(ctx context.Context, mediaID string, req *Request, onProg
 		return nil, err
 	}
 
-	report(80, "audio_master", "Extracting master audio")
+	report(75, "audio_master", "Extracting master audio")
 	masterPath := filepath.Join(workDir, "audio_master.flac")
 	if err := ExtractMasterAudio(ctx, working, masterPath, req.Audio.Master); err != nil {
 		return nil, err
@@ -160,7 +155,7 @@ func (p *Pipeline) Run(ctx context.Context, mediaID string, req *Request, onProg
 
 	report(90, "sprite", "Building sprite")
 	spritePath := filepath.Join(workDir, "sprite.jpg")
-	spriteMeta, err := MakeSprite(ctx, proxyPath, spritePath, probe.DurationMs)
+	spriteMeta, err := MakeSprite(ctx, working, spritePath, probe.DurationMs)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +175,6 @@ func (p *Pipeline) Run(ctx context.Context, mediaID string, req *Request, onProg
 		},
 		Probe:     probe,
 		Mezzanine: mezzanine,
-		Proxy:     ObjectRef{Key: proxyKey},
 		Audio: AudioOut{
 			AnalysisKey:      analysisKey,
 			TranscriptionKey: txKey,
@@ -233,4 +227,9 @@ func contentTypeForExt(ext string) string {
 	default:
 		return "application/octet-stream"
 	}
+}
+
+func isDev() bool {
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("GO_ENV")))
+	return env == "" || env == "development" || env == "dev" || env == "local"
 }

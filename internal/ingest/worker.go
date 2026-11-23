@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	s3store "go-api/internal/infrastructure/storage/s3"
@@ -16,23 +17,34 @@ import (
 )
 
 const (
-	queueName       = "q.ingest"
-	resultsExchange = "results"
+	queueName          = "q.ingest"
+	resultsExchange    = "results"
+	defaultConcurrency = 2
 )
 
 type WorkerConfig struct {
 	RabbitURL   string
 	MediaBucket string
 	WorkDir     string
+	Concurrency int
 	S3          s3store.Config
 	YTDLP       YTDLPConfig
 }
 
 func LoadWorkerConfigFromEnv() (WorkerConfig, error) {
+	concurrency := envIntOr("INGEST_CONCURRENCY", 0)
+	if concurrency <= 0 {
+		concurrency = envIntOr("WORKER_CONCURRENCY", defaultConcurrency)
+	}
+	if concurrency <= 0 {
+		concurrency = defaultConcurrency
+	}
+
 	cfg := WorkerConfig{
 		RabbitURL:   os.Getenv("RABBITMQ_URL"),
 		MediaBucket: envOr("S3_BUCKET_MEDIA", "media"),
 		WorkDir:     envOr("WORK_DIR", "/tmp/work"),
+		Concurrency: concurrency,
 		S3: s3store.Config{
 			Endpoint:  os.Getenv("S3_ENDPOINT"),
 			Region:    envOr("S3_REGION", "us-east-1"),
@@ -88,9 +100,12 @@ func RunWorker(ctx context.Context, cfg WorkerConfig) error {
 	if err := ch.Confirm(false); err != nil {
 		return fmt.Errorf("confirm mode: %w", err)
 	}
-	confirms := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
+	bus := &amqpBus{
+		ch:       ch,
+		confirms: ch.NotifyPublish(make(chan amqp.Confirmation, cfg.Concurrency)),
+	}
 
-	if err := ch.Qos(1, 0, false); err != nil {
+	if err := ch.Qos(cfg.Concurrency, 0, false); err != nil {
 		return fmt.Errorf("qos: %w", err)
 	}
 
@@ -99,79 +114,154 @@ func RunWorker(ctx context.Context, cfg WorkerConfig) error {
 		return fmt.Errorf("consume %s: %w", queueName, err)
 	}
 
-	log.Printf("worker-ingest started, consuming %s", queueName)
+	log.Printf("worker-ingest started, consuming %s (concurrency=%d)", queueName, cfg.Concurrency)
 
+	sem := make(chan struct{}, cfg.Concurrency)
+	var wg sync.WaitGroup
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("worker-ingest shutting down")
+			log.Printf("worker-ingest shutting down, waiting for in-flight jobs")
+			wg.Wait()
+			log.Printf("worker-ingest stopped")
 			return nil
 		case d, ok := <-deliveries:
 			if !ok {
+				wg.Wait()
 				return fmt.Errorf("worker-ingest: deliveries channel closed")
 			}
-			if err := handleDelivery(ctx, ch, confirms, pipeline, d); err != nil {
-				log.Printf("worker-ingest handle error: %v", err)
+			select {
+			case <-ctx.Done():
+				// Leave unacked so RabbitMQ redelivers after channel close.
+				log.Printf("worker-ingest shutting down, waiting for in-flight jobs")
+				wg.Wait()
+				log.Printf("worker-ingest stopped")
+				return nil
+			case sem <- struct{}{}:
 			}
+			wg.Add(1)
+			go func(d amqp.Delivery) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				if err := handleDelivery(ctx, bus, pipeline, d); err != nil {
+					log.Printf("worker-ingest handle error: %v", err)
+				}
+			}(d)
 		}
 	}
 }
 
-func handleDelivery(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp.Confirmation, pipeline *Pipeline, d amqp.Delivery) error {
+// amqpBus serializes channel use: amqp091.Channel is not concurrency-safe.
+type amqpBus struct {
+	ch       *amqp.Channel
+	confirms <-chan amqp.Confirmation
+	mu       sync.Mutex
+}
+
+func (b *amqpBus) ack(d amqp.Delivery) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return d.Ack(false)
+}
+
+func (b *amqpBus) nack(d amqp.Delivery) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	// No requeue — avoid tight loops (architecture: never Nack(requeue=true)).
+	return d.Nack(false, false)
+}
+
+func (b *amqpBus) publishConfirm(ctx context.Context, routingKey string, msg amqp.Publishing) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if err := b.ch.PublishWithContext(ctx, resultsExchange, routingKey, false, false, msg); err != nil {
+		return err
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case c, ok := <-b.confirms:
+		if !ok {
+			return fmt.Errorf("confirm channel closed")
+		}
+		if !c.Ack {
+			return fmt.Errorf("publish not confirmed for %s", routingKey)
+		}
+		return nil
+	case <-time.After(30 * time.Second):
+		return fmt.Errorf("publish confirm timeout for %s", routingKey)
+	}
+}
+
+func handleDelivery(ctx context.Context, bus *amqpBus, pipeline *Pipeline, d amqp.Delivery) error {
 	env, err := ParseEnvelope(d.Body)
 	if err != nil {
 		log.Printf("poison message: %v", err)
-		// No requeue — avoid tight loops (architecture: never Nack(requeue=true)).
-		_ = d.Nack(false, false)
+		_ = bus.nack(d)
 		return err
 	}
 
 	req, err := ParseRequest(env.Payload)
 	if err != nil {
 		classified := Permanent("INVALID_PAYLOAD", err.Error())
-		if pubErr := publishResult(ctx, ch, confirms, env, env.MediaID, nil, classified, 0); pubErr != nil {
+		if pubErr := publishResult(ctx, bus, env, env.MediaID, nil, classified, 0); pubErr != nil {
 			log.Printf("failed to publish permanent failure: %v", pubErr)
-			_ = d.Nack(false, false)
+			_ = bus.nack(d)
 			return pubErr
 		}
-		return d.Ack(false)
+		return bus.ack(d)
 	}
 
 	mediaID := env.MediaID
 	if mediaID == "" {
-		return publishAndAckPermanent(ctx, ch, confirms, d, env, Permanent("MISSING_MEDIA_ID", "media_id is required"))
+		return publishAndAckPermanent(ctx, bus, d, env, Permanent("MISSING_MEDIA_ID", "media_id is required"))
 	}
 
-	_ = publishProgress(ctx, ch, confirms, env, 0, "start", "ingest started")
+	if isDev() {
+		log.Printf("ingest[%s] start step=%s job=%s kind=%s", mediaID, env.StepID, env.JobID, req.Source.Kind)
+	}
+
+	_ = publishProgress(ctx, bus, env, 0, "start", "ingest started")
 
 	start := time.Now()
 	lastProgress := time.Time{}
+	var progressMu sync.Mutex
 	completed, runErr := pipeline.Run(ctx, mediaID, req, func(pct float64, stage, message string) {
+		progressMu.Lock()
+		defer progressMu.Unlock()
 		if time.Since(lastProgress) < time.Second && pct < 100 {
 			return
 		}
 		lastProgress = time.Now()
-		_ = publishProgress(ctx, ch, confirms, env, pct, stage, message)
+		_ = publishProgress(ctx, bus, env, pct, stage, message)
 	})
 	elapsed := time.Since(start).Milliseconds()
 
-	if pubErr := publishResult(ctx, ch, confirms, env, mediaID, completed, runErr, elapsed); pubErr != nil {
+	if isDev() {
+		if runErr != nil {
+			log.Printf("ingest[%s] failed after %dms: %v", mediaID, elapsed, runErr)
+		} else {
+			log.Printf("ingest[%s] succeeded in %dms source=%s", mediaID, elapsed, completed.Source.Key)
+		}
+	}
+
+	if pubErr := publishResult(ctx, bus, env, mediaID, completed, runErr, elapsed); pubErr != nil {
 		log.Printf("result publish failed: %v", pubErr)
-		_ = d.Nack(false, false)
+		_ = bus.nack(d)
 		return pubErr
 	}
-	return d.Ack(false)
+	return bus.ack(d)
 }
 
-func publishAndAckPermanent(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp.Confirmation, d amqp.Delivery, env *Envelope, err error) error {
-	if pubErr := publishResult(ctx, ch, confirms, env, env.MediaID, nil, err, 0); pubErr != nil {
-		_ = d.Nack(false, false)
+func publishAndAckPermanent(ctx context.Context, bus *amqpBus, d amqp.Delivery, env *Envelope, err error) error {
+	if pubErr := publishResult(ctx, bus, env, env.MediaID, nil, err, 0); pubErr != nil {
+		_ = bus.nack(d)
 		return pubErr
 	}
-	return d.Ack(false)
+	return bus.ack(d)
 }
 
-func publishProgress(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp.Confirmation, env *Envelope, pct float64, stage, message string) error {
+func publishProgress(ctx context.Context, bus *amqpBus, env *Envelope, pct float64, stage, message string) error {
 	payload, err := json.Marshal(StepProgress{
 		StepID:  env.StepID,
 		Pct:     pct,
@@ -195,7 +285,7 @@ func publishProgress(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp
 	if err != nil {
 		return err
 	}
-	return publishConfirm(ctx, ch, confirms, "progress.ingest", amqp.Publishing{
+	return bus.publishConfirm(ctx, "progress.ingest", amqp.Publishing{
 		ContentType:   "application/json",
 		DeliveryMode:  amqp.Transient,
 		Type:          SchemaStepProgress,
@@ -206,7 +296,7 @@ func publishProgress(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp
 	})
 }
 
-func publishResult(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp.Confirmation, env *Envelope, mediaID string, out *Completed, runErr error, durationMs int64) error {
+func publishResult(ctx context.Context, bus *amqpBus, env *Envelope, mediaID string, out *Completed, runErr error, durationMs int64) error {
 	result := StepResult{
 		StepID:  env.StepID,
 		Metrics: &StepMetrics{DurationMs: durationMs},
@@ -245,7 +335,7 @@ func publishResult(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp.C
 	if err != nil {
 		return err
 	}
-	return publishConfirm(ctx, ch, confirms, routing, amqp.Publishing{
+	return bus.publishConfirm(ctx, routing, amqp.Publishing{
 		ContentType:   "application/json",
 		DeliveryMode:  amqp.Persistent,
 		Type:          SchemaStepResult,
@@ -254,26 +344,6 @@ func publishResult(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp.C
 		Headers:       amqp.Table{"causation_id": env.EventID},
 		Body:          body,
 	})
-}
-
-func publishConfirm(ctx context.Context, ch *amqp.Channel, confirms <-chan amqp.Confirmation, routingKey string, msg amqp.Publishing) error {
-	if err := ch.PublishWithContext(ctx, resultsExchange, routingKey, false, false, msg); err != nil {
-		return err
-	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case c, ok := <-confirms:
-		if !ok {
-			return fmt.Errorf("confirm channel closed")
-		}
-		if !c.Ack {
-			return fmt.Errorf("publish not confirmed for %s", routingKey)
-		}
-		return nil
-	case <-time.After(30 * time.Second):
-		return fmt.Errorf("publish confirm timeout for %s", routingKey)
-	}
 }
 
 func envOr(key, fallback string) string {

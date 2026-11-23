@@ -29,34 +29,6 @@ func MakeMezzanine(ctx context.Context, src, dest string) error {
 	)
 }
 
-func MakeProxy(ctx context.Context, src, dest string, spec ProxySpec) error {
-	height := spec.Height
-	if height <= 0 {
-		height = 720
-	}
-	gop := spec.GOPFrames
-	if gop <= 0 {
-		gop = 15
-	}
-	crf := spec.CRF
-	if crf <= 0 {
-		crf = 26
-	}
-	scale := fmt.Sprintf("scale=-2:%d:flags=lanczos", height)
-	return runFFmpeg(ctx,
-		"-i", src,
-		"-map", "0:v:0", "-map", "0:a:0?",
-		"-vf", scale,
-		"-c:v", "libx264", "-preset", "veryfast", "-crf", strconv.Itoa(crf),
-		"-pix_fmt", "yuv420p",
-		"-fps_mode", "cfr",
-		"-g", strconv.Itoa(gop), "-keyint_min", strconv.Itoa(gop), "-sc_threshold", "0",
-		"-c:a", "aac", "-b:a", "128k",
-		"-movflags", "+faststart",
-		dest,
-	)
-}
-
 func ExtractAnalysisAudio(ctx context.Context, src, dest string, spec AudioAnalysisSpec) error {
 	sr := spec.SampleRate
 	if sr <= 0 {
@@ -108,7 +80,7 @@ func ExtractMasterAudio(ctx context.Context, src, dest string, spec AudioMasterS
 	)
 }
 
-// MakeSprite builds a tiled jpeg contact sheet from the proxy/source.
+// MakeSprite builds a tiled jpeg contact sheet from the working source.
 func MakeSprite(ctx context.Context, src, dest string, durationMs int64) (SpriteOut, error) {
 	intervalMs := 2000
 	tileW, tileH, cols := 160, 90, 10

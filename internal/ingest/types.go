@@ -77,7 +77,6 @@ type Completed struct {
 	Source     SourceOut   `json:"source"`
 	Probe      Probe       `json:"probe"`
 	Mezzanine  *ObjectRef  `json:"mezzanine,omitempty"`
-	Proxy      ObjectRef   `json:"proxy"`
 	Audio      AudioOut    `json:"audio"`
 	Sprite     SpriteOut   `json:"sprite"`
 	Origin     *OriginOut  `json:"origin,omitempty"`
