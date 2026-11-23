@@ -66,21 +66,12 @@ worker-render-logs:
 worker-translate-logs:
 	$(COMPOSE_DEV) logs -f worker-translate
 
-worker-upscale-logs:
-	$(COMPOSE_DEV) --profile gpu logs -f worker-upscale
-
-worker-dub-logs:
-	$(COMPOSE_DEV) --profile gpu logs -f worker-dub
-
 dev-restart:
 	$(COMPOSE_DEV) restart $(APP_SERVICES)
 
 # Optional profile workers
 dev-denoise:
 	$(COMPOSE_DEV) --profile denoise up -d worker-denoise
-
-dev-gpu:
-	$(COMPOSE_DEV) --profile gpu up -d worker-upscale worker-dub
 
 lint:
 	$(COMPOSE_DEV) exec api golangci-lint run --fix

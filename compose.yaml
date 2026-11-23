@@ -162,18 +162,6 @@ services:
     command: ["./worker-translate"]
     networks: [egress, backend]
 
-  worker-upscale:
-    <<: *pipeline-worker
-    command: ["./worker-upscale"]
-    profiles: [gpu]
-    networks: [backend]
-
-  worker-dub:
-    <<: *pipeline-worker
-    command: ["./worker-dub"]
-    profiles: [gpu]
-    networks: [backend]
-
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     healthcheck:

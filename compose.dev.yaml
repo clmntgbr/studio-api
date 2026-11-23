@@ -156,20 +156,6 @@ services:
     command: ["go", "run", "./cmd/worker-translate"]
     networks: [egress, backend]
 
-  worker-upscale:
-    <<: *pipeline-worker
-    container_name: worker-upscale
-    command: ["go", "run", "./cmd/worker-upscale"]
-    profiles: [gpu]
-    networks: [backend]
-
-  worker-dub:
-    <<: *pipeline-worker
-    container_name: worker-dub
-    command: ["go", "run", "./cmd/worker-dub"]
-    profiles: [gpu]
-    networks: [backend]
-
   database:
     container_name: datastore
     image: postgres:${POSTGRES_VERSION:-17}-alpine

@@ -51,7 +51,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     ./cmd/cli
 
 RUN set -eu; \
-    for name in ingest audio denoise transcribe scenes detect analyze reframe render translate upscale dub; do \
+    for name in ingest audio denoise transcribe scenes detect analyze reframe render translate; do \
       CGO_ENABLED=0 GOOS=linux go build \
         -a -installsuffix cgo \
         -ldflags="-w -s" \
@@ -93,8 +93,6 @@ COPY --from=builder --chown=appuser:appuser /app/worker-analyze .
 COPY --from=builder --chown=appuser:appuser /app/worker-reframe .
 COPY --from=builder --chown=appuser:appuser /app/worker-render .
 COPY --from=builder --chown=appuser:appuser /app/worker-translate .
-COPY --from=builder --chown=appuser:appuser /app/worker-upscale .
-COPY --from=builder --chown=appuser:appuser /app/worker-dub .
 
 EXPOSE 3000
 CMD ["./api"]
