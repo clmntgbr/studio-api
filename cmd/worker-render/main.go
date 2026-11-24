@@ -7,14 +7,20 @@ import (
 	"os/signal"
 	"syscall"
 
-	"go-api/internal/workerstub"
+	"github.com/joho/godotenv"
+
+	"go-api/internal/renderworker"
 )
 
 func main() {
+	_ = godotenv.Load()
+	cfg, err := renderworker.LoadConfigFromEnv()
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-
-	if err := workerstub.Run(ctx, "render"); err != nil {
+	if err := renderworker.Run(ctx, cfg); err != nil {
 		log.Fatalf("worker-render stopped: %v", err)
 	}
 }

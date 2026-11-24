@@ -5,6 +5,7 @@ import (
 
 	detectioncmd "go-api/internal/application/command/detection"
 	mediacmd "go-api/internal/application/command/media"
+	rendercmd "go-api/internal/application/command/render"
 	timelinecmd "go-api/internal/application/command/timeline"
 	transcriptcmd "go-api/internal/application/command/transcript"
 	"go-api/internal/application/event/dedup"
@@ -115,6 +116,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo, "publish_media_audio_ready_realtime", publishMediaRealtime.OnAudioReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
+		dedupRepo,
+		"enqueue_reframe_on_proxy_ready",
+		eventmedia.NewEnqueueReframeHandler(jobPublisher, mediaWriteRepo).Handle,
+	))
+	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
 		dedupRepo, "publish_media_proxy_ready_realtime", publishMediaRealtime.OnProxyReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaWaveformReady, dedup.With(
@@ -139,6 +145,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		"enqueue_text_on_transcribed",
 		eventmedia.NewEnqueueTextHandler(jobPublisher, mediaWriteRepo).Handle,
 	))
+	reg.Register(domainmedia.EventTypeMediaTranscribed, dedup.With(
+		dedupRepo,
+		"enqueue_llm_on_transcribed",
+		eventmedia.NewEnqueueLLMHandler(jobPublisher, mediaWriteRepo).Handle,
+	))
 
 	consumer := rabbitmq.NewConsumer(conn, reg, env.WorkerConcurrency, env.WorkerMaxRetries)
 
@@ -151,12 +162,20 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	applySilence := mediacmd.NewApplySilenceResultHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
 	applyTranscript := transcriptcmd.NewApplyResultHandler(mediaWriteRepo, transcriptWriteRepo, outboxRepo)
 	applyText := detectioncmd.NewApplyTextResultHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
+	clipWriteRepo := write.NewClipWriteRepository(db)
+	llmArtifactWriteRepo := write.NewLLMArtifactWriteRepository(db)
+	applyLLM := detectioncmd.NewApplyLLMResultHandler(mediaWriteRepo, detectionWriteRepo, llmArtifactWriteRepo, clipWriteRepo, outboxRepo)
+	applyReframe := mediacmd.NewApplyReframeResultHandler(mediaWriteRepo)
+	renderWriteRepo := write.NewRenderWriteRepository(db)
+	applyRender := rendercmd.NewApplyResultHandler(renderWriteRepo, realtimePublisher)
 	resultsConsumer := studiojobs.NewResultsConsumer(
-		env.RabbitMQURL, mediaWriteRepo, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence, applyTranscript, applyText,
+		env.RabbitMQURL, mediaWriteRepo, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence, applyTranscript, applyText, applyLLM, applyReframe, applyRender,
 	)
 	progressConsumer := studiojobs.NewProgressConsumer(
 		env.RabbitMQURL,
 		read.NewMediaProjectResolver(db),
+		read.NewRenderProjectResolver(db),
+		renderWriteRepo,
 		mediaWriteRepo,
 		realtimePublisher,
 	)

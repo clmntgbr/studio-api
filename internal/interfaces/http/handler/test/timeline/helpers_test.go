@@ -63,6 +63,47 @@ func (m *mockListVersions) Handle(_ context.Context, _ querytimeline.ListVersion
 	return m.items, m.err
 }
 
+type mockGetSubtitles struct {
+	calls       int
+	last        querytimeline.GetSubtitlesQuery
+	body        string
+	contentType string
+	err         error
+}
+
+func (m *mockGetSubtitles) Handle(_ context.Context, q querytimeline.GetSubtitlesQuery) (string, string, error) {
+	m.calls++
+	m.last = q
+	ct := m.contentType
+	if ct == "" {
+		ct = "text/x-ssa"
+	}
+	return m.body, ct, m.err
+}
+
+type mockGetExport struct {
+	calls    int
+	last     querytimeline.GetExportQuery
+	body     string
+	ctype    string
+	filename string
+	err      error
+}
+
+func (m *mockGetExport) Handle(_ context.Context, q querytimeline.GetExportQuery) (string, string, string, error) {
+	m.calls++
+	m.last = q
+	ct := m.ctype
+	if ct == "" {
+		ct = "application/xml"
+	}
+	fn := m.filename
+	if fn == "" {
+		fn = "timeline." + q.Format
+	}
+	return m.body, ct, fn, m.err
+}
+
 func sampleTimeline() *domaintimeline.Timeline {
 	now := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
 	return &domaintimeline.Timeline{
@@ -112,7 +153,7 @@ func samplePreview() *cmdtimeline.PreviewResult {
 }
 
 func newHandler(preview *mockPreview, validate *mockValidate, get *mockGet) *handler.TimelineHandler {
-	return newHandlerFull(preview, validate, get, nil)
+	return newHandlerFull(preview, validate, get, nil, nil, nil)
 }
 
 func newHandlerFull(
@@ -120,6 +161,8 @@ func newHandlerFull(
 	validate *mockValidate,
 	get *mockGet,
 	list *mockListVersions,
+	subs *mockGetSubtitles,
+	exp *mockGetExport,
 ) *handler.TimelineHandler {
 	if preview == nil {
 		preview = &mockPreview{}
@@ -133,7 +176,13 @@ func newHandlerFull(
 	if list == nil {
 		list = &mockListVersions{}
 	}
-	return handler.NewTimelineHandler(preview, validate, get, list)
+	if subs == nil {
+		subs = &mockGetSubtitles{}
+	}
+	if exp == nil {
+		exp = &mockGetExport{}
+	}
+	return handler.NewTimelineHandler(preview, validate, get, list, subs, exp)
 }
 
 func mount(h *handler.TimelineHandler, withUser bool) *fiber.App {
@@ -142,12 +191,22 @@ func mount(h *handler.TimelineHandler, withUser bool) *fiber.App {
 	if withUser {
 		app.Get("/api/projects/:id/timeline", auth, h.Get)
 		app.Get("/api/projects/:id/timeline/versions", auth, h.ListVersions)
+		app.Get("/api/projects/:id/timeline/subtitles.ass", auth, h.GetSubtitlesASS)
+		app.Get("/api/projects/:id/timeline/subtitles.srt", auth, h.GetSubtitlesSRT)
+		app.Get("/api/projects/:id/timeline/export.fcpxml", auth, h.GetExportFCPXML)
+		app.Get("/api/projects/:id/timeline/export.edl", auth, h.GetExportEDL)
+		app.Get("/api/projects/:id/timeline/export.otio", auth, h.GetExportOTIO)
 		app.Post("/api/projects/:id/timeline/preview", auth, h.Preview)
 		app.Post("/api/projects/:id/timeline/validate", auth, h.Validate)
 		return app
 	}
 	app.Get("/api/projects/:id/timeline", h.Get)
 	app.Get("/api/projects/:id/timeline/versions", h.ListVersions)
+	app.Get("/api/projects/:id/timeline/subtitles.ass", h.GetSubtitlesASS)
+	app.Get("/api/projects/:id/timeline/subtitles.srt", h.GetSubtitlesSRT)
+	app.Get("/api/projects/:id/timeline/export.fcpxml", h.GetExportFCPXML)
+	app.Get("/api/projects/:id/timeline/export.edl", h.GetExportEDL)
+	app.Get("/api/projects/:id/timeline/export.otio", h.GetExportOTIO)
 	app.Post("/api/projects/:id/timeline/preview", h.Preview)
 	app.Post("/api/projects/:id/timeline/validate", h.Validate)
 	return app

@@ -237,6 +237,25 @@ func TestMediaHandler_Reanalyze_Text_Success(t *testing.T) {
 	}
 }
 
+func TestMediaHandler_Reanalyze_Reframe_Success(t *testing.T) {
+	reanalyze := &mockReanalyze{}
+	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, nil, nil, reanalyze, nil)
+	app := mount(h, true)
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/reanalyze", map[string]any{
+		"steps": []string{"reframe"},
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if reanalyze.calls != 1 || len(reanalyze.cmd.Steps) != 1 || reanalyze.cmd.Steps[0] != "reframe" {
+		t.Fatalf("cmd=%+v", reanalyze.cmd)
+	}
+}
+
 func TestMediaHandler_Reanalyze_EmptyBody_Success(t *testing.T) {
 	reanalyze := &mockReanalyze{}
 	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, nil, nil, reanalyze, nil)

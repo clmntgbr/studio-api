@@ -22,4 +22,6 @@ type ObjectStorage interface {
 	CompleteMultipartUpload(ctx context.Context, bucket, key, uploadID string, parts []CompletedUploadPart) error
 	AbortMultipartUpload(ctx context.Context, bucket, key, uploadID string) error
 	HeadObjectSize(ctx context.Context, bucket, key string) (int64, error)
+	PutObject(ctx context.Context, bucket, key string, body []byte, contentType string) error
+	PresignGetObject(ctx context.Context, bucket, key string, expiry time.Duration, publicBase string) (string, error)
 }

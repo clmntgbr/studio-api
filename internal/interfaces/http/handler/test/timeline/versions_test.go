@@ -12,7 +12,7 @@ import (
 
 func TestTimelineHandler_ListVersions_Success(t *testing.T) {
 	list := &mockListVersions{items: []domaintimeline.Timeline{*sampleTimeline()}}
-	h := newHandlerFull(nil, nil, nil, list)
+	h := newHandlerFull(nil, nil, nil, list, nil, nil)
 	app := mount(h, true)
 
 	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/versions", nil)
@@ -35,7 +35,7 @@ func TestTimelineHandler_ListVersions_Success(t *testing.T) {
 
 func TestTimelineHandler_ListVersions_Empty(t *testing.T) {
 	list := &mockListVersions{items: nil}
-	h := newHandlerFull(nil, nil, nil, list)
+	h := newHandlerFull(nil, nil, nil, list, nil, nil)
 	app := mount(h, true)
 	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/versions", nil)
 	resp, err := app.Test(req)
@@ -56,7 +56,7 @@ func TestTimelineHandler_ListVersions_Empty(t *testing.T) {
 }
 
 func TestTimelineHandler_ListVersions_Unauthorized(t *testing.T) {
-	h := newHandlerFull(nil, nil, nil, nil)
+	h := newHandlerFull(nil, nil, nil, nil, nil, nil)
 	app := mount(h, false)
 	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/versions", nil)
 	resp, err := app.Test(req)
@@ -69,7 +69,7 @@ func TestTimelineHandler_ListVersions_Unauthorized(t *testing.T) {
 }
 
 func TestTimelineHandler_ListVersions_InvalidProjectID(t *testing.T) {
-	h := newHandlerFull(nil, nil, nil, nil)
+	h := newHandlerFull(nil, nil, nil, nil, nil, nil)
 	app := mount(h, true)
 	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/bad/timeline/versions", nil)
 	resp, err := app.Test(req)
@@ -83,7 +83,7 @@ func TestTimelineHandler_ListVersions_InvalidProjectID(t *testing.T) {
 
 func TestTimelineHandler_ListVersions_HandlerError_Internal(t *testing.T) {
 	list := &mockListVersions{err: errors.New("boom")}
-	h := newHandlerFull(nil, nil, nil, list)
+	h := newHandlerFull(nil, nil, nil, list, nil, nil)
 	app := mount(h, true)
 	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/versions", nil)
 	resp, err := app.Test(req)

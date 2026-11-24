@@ -11,9 +11,11 @@ type WriteRepository interface {
 	Save(ctx context.Context, r *Render) error
 	Update(ctx context.Context, r *Render) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Render, error)
+	FindByFingerprint(ctx context.Context, projectID uuid.UUID, fingerprint string) (*Render, error)
 }
 
 type ReadRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Render, error)
+	FindByFingerprint(ctx context.Context, projectID uuid.UUID, fingerprint string) (*Render, error)
 	ListByProject(ctx context.Context, projectID uuid.UUID) ([]Render, error)
 }

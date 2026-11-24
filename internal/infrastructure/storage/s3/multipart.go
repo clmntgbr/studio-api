@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/url"
@@ -113,6 +114,36 @@ func (c *Client) HeadObjectSize(ctx context.Context, bucket, key string) (int64,
 		return 0, nil
 	}
 	return *out.ContentLength, nil
+}
+
+func (c *Client) PutObject(ctx context.Context, bucket, key string, body []byte, contentType string) error {
+	input := &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Body:   bytes.NewReader(body),
+	}
+	if contentType != "" {
+		input.ContentType = aws.String(contentType)
+	}
+	if _, err := c.inner.PutObject(ctx, input); err != nil {
+		return fmt.Errorf("put s3://%s/%s: %w", bucket, key, err)
+	}
+	return nil
+}
+
+func (c *Client) PresignGetObject(ctx context.Context, bucket, key string, expiry time.Duration, publicBase string) (string, error) {
+	presigner := s3.NewPresignClient(c.inner)
+	if expiry <= 0 {
+		expiry = 15 * time.Minute
+	}
+	res, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", fmt.Errorf("presign get s3://%s/%s: %w", bucket, key, err)
+	}
+	return rewritePublicURL(res.URL, publicBase), nil
 }
 
 func rewritePublicURL(signed, publicBase string) string {

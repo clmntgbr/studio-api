@@ -2,10 +2,10 @@ COMPOSE_DEV := docker compose -f compose.dev.yaml
 
 # Always-on app processes (excludes profile-only denoise/gpu workers)
 APP_SERVICES := api worker \
-	worker-fetch worker-media worker-silence worker-transcribe worker-text worker-scenes \
+	worker-fetch worker-media worker-silence worker-transcribe worker-text worker-llm worker-scenes \
 	worker-analyze worker-reframe worker-render worker-translate
 
-PIPELINE_WORKERS := worker-fetch worker-media worker-silence worker-transcribe worker-text worker-scenes \
+PIPELINE_WORKERS := worker-fetch worker-media worker-silence worker-transcribe worker-text worker-llm worker-scenes \
 	worker-analyze worker-reframe worker-render worker-translate
 
 # ============================================
@@ -50,6 +50,9 @@ worker-transcribe-logs:
 
 worker-text-logs:
 	$(COMPOSE_DEV) logs -f worker-text
+
+worker-llm-logs:
+	$(COMPOSE_DEV) logs -f worker-llm
 
 worker-scenes-logs:
 	$(COMPOSE_DEV) logs -f worker-scenes

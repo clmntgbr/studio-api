@@ -2,6 +2,7 @@ package studiojobs
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"go-api/internal/domain/port"
@@ -30,7 +31,7 @@ func NewPublisher(rabbitURL string) (*Publisher, error) {
 		_ = conn.Close()
 		return nil, err
 	}
-	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform", "silence", "transcribe", "text"} {
+	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform", "silence", "transcribe", "text", "llm", "reframe", "render"} {
 		if err := topology.DeclareJobQueue(ch, job, 30000); err != nil {
 			_ = ch.Close()
 			_ = conn.Close()
@@ -146,6 +147,19 @@ func (p *Publisher) PublishTranscribeJob(ctx context.Context, mediaID, audioKey 
 	return p.bus.PublishJob(ctx, "job.transcribe", body, msg.MessageID, mediaID)
 }
 
+func (p *Publisher) PublishRenderJob(ctx context.Context, renderID string, plan json.RawMessage) error {
+	payload := map[string]any{}
+	if len(plan) > 0 {
+		_ = json.Unmarshal(plan, &payload)
+	}
+	payload["renderId"] = renderID
+	msg, body, err := envelope.NewJob("render", renderID, "", 1, payload)
+	if err != nil {
+		return err
+	}
+	return p.bus.PublishJob(ctx, "job.render", body, msg.MessageID, renderID)
+}
+
 func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string, opts port.TextJobOptions) error {
 	if opts.Language == "" {
 		opts.Language = "fr"
@@ -167,6 +181,39 @@ func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string
 		return err
 	}
 	return p.bus.PublishJob(ctx, "job.text", body, msg.MessageID, mediaID)
+}
+
+func (p *Publisher) PublishLLMJob(ctx context.Context, mediaID, wordsKey string, opts port.LLMJobOptions) error {
+	if opts.Language == "" {
+		opts.Language = "fr"
+	}
+	tasks := opts.Tasks
+	if len(tasks) == 0 {
+		tasks = []string{"sponsors", "chapters", "viral"}
+	}
+	payload := map[string]any{
+		"mediaId":        mediaID,
+		"wordsKey":       wordsKey,
+		"language":       opts.Language,
+		"tasks":          tasks,
+		"sponsorsAction": opts.SponsorsAction,
+	}
+	msg, body, err := envelope.NewJob("llm", mediaID, "", 1, payload)
+	if err != nil {
+		return err
+	}
+	return p.bus.PublishJob(ctx, "job.llm", body, msg.MessageID, mediaID)
+}
+
+func (p *Publisher) PublishReframeJob(ctx context.Context, mediaID, proxyKey string) error {
+	msg, body, err := envelope.NewJob("reframe", mediaID, "", 1, map[string]any{
+		"mediaId":  mediaID,
+		"proxyKey": proxyKey,
+	})
+	if err != nil {
+		return err
+	}
+	return p.bus.PublishJob(ctx, "job.reframe", body, msg.MessageID, mediaID)
 }
 
 var _ port.JobPublisher = (*Publisher)(nil)

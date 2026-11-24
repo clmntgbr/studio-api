@@ -4,15 +4,23 @@ import (
 	"log"
 
 	authcmd "go-api/internal/application/command/auth"
+	clipcmd "go-api/internal/application/command/clip"
 	detectioncmd "go-api/internal/application/command/detection"
 	identitycmd "go-api/internal/application/command/identity"
 	mediacmd "go-api/internal/application/command/media"
 	projectcmd "go-api/internal/application/command/project"
+	rendercmd "go-api/internal/application/command/render"
+	subtitlestylecmd "go-api/internal/application/command/subtitlestyle"
 	timelinecmd "go-api/internal/application/command/timeline"
 	usercmd "go-api/internal/application/command/user"
+	queryclip "go-api/internal/application/query/clip"
 	querydetection "go-api/internal/application/query/detection"
+	queryllm "go-api/internal/application/query/llmartifact"
 	querymedia "go-api/internal/application/query/media"
+	queryoutputpreset "go-api/internal/application/query/outputpreset"
 	queryproject "go-api/internal/application/query/project"
+	queryrender "go-api/internal/application/query/render"
+	querysubtitlestyle "go-api/internal/application/query/subtitlestyle"
 	querytimeline "go-api/internal/application/query/timeline"
 	querytranscript "go-api/internal/application/query/transcript"
 	queryuser "go-api/internal/application/query/user"
@@ -42,8 +50,12 @@ type Container struct {
 	MediaHandler           *httphandler.MediaHandler
 	DetectionHandler       *httphandler.DetectionHandler
 	OverrideHandler        *httphandler.OverrideHandler
+	SubtitleStyleHandler   *httphandler.SubtitleStyleHandler
 	TranscriptHandler      *httphandler.TranscriptHandler
 	TimelineHandler        *httphandler.TimelineHandler
+	OutputPresetHandler    *httphandler.OutputPresetHandler
+	RenderHandler          *httphandler.RenderHandler
+	ClipHandler            *httphandler.ClipHandler
 }
 
 func NewContainer(db *gorm.DB, env *config.Config) *Container {
@@ -64,6 +76,8 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	transcriptReadRepo := read.NewTranscriptReadRepository(db)
 	timelineWriteRepo := write.NewTimelineWriteRepository(db)
 	timelineReadRepo := read.NewTimelineReadRepository(db)
+	subtitleStyleWriteRepo := write.NewSubtitleStyleWriteRepository(db)
+	subtitleStyleReadRepo := read.NewSubtitleStyleReadRepository(db)
 
 	storage, err := s3store.New(s3store.Config{
 		Endpoint:  env.S3Endpoint,
@@ -118,6 +132,44 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	validateTimeline := timelinecmd.NewValidateHandler(timelineWriteRepo, timelineReadRepo)
 	getTimeline := querytimeline.NewGetTimelineHandler(timelineReadRepo)
 	listTimelineVersions := querytimeline.NewListVersionsHandler(timelineReadRepo)
+	getSubtitles := querytimeline.NewGetSubtitlesHandler(timelineReadRepo, subtitleStyleReadRepo, transcriptReadRepo)
+	getExport := querytimeline.NewGetExportHandler(timelineReadRepo, projectWriteRepo, mediaWriteRepo)
+
+	createSubtitleStyle := subtitlestylecmd.NewCreateHandler(subtitleStyleWriteRepo)
+	updateSubtitleStyle := subtitlestylecmd.NewUpdateHandler(subtitleStyleWriteRepo)
+	deleteSubtitleStyle := subtitlestylecmd.NewDeleteHandler(subtitleStyleWriteRepo)
+	getSubtitleStyle := querysubtitlestyle.NewGetHandler(subtitleStyleReadRepo)
+	listSubtitleStyles := querysubtitlestyle.NewListHandler(subtitleStyleReadRepo)
+
+	outputPresetReadRepo := read.NewOutputPresetReadRepository(db)
+	renderWriteRepo := write.NewRenderWriteRepository(db)
+	renderReadRepo := read.NewRenderReadRepository(db)
+	listOutputPresets := queryoutputpreset.NewListHandler(outputPresetReadRepo)
+	clipWriteRepo := write.NewClipWriteRepository(db)
+	clipReadRepo := read.NewClipReadRepository(db)
+	createRender := rendercmd.NewCreateHandler(
+		renderWriteRepo,
+		timelineReadRepo,
+		outputPresetReadRepo,
+		mediaWriteRepo,
+		clipReadRepo,
+		jobPublisher,
+		storage,
+		getSubtitles,
+		env.S3BucketRenders,
+	)
+	cancelRender := rendercmd.NewCancelHandler(renderWriteRepo)
+	getRender := queryrender.NewGetHandler(renderReadRepo)
+	listRenders := queryrender.NewListHandler(renderReadRepo)
+	downloadRender := queryrender.NewDownloadHandler(renderReadRepo, storage, env.S3BucketRenders, env.S3PublicEndpoint)
+
+	llmArtifactReadRepo := read.NewLLMArtifactReadRepository(db)
+	listClips := queryclip.NewListHandler(clipReadRepo)
+	getClip := queryclip.NewGetHandler(clipReadRepo)
+	createClip := clipcmd.NewCreateHandler(clipWriteRepo, mediaWriteRepo)
+	updateClip := clipcmd.NewUpdateHandler(clipWriteRepo, clipReadRepo)
+	analyzeClips := clipcmd.NewAnalyzeHandler(mediaWriteRepo, jobPublisher)
+	listLLMArtifacts := queryllm.NewListHandler(llmArtifactReadRepo)
 
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
@@ -157,13 +209,39 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			listStepRunsHandler,
 		),
 		DetectionHandler:  httphandler.NewDetectionHandler(listDetectionsHandler),
-		OverrideHandler:   httphandler.NewOverrideHandler(createOverrideHandler, deleteOverrideHandler),
+		OverrideHandler: httphandler.NewOverrideHandler(createOverrideHandler, deleteOverrideHandler),
+		SubtitleStyleHandler: httphandler.NewSubtitleStyleHandler(
+			createSubtitleStyle,
+			updateSubtitleStyle,
+			deleteSubtitleStyle,
+			getSubtitleStyle,
+			listSubtitleStyles,
+		),
 		TranscriptHandler: httphandler.NewTranscriptHandler(getTranscriptHandler, getTranscriptSRTHandler),
 		TimelineHandler: httphandler.NewTimelineHandler(
 			previewTimeline,
 			validateTimeline,
 			getTimeline,
 			listTimelineVersions,
+			getSubtitles,
+			getExport,
+		),
+		OutputPresetHandler: httphandler.NewOutputPresetHandler(listOutputPresets),
+		RenderHandler: httphandler.NewRenderHandler(
+			createRender,
+			cancelRender,
+			getRender,
+			listRenders,
+			downloadRender,
+		),
+		ClipHandler: httphandler.NewClipHandler(
+			listClips,
+			createClip,
+			updateClip,
+			analyzeClips,
+			listLLMArtifacts,
+			getClip,
+			createRender,
 		),
 	}
 }

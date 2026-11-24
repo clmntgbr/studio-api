@@ -23,3 +23,11 @@ type timelineGetHandler interface {
 type timelineListVersionsHandler interface {
 	Handle(ctx context.Context, q querytimeline.ListVersionsQuery) ([]domaintimeline.Timeline, error)
 }
+
+type timelineGetSubtitlesHandler interface {
+	Handle(ctx context.Context, q querytimeline.GetSubtitlesQuery) (string, string, error)
+}
+
+type timelineGetExportHandler interface {
+	Handle(ctx context.Context, q querytimeline.GetExportQuery) (body string, contentType string, filename string, err error)
+}

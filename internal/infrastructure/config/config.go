@@ -41,6 +41,7 @@ type Config struct {
 	S3SecretKey           string
 	S3Region              string
 	S3BucketMedia         string
+	S3BucketRenders       string
 	MinioWebhookSecret    string
 }
 
@@ -83,6 +84,7 @@ func Load() *Config {
 		S3SecretKey:           getEnvOrDefault("S3_SECRET_KEY", "devpassword"),
 		S3Region:              getEnvOrDefault("S3_REGION", "us-east-1"),
 		S3BucketMedia:         getEnvOrDefault("S3_BUCKET_MEDIA", "media"),
+		S3BucketRenders:       getEnvOrDefault("S3_BUCKET_RENDERS", "renders"),
 		MinioWebhookSecret:    getEnvOrDefault("MINIO_WEBHOOK_SECRET", "dev-minio-webhook-secret"),
 	}
 }

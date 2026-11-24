@@ -166,6 +166,20 @@ services:
       TEXT_PREFETCH: ${TEXT_PREFETCH:-4}
     networks: [backend]
 
+  worker-llm:
+    <<: *pipeline-worker
+    container_name: worker-llm
+    command: ["go", "run", "./cmd/worker-llm"]
+    environment:
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      LLM_PREFETCH: ${LLM_PREFETCH:-4}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+    networks: [egress, backend]
+
   worker-detect:
     <<: *pipeline-worker
     container_name: worker-detect
@@ -180,15 +194,33 @@ services:
     networks: [egress, backend]
 
   worker-reframe:
-    <<: *pipeline-worker
     container_name: worker-reframe
-    command: ["go", "run", "./cmd/worker-reframe"]
+    build:
+      context: .
+      dockerfile: workers/reframe/Dockerfile
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      REFRAME_SAMPLE_FPS: ${REFRAME_SAMPLE_FPS:-5}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     networks: [backend]
+    restart: unless-stopped
 
   worker-render:
     <<: *pipeline-worker
     container_name: worker-render
     command: ["go", "run", "./cmd/worker-render"]
+    environment:
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      FONTS_DIR: ${FONTS_DIR:-/fonts}
     networks: [backend]
 
   worker-translate:

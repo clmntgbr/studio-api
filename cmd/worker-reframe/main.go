@@ -1,20 +1,14 @@
+// Deprecated: worker-reframe runs as the Python service under workers/reframe.
+// Compose builds workers/reframe/Dockerfile. This binary remains so `go build ./...`
+// and the production multi-binary image stay green; it only prints a hint.
 package main
 
 import (
-	"context"
-	"log"
+	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
-
-	"go-api/internal/workerstub"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	if err := workerstub.Run(ctx, "reframe"); err != nil {
-		log.Fatalf("worker-reframe stopped: %v", err)
-	}
+	fmt.Fprintln(os.Stderr, "worker-reframe is the Python MediaPipe service (workers/reframe). Use the compose worker-reframe image.")
+	os.Exit(1)
 }

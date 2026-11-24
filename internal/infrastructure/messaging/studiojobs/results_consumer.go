@@ -9,6 +9,7 @@ import (
 
 	detectioncmd "go-api/internal/application/command/detection"
 	mediacmd "go-api/internal/application/command/media"
+	rendercmd "go-api/internal/application/command/render"
 	transcriptcmd "go-api/internal/application/command/transcript"
 	domainmedia "go-api/internal/domain/media"
 	"go-api/internal/pipeline"
@@ -32,6 +33,9 @@ type ResultsConsumer struct {
 	applySilence    *mediacmd.ApplySilenceResultHandler
 	applyTranscript *transcriptcmd.ApplyResultHandler
 	applyText       *detectioncmd.ApplyTextResultHandler
+	applyLLM        *detectioncmd.ApplyLLMResultHandler
+	applyReframe    *mediacmd.ApplyReframeResultHandler
+	applyRender     *rendercmd.ApplyResultHandler
 }
 
 func NewResultsConsumer(
@@ -46,6 +50,9 @@ func NewResultsConsumer(
 	applySilence *mediacmd.ApplySilenceResultHandler,
 	applyTranscript *transcriptcmd.ApplyResultHandler,
 	applyText *detectioncmd.ApplyTextResultHandler,
+	applyLLM *detectioncmd.ApplyLLMResultHandler,
+	applyReframe *mediacmd.ApplyReframeResultHandler,
+	applyRender *rendercmd.ApplyResultHandler,
 ) *ResultsConsumer {
 	return &ResultsConsumer{
 		url:             rabbitURL,
@@ -59,6 +66,9 @@ func NewResultsConsumer(
 		applySilence:    applySilence,
 		applyTranscript: applyTranscript,
 		applyText:       applyText,
+		applyLLM:        applyLLM,
+		applyReframe:    applyReframe,
+		applyRender:     applyRender,
 	}
 }
 
@@ -138,7 +148,15 @@ func (c *ResultsConsumer) handle(ctx context.Context, bus *topology.Bus, d amqp.
 		handleErr = c.onTranscribeSucceeded(ctx, msg)
 	case "result.text.succeeded":
 		handleErr = c.onTextSucceeded(ctx, msg)
-	case "result.probe.failed", "result.audio.failed", "result.proxy.failed", "result.waveform.failed", "result.silence.failed", "result.transcribe.failed", "result.text.failed":
+	case "result.llm.succeeded":
+		handleErr = c.onLLMSucceeded(ctx, msg)
+	case "result.reframe.succeeded":
+		handleErr = c.onReframeSucceeded(ctx, msg)
+	case "result.render.succeeded":
+		handleErr = c.onRenderSucceeded(ctx, msg)
+	case "result.render.failed":
+		handleErr = c.onRenderFailed(ctx, msg)
+	case "result.probe.failed", "result.audio.failed", "result.proxy.failed", "result.waveform.failed", "result.silence.failed", "result.transcribe.failed", "result.text.failed", "result.llm.failed", "result.reframe.failed":
 		handleErr = c.onStepFailed(ctx, msg)
 	default:
 		return bus.Ack(d)
@@ -430,6 +448,166 @@ func (c *ResultsConsumer) onTextSucceeded(ctx context.Context, msg *envelope.Mes
 	})
 }
 
+type llmSponsorOut struct {
+	SourceStartMs int64   `json:"sourceStartMs"`
+	SourceEndMs   int64   `json:"sourceEndMs"`
+	FirstWord     *int    `json:"firstWord"`
+	LastWord      *int    `json:"lastWord"`
+	Confidence    float64 `json:"confidence"`
+	Reason        string  `json:"reason"`
+}
+
+type llmChapterOut struct {
+	Title         string `json:"title"`
+	SourceStartMs int64  `json:"sourceStartMs"`
+	SourceEndMs   int64  `json:"sourceEndMs"`
+}
+
+type llmClipOut struct {
+	SourceStartMs int64   `json:"sourceStartMs"`
+	SourceEndMs   int64   `json:"sourceEndMs"`
+	Score         float64 `json:"score"`
+	Hook          string  `json:"hook"`
+	Reason        string  `json:"reason"`
+}
+
+type llmOutput struct {
+	ArtifactsKey string          `json:"artifactsKey"`
+	Provider     string          `json:"provider"`
+	Sponsors     []llmSponsorOut `json:"sponsors"`
+	Chapters     []llmChapterOut `json:"chapters"`
+	Clips        []llmClipOut    `json:"clips"`
+}
+
+func (c *ResultsConsumer) onLLMSucceeded(ctx context.Context, msg *envelope.Message) error {
+	if c.applyLLM == nil {
+		return nil
+	}
+	mediaID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return fmt.Errorf("invalid correlationId: %w", err)
+	}
+	out, err := decodeResult[llmOutput](msg)
+	if err != nil {
+		return err
+	}
+	sponsors := make([]detectioncmd.LLMSponsorInterval, 0, len(out.Sponsors))
+	for _, s := range out.Sponsors {
+		conf := s.Confidence
+		sponsors = append(sponsors, detectioncmd.LLMSponsorInterval{
+			SourceStartMs: s.SourceStartMs,
+			SourceEndMs:   s.SourceEndMs,
+			FirstWord:     s.FirstWord,
+			LastWord:      s.LastWord,
+			Confidence:    &conf,
+			Reason:        s.Reason,
+		})
+	}
+	chapters := make([]detectioncmd.LLMChapter, 0, len(out.Chapters))
+	for _, ch := range out.Chapters {
+		chapters = append(chapters, detectioncmd.LLMChapter{
+			Title:         ch.Title,
+			SourceStartMs: ch.SourceStartMs,
+			SourceEndMs:   ch.SourceEndMs,
+		})
+	}
+	clips := make([]detectioncmd.LLMClipCandidate, 0, len(out.Clips))
+	for _, cl := range out.Clips {
+		score := cl.Score
+		clips = append(clips, detectioncmd.LLMClipCandidate{
+			SourceStartMs: cl.SourceStartMs,
+			SourceEndMs:   cl.SourceEndMs,
+			Score:         &score,
+			Hook:          cl.Hook,
+			Reason:        cl.Reason,
+		})
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	return c.applyLLM.Handle(hCtx, detectioncmd.ApplyLLMResultCommand{
+		MediaID:      mediaID,
+		ArtifactsKey: out.ArtifactsKey,
+		Provider:     out.Provider,
+		Sponsors:     sponsors,
+		Chapters:     chapters,
+		Clips:        clips,
+	})
+}
+
+type reframeOutput struct {
+	CropPathKey string `json:"cropPathKey"`
+	SampleCount int    `json:"sampleCount"`
+	Detector    string `json:"detector"`
+}
+
+func (c *ResultsConsumer) onReframeSucceeded(ctx context.Context, msg *envelope.Message) error {
+	if c.applyReframe == nil {
+		return nil
+	}
+	mediaID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return fmt.Errorf("invalid correlationId: %w", err)
+	}
+	out, err := decodeResult[reframeOutput](msg)
+	if err != nil {
+		return err
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return c.applyReframe.Handle(hCtx, mediacmd.ApplyReframeResultCommand{
+		MediaID:     mediaID,
+		CropPathKey: out.CropPathKey,
+		SampleCount: out.SampleCount,
+		Detector:    out.Detector,
+	})
+}
+
+func (c *ResultsConsumer) onRenderSucceeded(ctx context.Context, msg *envelope.Message) error {
+	if c.applyRender == nil {
+		return nil
+	}
+	renderID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return err
+	}
+	type renderOut struct {
+		OutputKey  string `json:"outputKey"`
+		DurationMs int64  `json:"durationMs"`
+		SizeBytes  int64  `json:"sizeBytes"`
+	}
+	out, err := decodeResult[renderOut](msg)
+	if err != nil {
+		return err
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return c.applyRender.Handle(hCtx, rendercmd.ApplyResultCommand{
+		RenderID:   renderID,
+		OutputKey:  out.OutputKey,
+		DurationMs: out.DurationMs,
+		SizeBytes:  out.SizeBytes,
+	})
+}
+
+func (c *ResultsConsumer) onRenderFailed(ctx context.Context, msg *envelope.Message) error {
+	log.Printf("render failed correlationId=%s", msg.CorrelationID)
+	if c.applyRender == nil {
+		return nil
+	}
+	renderID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return nil
+	}
+	errMsg := "render failed"
+	var rp envelope.ResultPayload
+	if err := json.Unmarshal(msg.Payload, &rp); err == nil && rp.Error != nil && rp.Error.Message != "" {
+		errMsg = rp.Error.Message
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	return c.applyRender.Fail(hCtx, rendercmd.FailCommand{RenderID: renderID, Message: errMsg})
+}
+
 func (c *ResultsConsumer) onStepFailed(ctx context.Context, msg *envelope.Message) error {
 	log.Printf("pipeline step failed type=%s correlationId=%s", msg.Type, msg.CorrelationID)
 	if c.media == nil {
@@ -469,6 +647,10 @@ func failedResultStepKind(msgType string) (domainmedia.StepKind, bool) {
 		return domainmedia.StepTranscribe, true
 	case "result.text.failed":
 		return domainmedia.StepText, true
+	case "result.llm.failed":
+		return domainmedia.StepLLM, true
+	case "result.reframe.failed":
+		return domainmedia.StepReframe, true
 	default:
 		return "", false
 	}

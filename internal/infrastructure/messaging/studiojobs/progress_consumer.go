@@ -12,6 +12,7 @@ import (
 	"go-api/internal/application/realtime"
 	domainmedia "go-api/internal/domain/media"
 	"go-api/internal/domain/port"
+	domainrender "go-api/internal/domain/render"
 	"go-api/internal/studio/envelope"
 	"go-api/internal/studio/topology"
 
@@ -24,6 +25,8 @@ import (
 type ProgressConsumer struct {
 	url       string
 	media     mediaProjectResolver
+	renders   renderProjectResolver
+	renderRepo domainrender.WriteRepository
 	steps     domainmedia.WriteRepository
 	publisher *realtime.Publisher
 }
@@ -32,17 +35,25 @@ type mediaProjectResolver interface {
 	ProjectIDForMedia(ctx context.Context, mediaID uuid.UUID) (uuid.UUID, error)
 }
 
+type renderProjectResolver interface {
+	ProjectIDForRender(ctx context.Context, renderID uuid.UUID) (uuid.UUID, error)
+}
+
 func NewProgressConsumer(
 	rabbitURL string,
 	media mediaProjectResolver,
+	renders renderProjectResolver,
+	renderRepo domainrender.WriteRepository,
 	steps domainmedia.WriteRepository,
 	transport port.RealtimePublisher,
 ) *ProgressConsumer {
 	return &ProgressConsumer{
-		url:       rabbitURL,
-		media:     media,
-		steps:     steps,
-		publisher: realtime.NewPublisher(transport),
+		url:        rabbitURL,
+		media:      media,
+		renders:    renders,
+		renderRepo: renderRepo,
+		steps:      steps,
+		publisher:  realtime.NewPublisher(transport),
 	}
 }
 
@@ -97,28 +108,68 @@ func (c *ProgressConsumer) handle(ctx context.Context, d amqp.Delivery) error {
 	if err != nil {
 		return err
 	}
-	mediaID, err := uuid.Parse(msg.CorrelationID)
+	corrID, err := uuid.Parse(msg.CorrelationID)
 	if err != nil {
-		return err
-	}
-	projectID, err := c.media.ProjectIDForMedia(ctx, mediaID)
-	if err != nil || projectID == uuid.Nil {
 		return err
 	}
 	var pp envelope.ProgressPayload
 	_ = json.Unmarshal(msg.Payload, &pp)
 	stepName := strings.TrimPrefix(msg.Type, "progress.")
+
+	if stepName == "render" {
+		return c.handleRenderProgress(ctx, corrID, pp)
+	}
+
+	projectID, err := c.media.ProjectIDForMedia(ctx, corrID)
+	if err != nil || projectID == uuid.Nil {
+		return err
+	}
 	if c.steps != nil {
 		if kind, ok := progressStepKind(stepName); ok {
-			_ = mediacmd.MarkStepRunning(ctx, c.steps, mediaID, kind, time.Now().UTC())
+			_ = mediacmd.MarkStepRunning(ctx, c.steps, corrID, kind, time.Now().UTC())
 		}
 	}
 	return c.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionProgress, projectID.String(), map[string]any{
-		"mediaId": mediaID.String(),
+		"mediaId": corrID.String(),
 		"step":    stepName,
 		"percent": pp.Pct,
 		"stage":   pp.Stage,
 		"message": pp.Message,
+	})
+}
+
+func (c *ProgressConsumer) handleRenderProgress(ctx context.Context, renderID uuid.UUID, pp envelope.ProgressPayload) error {
+	if c.renders == nil {
+		return nil
+	}
+	projectID, err := c.renders.ProjectIDForRender(ctx, renderID)
+	if err != nil || projectID == uuid.Nil {
+		return err
+	}
+	if c.renderRepo != nil {
+		if r, err := c.renderRepo.GetByID(ctx, renderID); err == nil && r != nil {
+			if r.Status != domainrender.StatusCompleted &&
+				r.Status != domainrender.StatusFailed &&
+				r.Status != domainrender.StatusCancelled {
+				now := time.Now().UTC()
+				if r.Status == domainrender.StatusQueued || r.Status == domainrender.StatusPending {
+					r.Status = domainrender.StatusRunning
+					if r.StartedAt == nil {
+						r.StartedAt = &now
+					}
+				}
+				if pp.Pct > r.Progress {
+					r.Progress = pp.Pct
+				}
+				_ = c.renderRepo.Update(ctx, r)
+			}
+		}
+	}
+	return c.publisher.ToProject(ctx, realtime.EntityRender, realtime.ActionRenderProgress, projectID.String(), map[string]any{
+		"renderId": renderID.String(),
+		"percent":  pp.Pct,
+		"stage":    pp.Stage,
+		"message":  pp.Message,
 	})
 }
 

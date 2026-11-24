@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Style is a reusable karaoke subtitle look (project-scoped or global).
 type Style struct {
 	ID             uuid.UUID
 	ProjectID      *uuid.UUID
@@ -17,7 +18,7 @@ type Style struct {
 	HighlightColor *string
 	OutlineColor   *string
 	OutlineSize    *int
-	WordsPerLine   *int16
+	WordsPerLine   *int
 	Position       *string
 	Uppercase      bool
 	Settings       json.RawMessage

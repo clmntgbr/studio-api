@@ -35,8 +35,12 @@ func setupAPIRoutes(app *fiber.App, container *di.Container) {
 	setupMediaRoutes(protected, container)
 	setupDetectionRoutes(protected, container)
 	setupOverrideRoutes(protected, container)
+	setupSubtitleStyleRoutes(protected, container)
 	setupTranscriptRoutes(protected, container)
 	setupTimelineRoutes(protected, container)
+	setupOutputPresetRoutes(protected, container)
+	setupRenderRoutes(protected, container)
+	setupClipRoutes(protected, container)
 }
 
 func setupRealtimeRoutes(api fiber.Router, container *di.Container) {
@@ -79,6 +83,14 @@ func setupOverrideRoutes(api fiber.Router, container *di.Container) {
 	api.Delete("/overrides/:id", container.OverrideHandler.Delete)
 }
 
+func setupSubtitleStyleRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/subtitle-styles", container.SubtitleStyleHandler.List)
+	api.Post("/subtitle-styles", container.SubtitleStyleHandler.Create)
+	api.Get("/subtitle-styles/:id", container.SubtitleStyleHandler.GetByID)
+	api.Patch("/subtitle-styles/:id", container.SubtitleStyleHandler.Update)
+	api.Delete("/subtitle-styles/:id", container.SubtitleStyleHandler.Delete)
+}
+
 func setupTranscriptRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/media/:id/transcript.srt", container.TranscriptHandler.GetSRT)
 	api.Get("/media/:id/transcript", container.TranscriptHandler.GetByMedia)
@@ -87,6 +99,32 @@ func setupTranscriptRoutes(api fiber.Router, container *di.Container) {
 func setupTimelineRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/projects/:id/timeline", container.TimelineHandler.Get)
 	api.Get("/projects/:id/timeline/versions", container.TimelineHandler.ListVersions)
+	api.Get("/projects/:id/timeline/subtitles.ass", container.TimelineHandler.GetSubtitlesASS)
+	api.Get("/projects/:id/timeline/subtitles.srt", container.TimelineHandler.GetSubtitlesSRT)
+	api.Get("/projects/:id/timeline/export.fcpxml", container.TimelineHandler.GetExportFCPXML)
+	api.Get("/projects/:id/timeline/export.edl", container.TimelineHandler.GetExportEDL)
+	api.Get("/projects/:id/timeline/export.otio", container.TimelineHandler.GetExportOTIO)
 	api.Post("/projects/:id/timeline/preview", container.TimelineHandler.Preview)
 	api.Post("/projects/:id/timeline/validate", container.TimelineHandler.Validate)
+}
+
+func setupOutputPresetRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/output-presets", container.OutputPresetHandler.List)
+}
+
+func setupRenderRoutes(api fiber.Router, container *di.Container) {
+	api.Post("/projects/:id/renders", container.RenderHandler.Create)
+	api.Get("/projects/:id/renders", container.RenderHandler.ListByProject)
+	api.Get("/renders/:id", container.RenderHandler.GetByID)
+	api.Post("/renders/:id/cancel", container.RenderHandler.Cancel)
+	api.Get("/renders/:id/download", container.RenderHandler.Download)
+}
+
+func setupClipRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/projects/:id/clips", container.ClipHandler.ListByProject)
+	api.Post("/projects/:id/clips", container.ClipHandler.Create)
+	api.Post("/projects/:id/clips/analyze", container.ClipHandler.Analyze)
+	api.Patch("/clips/:id", container.ClipHandler.Update)
+	api.Post("/clips/:id/render", container.ClipHandler.Render)
+	api.Get("/media/:id/llm-artifacts", container.ClipHandler.ListArtifactsByMedia)
 }

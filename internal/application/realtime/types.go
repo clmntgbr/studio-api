@@ -9,8 +9,13 @@ const (
 	ActionCompleted = "step_completed"
 	ActionFailed    = "step_failed"
 
-	EntityUser  = "user"
-	EntityMedia = "media"
+	EntityUser   = "user"
+	EntityMedia  = "media"
+	EntityRender = "render"
+
+	ActionRenderProgress  = "progress"
+	ActionRenderCompleted = "completed"
+	ActionRenderFailed    = "failed"
 )
 
 func EventType(entity, action string) string {

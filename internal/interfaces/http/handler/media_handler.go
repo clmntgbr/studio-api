@@ -287,7 +287,7 @@ type updateConfigurationBody struct {
 }
 
 type reanalyzeBody struct {
-	Steps []string `json:"steps" validate:"omitempty,dive,oneof=silence text"`
+	Steps []string `json:"steps" validate:"omitempty,dive,oneof=silence text llm reframe"`
 }
 
 func (h *MediaHandler) ListSteps(c fiber.Ctx) error {
