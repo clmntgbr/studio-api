@@ -116,25 +116,3 @@ migrate-check: cli-build
 
 shell:
 	$(COMPOSE_DEV) exec api sh
-
-# ============================================
-# MinIO
-# ============================================
-
-minio-init:
-	$(COMPOSE_DEV) up mc --force-recreate
-
-minio-ls:
-	@$(COMPOSE_DEV) exec minio sh -c 'mc alias set local http://127.0.0.1:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null && mc ls local'
-
-# Publish a sample ingest.requested message (URL= required).
-# Example: make ingest-sample URL='https://www.youtube.com/watch?v=…'
-ingest-sample:
-	@test -n "$(URL)" || (echo "URL is required: make ingest-sample URL=https://…"; exit 1)
-	@MID="$(MEDIA_ID)"; if [ -z "$$MID" ]; then MID=$$(uuidgen | tr '[:upper:]' '[:lower:]'); fi; \
-	PAYLOAD=$$(printf '%s' "{\"properties\":{},\"routing_key\":\"q.ingest\",\"payload_encoding\":\"string\",\"payload\":\"{\\\"schema\\\":\\\"envelope.v1\\\",\\\"event_id\\\":\\\"$$(uuidgen | tr '[:upper:]' '[:lower:]')\\\",\\\"occurred_at\\\":\\\"$$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\",\\\"job_id\\\":\\\"$$(uuidgen | tr '[:upper:]' '[:lower:]')\\\",\\\"step_id\\\":\\\"$$(uuidgen | tr '[:upper:]' '[:lower:]')\\\",\\\"media_id\\\":\\\"$$MID\\\",\\\"attempt\\\":1,\\\"payload\\\":{\\\"source\\\":{\\\"kind\\\":\\\"url\\\",\\\"url\\\":\\\"$(URL)\\\"},\\\"normalize_cfr\\\":true}}\"}"); \
-	curl -fsS -u "$${RABBITMQ_DEFAULT_USER:-user}:$${RABBITMQ_DEFAULT_PASS:-password}" \
-		-H 'content-type: application/json' \
-		-X POST "http://localhost:9003/api/exchanges/%2F/amq.default/publish" \
-		-d "$$PAYLOAD" >/dev/null; \
-	echo "published ingest job media_id=$$MID"
