@@ -44,6 +44,43 @@ func TestClipHandler_NumberedPack_Manifest(t *testing.T) {
 	}
 }
 
+func TestClipHandler_NumberedPack_Unauthorized(t *testing.T) {
+	app := mount(nil, nil, nil, nil, nil, nil, nil, false)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips/numbered-pack", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
+func TestClipHandler_NumberedPack_InvalidProjectID(t *testing.T) {
+	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/bad/clips/numbered-pack", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
+func TestClipHandler_NumberedPack_HandlerError(t *testing.T) {
+	list := &mockList{err: errors.New("boom")}
+	app := mount(list, nil, nil, nil, nil, nil, nil, true)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips/numbered-pack", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
 func TestClipHandler_ListByProject_Unauthorized(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, false)
 	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips", nil)

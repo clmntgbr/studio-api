@@ -162,3 +162,115 @@ func TestMinioWebhookHandler_ObjectCreated_EmptyRecords(t *testing.T) {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
 }
+
+func TestMinioWebhookHandler_ObjectCreated_SkipsNonObjectCreated(t *testing.T) {
+	mark := &mockMarkReady{}
+	app := mount(mark, false)
+	mediaID := testutil.TestMediaID
+	body := []byte(`{"Records":[{"eventName":"s3:ObjectRemoved:Delete","s3":{"bucket":{"name":"media"},"object":{"key":"media/` + mediaID.String() + `/source/original.mp4","size":1}}}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/minio/object-created", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if len(mark.calls) != 0 {
+		t.Fatalf("expected no calls, got %d", len(mark.calls))
+	}
+}
+
+func TestMinioWebhookHandler_ObjectCreated_StripsBucketPrefix(t *testing.T) {
+	mark := &mockMarkReady{}
+	app := mount(mark, false)
+	mediaID := testutil.TestMediaID
+	key := "media/" + mediaID.String() + "/source/original.mp4"
+	body := []byte(`{"Records":[{"eventName":"s3:ObjectCreated:Put","s3":{"bucket":{"name":"media"},"object":{"key":"media/` + key + `","size":3}}}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/minio/object-created", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if len(mark.calls) != 1 {
+		t.Fatalf("calls=%d", len(mark.calls))
+	}
+	if mark.calls[0].SourceKey != key {
+		t.Fatalf("sourceKey=%s", mark.calls[0].SourceKey)
+	}
+}
+
+func TestMinioWebhookHandler_ObjectCreated_WrongBucket(t *testing.T) {
+	mark := &mockMarkReady{}
+	app := mount(mark, false)
+	mediaID := testutil.TestMediaID
+	body := []byte(`{"Records":[{"eventName":"s3:ObjectCreated:Put","s3":{"bucket":{"name":"other"},"object":{"key":"media/` + mediaID.String() + `/source/original.mp4","size":1}}}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/minio/object-created", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if len(mark.calls) != 0 {
+		t.Fatalf("expected no calls, got %d", len(mark.calls))
+	}
+}
+
+func TestMinioWebhookHandler_ObjectCreated_InvalidMediaUUID(t *testing.T) {
+	mark := &mockMarkReady{}
+	app := mount(mark, false)
+	body := []byte(`{"Records":[{"eventName":"s3:ObjectCreated:Put","s3":{"bucket":{"name":"media"},"object":{"key":"media/not-a-uuid/source/original.mp4","size":1}}}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/minio/object-created", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if len(mark.calls) != 0 {
+		t.Fatalf("expected no calls, got %d", len(mark.calls))
+	}
+}
+
+func TestMinioWebhookHandler_ObjectCreated_UnescapeFallback(t *testing.T) {
+	mark := &mockMarkReady{}
+	app := mount(mark, false)
+	mediaID := testutil.TestMediaID
+	rawKey := "media/" + mediaID.String() + "/source/orig%zzinal.mp4"
+	body := []byte(`{"Records":[{"eventName":"s3:ObjectCreated:Put","s3":{"bucket":{"name":"media"},"object":{"key":"` + rawKey + `","size":0}}}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/minio/object-created", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if len(mark.calls) != 1 {
+		t.Fatalf("calls=%d", len(mark.calls))
+	}
+	if mark.calls[0].SourceKey != rawKey {
+		t.Fatalf("sourceKey=%q", mark.calls[0].SourceKey)
+	}
+}

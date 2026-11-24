@@ -6,6 +6,10 @@ tmp/
 # Air
 build-errors.log
 
-coverage*
+# Do not use coverage* — it ignores coverage_*_test.go files.
+coverage.out
+coverage.txt
+coverage.html
+coverage/
 .env
 bin/*
