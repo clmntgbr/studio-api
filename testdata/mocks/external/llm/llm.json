@@ -1,0 +1,94 @@
+{
+  "provider": "compatible",
+  "sponsors": [],
+  "chapters": [
+    {
+      "title": "Introduction au Blue Train",
+      "sourceStartMs": 220,
+      "sourceEndMs": 81336
+    },
+    {
+      "title": "Histoire et Héritage (Nelson Mandela)",
+      "sourceStartMs": 82330,
+      "sourceEndMs": 156540
+    },
+    {
+      "title": "Découverte de la Chambre",
+      "sourceStartMs": 156540,
+      "sourceEndMs": 202883
+    },
+    {
+      "title": "Le Lounge et le Service",
+      "sourceStartMs": 202883,
+      "sourceEndMs": 373824
+    },
+    {
+      "title": "Préparation pour le Dîner",
+      "sourceStartMs": 373840,
+      "sourceEndMs": 419915
+    },
+    {
+      "title": "L'Observatory Car",
+      "sourceStartMs": 419915,
+      "sourceEndMs": 472660
+    },
+    {
+      "title": "Le Dîner Gastronomique",
+      "sourceStartMs": 472660,
+      "sourceEndMs": 570477
+    }
+  ],
+  "clips": [
+    {
+      "sourceStartMs": 173040,
+      "sourceEndMs": 184051,
+      "score": 0.9,
+      "hook": "J'ai appelé le majordome... et il a répondu.",
+      "reason": "Moment de surprise et d'humour où le vloggeur découvre le service de majordome personnel, avec une réaction authentique et une interaction en direct.",
+      "title": "J'ai un MAJORDOME personnel dans un train ?! 😱",
+      "description": "Découvrez ma réaction quand j'ai appelé le majordome du Blue Train. Le niveau de service est incroyable !",
+      "hashtags": [
+        "#BlueTrain",
+        "#LuxuryTravel",
+        "#Vlog",
+        "#AfriqueDuSud",
+        "#Majordome",
+        "#TravelVlog"
+      ]
+    },
+    {
+      "sourceStartMs": 184051,
+      "sourceEndMs": 197159,
+      "score": 0.85,
+      "hook": "Une baignoire dans un train ?!",
+      "reason": "Visuel surprenant et fort pour les réseaux sociaux. La découverte de la salle de bain luxueuse est un point de curiosité majeur.",
+      "title": "Il y a une BAINOIRE dans cette chambre de train 🛁",
+      "description": "La chambre du Blue Train est plus luxueuse que certains hôtels 5 étoiles. Regardez la salle de bain !",
+      "hashtags": [
+        "#HotelLife",
+        "#Luxury",
+        "#TrainTravel",
+        "#InteriorDesign",
+        "#CapeTown",
+        "#TravelHacks"
+      ]
+    },
+    {
+      "sourceStartMs": 424027,
+      "sourceEndMs": 439528,
+      "score": 0.8,
+      "hook": "Je me fais peindre... tout nu ? (Non, presque)",
+      "reason": "Situation absurde et drôle où le vloggeur se fait photographier/peindre dans le wagon panoramique, créant un moment viral par l'humour.",
+      "title": "Je me suis fait peindre dans le train (et c'est bizarre) 🎨",
+      "description": "L'expérience dans l'observatory car est unique. Regardez ce qui m'est arrivé pendant le coucher de soleil.",
+      "hashtags": [
+        "#FunnyTravel",
+        "#BlueTrain",
+        "#Sunset",
+        "#TravelMistakes",
+        "#VlogLife",
+        "#Africa"
+      ]
+    }
+  ]
+}

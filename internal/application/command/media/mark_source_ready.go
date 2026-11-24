@@ -84,6 +84,9 @@ func (h *MarkSourceReadyHandler) Handle(ctx context.Context, cmd MarkSourceReady
 		if !claimed {
 			return errAlreadyClaimed
 		}
+		if err := CompleteStep(txCtx, h.media, m.ID, domainmedia.StepFetch, now); err != nil {
+			return err
+		}
 		if err := h.media.SaveStep(txCtx, probeStep); err != nil {
 			return err
 		}
@@ -120,10 +123,14 @@ func (h *MarkSourceReadyHandler) applyLateMetadata(ctx context.Context, m *domai
 		m.StorageKey = &key
 		changed = true
 	}
+	now := time.Now().UTC()
+	if err := CompleteStep(ctx, h.media, m.ID, domainmedia.StepFetch, now); err != nil {
+		return err
+	}
 	if !changed {
 		return nil
 	}
-	m.UpdatedAt = time.Now().UTC()
+	m.UpdatedAt = now
 	if err := h.media.Update(ctx, m); err != nil {
 		return errors.New("failed to update media metadata")
 	}

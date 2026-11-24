@@ -68,7 +68,7 @@ func NewAnalyzer(cfg Config) Analyzer {
 		baseURL, model, provider := resolveCompatibleDefaults(cfg)
 		return NewOpenAICompatibleAnalyzer(baseURL, cfg.APIKey, model, provider)
 	default:
-		return NewMockAnalyzer()
+		return NewFileMockAnalyzer("")
 	}
 }
 

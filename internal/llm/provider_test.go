@@ -1,6 +1,9 @@
 package llm
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -32,6 +35,31 @@ func TestResolveCompatibleDefaults_GrokKeepsExplicitModel(t *testing.T) {
 func TestNewAnalyzer_GrokRequiresKeyAtRuntime(t *testing.T) {
 	a := NewAnalyzer(Config{Provider: "grok", APIKey: "xai-test"})
 	if _, ok := a.(*OpenAICompatibleAnalyzer); !ok {
+		t.Fatalf("got %T", a)
+	}
+}
+
+func TestFileMockAnalyzer_LoadsRecordedLLM(t *testing.T) {
+	path := filepath.Join("..", "..", "testdata", "mocks", "external", "llm", "llm.json")
+	if _, err := os.Stat(path); err != nil {
+		t.Skip("mock llm.json not present")
+	}
+	a := NewFileMockAnalyzer(path)
+	out, err := a.Analyze(context.Background(), nil, []string{"chapters", "viral"}, "fr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Provider != "mock" {
+		t.Fatalf("provider=%s", out.Provider)
+	}
+	if len(out.Chapters) == 0 || len(out.Clips) == 0 {
+		t.Fatalf("chapters=%d clips=%d", len(out.Chapters), len(out.Clips))
+	}
+}
+
+func TestNewAnalyzer_MockUsesFileMock(t *testing.T) {
+	a := NewAnalyzer(Config{Provider: "mock"})
+	if _, ok := a.(*FileMockAnalyzer); !ok {
 		t.Fatalf("got %T", a)
 	}
 }

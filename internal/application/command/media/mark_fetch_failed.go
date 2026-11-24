@@ -33,11 +33,15 @@ func (h *MarkFetchFailedHandler) Handle(ctx context.Context, cmd MarkFetchFailed
 	if m == nil {
 		return errors.New("media not found")
 	}
+	now := time.Now().UTC()
+	if err := FailStep(ctx, h.media, m.ID, domainmedia.StepFetch, now, "fetch failed"); err != nil {
+		return err
+	}
 	if m.Status == domainmedia.StatusFailed || m.Status == domainmedia.StatusReady || m.Status == domainmedia.StatusProcessing {
 		return nil
 	}
 	m.MarkFailed()
-	m.UpdatedAt = time.Now().UTC()
+	m.UpdatedAt = now
 	if err := h.media.Update(ctx, m); err != nil {
 		return errors.New("failed to mark fetch failed")
 	}

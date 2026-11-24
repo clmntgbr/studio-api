@@ -157,7 +157,9 @@ services:
       <<: *s3-env
       WORK_DIR: ${WORK_DIR:-/tmp/work}
       ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY:-}
+      TRANSCRIBE_PROVIDER: ${TRANSCRIBE_PROVIDER:-assemblyai}
       TRANSCRIBE_PREFETCH: ${TRANSCRIBE_PREFETCH:-2}
+      MOCK_EXTERNAL_DIR: ${MOCK_EXTERNAL_DIR:-/app/testdata/mocks/external}
     networks: [egress, backend]
     deploy:
       replicas: 2
@@ -215,6 +217,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      MOCK_EXTERNAL_DIR: ${MOCK_EXTERNAL_DIR:-/app/testdata/mocks/external}
     networks: [egress, backend]
     deploy:
       replicas: 2

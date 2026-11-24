@@ -13,6 +13,7 @@ import (
 	"time"
 
 	s3store "go-api/internal/infrastructure/storage/s3"
+	"go-api/internal/mocks/external"
 	"go-api/internal/studio/envelope"
 	"go-api/internal/studio/topology"
 
@@ -20,12 +21,13 @@ import (
 )
 
 type Config struct {
-	RabbitURL      string
-	MediaBucket    string
-	WorkDir        string
-	AssemblyAIKey  string
-	S3             s3store.Config
-	Prefetch       int
+	RabbitURL     string
+	MediaBucket   string
+	WorkDir       string
+	AssemblyAIKey string
+	Provider      string // assemblyai | mock
+	S3            s3store.Config
+	Prefetch      int
 }
 
 type jobPayload struct {
@@ -40,6 +42,7 @@ func LoadConfigFromEnv() (Config, error) {
 		MediaBucket:   envOr("S3_BUCKET_MEDIA", "media"),
 		WorkDir:       envOr("WORK_DIR", "/tmp/work"),
 		AssemblyAIKey: os.Getenv("ASSEMBLYAI_API_KEY"),
+		Provider:      strings.ToLower(envOr("TRANSCRIBE_PROVIDER", "assemblyai")),
 		S3: s3store.Config{
 			Endpoint:  os.Getenv("S3_ENDPOINT"),
 			Region:    envOr("S3_REGION", "us-east-1"),
@@ -51,7 +54,7 @@ func LoadConfigFromEnv() (Config, error) {
 	if cfg.RabbitURL == "" {
 		return cfg, fmt.Errorf("RABBITMQ_URL is required")
 	}
-	if cfg.AssemblyAIKey == "" {
+	if cfg.Provider != "mock" && cfg.AssemblyAIKey == "" {
 		return cfg, fmt.Errorf("ASSEMBLYAI_API_KEY is required")
 	}
 	if cfg.S3.Endpoint == "" || cfg.S3.AccessKey == "" || cfg.S3.SecretKey == "" {
@@ -65,7 +68,10 @@ func Run(ctx context.Context, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	client := newAssemblyClient(cfg.AssemblyAIKey)
+	var client *assemblyClient
+	if cfg.Provider != "mock" {
+		client = newAssemblyClient(cfg.AssemblyAIKey)
+	}
 
 	conn, err := amqp.Dial(cfg.RabbitURL)
 	if err != nil {
@@ -108,7 +114,7 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 
-	log.Printf("worker-transcribe started (prefetch=%d)", prefetch)
+	log.Printf("worker-transcribe started provider=%s (prefetch=%d)", cfg.Provider, prefetch)
 	sem := make(chan struct{}, prefetch)
 	var wg sync.WaitGroup
 	for {
@@ -150,6 +156,10 @@ func handle(ctx context.Context, bus *topology.Bus, store *s3store.Client, clien
 		return finish(ctx, bus, d, msg, false, nil, "WORKDIR", err.Error(), true)
 	}
 	defer os.RemoveAll(workDir)
+
+	if cfg.Provider == "mock" {
+		return handleMock(ctx, bus, store, cfg, d, msg, req, workDir)
+	}
 
 	markerKey := fmt.Sprintf("media/%s/transcript/provider.job", req.MediaID)
 	jobID, err := readProviderJob(ctx, store, cfg.MediaBucket, markerKey, workDir)
@@ -231,6 +241,69 @@ func handle(ctx context.Context, bus *topology.Bus, store *s3store.Client, clien
 		"provider":      "assemblyai",
 		"providerJobId": jobID,
 		"words":         words,
+	}, "", "", false)
+}
+
+func handleMock(ctx context.Context, bus *topology.Bus, store *s3store.Client, cfg Config, d amqp.Delivery, msg *envelope.Message, req jobPayload, workDir string) error {
+	_ = publishProgress(ctx, bus, msg, 20, "mock", "Loading recorded AssemblyAI words")
+	src := external.AssemblyAIWordsPath()
+	raw, err := os.ReadFile(src)
+	if err != nil {
+		return finish(ctx, bus, d, msg, false, nil, "MOCK_READ", err.Error(), false)
+	}
+
+	var wrap struct {
+		Language      string           `json:"language"`
+		Text          string           `json:"text"`
+		ProviderJobID string           `json:"providerJobId"`
+		Words         []map[string]any `json:"words"`
+	}
+	if err := json.Unmarshal(raw, &wrap); err != nil {
+		return finish(ctx, bus, d, msg, false, nil, "MOCK_PARSE", err.Error(), false)
+	}
+	jobID := wrap.ProviderJobID
+	if jobID == "" {
+		if b, err := os.ReadFile(external.AssemblyAIProviderJobPath()); err == nil {
+			jobID = strings.TrimSpace(string(b))
+		}
+	}
+	if jobID == "" {
+		jobID = "mock-assemblyai"
+	}
+
+	outRaw, err := json.Marshal(map[string]any{
+		"provider":      "mock",
+		"providerJobId": jobID,
+		"language":      wrap.Language,
+		"text":          wrap.Text,
+		"words":         wrap.Words,
+	})
+	if err != nil {
+		return finish(ctx, bus, d, msg, false, nil, "ENCODE", err.Error(), false)
+	}
+	tmp := filepath.Join(workDir, "words.json")
+	if err := os.WriteFile(tmp, outRaw, 0o644); err != nil {
+		return finish(ctx, bus, d, msg, false, nil, "WRITE", err.Error(), true)
+	}
+
+	markerKey := fmt.Sprintf("media/%s/transcript/provider.job", req.MediaID)
+	if err := writeProviderJob(ctx, store, cfg.MediaBucket, markerKey, workDir, jobID); err != nil {
+		return finish(ctx, bus, d, msg, false, nil, "MARKER_WRITE", err.Error(), true)
+	}
+
+	wordsKey := fmt.Sprintf("media/%s/transcript/words.json", req.MediaID)
+	_ = publishProgress(ctx, bus, msg, 90, "upload", "Uploading mocked words.json")
+	if err := store.UploadFile(ctx, cfg.MediaBucket, wordsKey, tmp, "application/json"); err != nil {
+		return finish(ctx, bus, d, msg, false, nil, "UPLOAD", err.Error(), true)
+	}
+	_ = publishProgress(ctx, bus, msg, 100, "done", "Mock transcription completed")
+	return finish(ctx, bus, d, msg, true, map[string]any{
+		"wordsKey":      wordsKey,
+		"language":      wrap.Language,
+		"text":          wrap.Text,
+		"provider":      "mock",
+		"providerJobId": jobID,
+		"words":         wrap.Words,
 	}, "", "", false)
 }
 

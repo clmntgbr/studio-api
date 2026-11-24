@@ -1,0 +1,9 @@
+{
+  "mediaId": "c807f663-b313-4457-b492-e5841d2b21b7",
+  "capturedAt": "2026-11-24T19:07:56.299956+00:00",
+  "services": [
+    "assemblyai",
+    "llm"
+  ],
+  "note": "paid external mocks only — no video/audio binaries"
+}
