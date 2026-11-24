@@ -25,11 +25,14 @@ type ChapterHit struct {
 }
 
 type ClipHit struct {
-	SourceStartMs int64   `json:"sourceStartMs"`
-	SourceEndMs   int64   `json:"sourceEndMs"`
-	Score         float64 `json:"score"`
-	Hook          string  `json:"hook"`
-	Reason        string  `json:"reason"`
+	SourceStartMs int64    `json:"sourceStartMs"`
+	SourceEndMs   int64    `json:"sourceEndMs"`
+	Score         float64  `json:"score"`
+	Hook          string   `json:"hook"`
+	Reason        string   `json:"reason"`
+	Title         string   `json:"title,omitempty"`
+	Description   string   `json:"description,omitempty"`
+	Hashtags      []string `json:"hashtags,omitempty"`
 }
 
 type Result struct {

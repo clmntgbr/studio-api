@@ -15,7 +15,7 @@ import (
 
 type GetExportQuery struct {
 	ProjectID uuid.UUID
-	Format    string // fcpxml | edl | otio
+	Format    string // fcpxml | edl | otio | premiere
 }
 
 type GetExportHandler struct {
@@ -35,9 +35,9 @@ func NewGetExportHandler(
 func (h *GetExportHandler) Handle(ctx context.Context, q GetExportQuery) (body string, contentType string, filename string, err error) {
 	format := q.Format
 	switch format {
-	case "fcpxml", "edl", "otio":
+	case "fcpxml", "edl", "otio", "premiere":
 	default:
-		return "", "", "", errors.New("format must be fcpxml, edl or otio")
+		return "", "", "", errors.New("format must be fcpxml, edl, otio or premiere")
 	}
 
 	t, err := h.timelines.FindHeadByProject(ctx, q.ProjectID)
@@ -124,6 +124,8 @@ func (h *GetExportHandler) Handle(ctx context.Context, q GetExportQuery) (body s
 			return "", "", "", fmt.Errorf("otio: %w", err)
 		}
 		return doc, "application/otio+json", "timeline.otio", nil
+	case "premiere":
+		return export.ToPremiereXML(in), "application/xml", "timeline.premiere.xml", nil
 	default:
 		return export.ToFCPXML(in), "application/xml", "timeline.fcpxml", nil
 	}

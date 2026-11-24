@@ -469,11 +469,14 @@ type llmChapterOut struct {
 }
 
 type llmClipOut struct {
-	SourceStartMs int64   `json:"sourceStartMs"`
-	SourceEndMs   int64   `json:"sourceEndMs"`
-	Score         float64 `json:"score"`
-	Hook          string  `json:"hook"`
-	Reason        string  `json:"reason"`
+	SourceStartMs int64    `json:"sourceStartMs"`
+	SourceEndMs   int64    `json:"sourceEndMs"`
+	Score         float64  `json:"score"`
+	Hook          string   `json:"hook"`
+	Reason        string   `json:"reason"`
+	Title         string   `json:"title"`
+	Description   string   `json:"description"`
+	Hashtags      []string `json:"hashtags"`
 }
 
 type llmOutput struct {
@@ -525,6 +528,9 @@ func (c *ResultsConsumer) onLLMSucceeded(ctx context.Context, msg *envelope.Mess
 			Score:         &score,
 			Hook:          cl.Hook,
 			Reason:        cl.Reason,
+			Title:         cl.Title,
+			Description:   cl.Description,
+			Hashtags:      cl.Hashtags,
 		})
 	}
 	hCtx, cancel := context.WithTimeout(ctx, 60*time.Second)

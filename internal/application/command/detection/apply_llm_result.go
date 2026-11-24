@@ -37,6 +37,9 @@ type LLMClipCandidate struct {
 	Score         *float64
 	Hook          string
 	Reason        string
+	Title         string
+	Description   string
+	Hashtags      []string
 }
 
 type ApplyLLMResultCommand struct {
@@ -134,6 +137,17 @@ func (h *ApplyLLMResultHandler) Handle(ctx context.Context, cmd ApplyLLMResultCo
 		if c.Reason != "" {
 			r := c.Reason
 			clip.Reason = &r
+		}
+		if c.Title != "" {
+			t := c.Title
+			clip.Title = &t
+		}
+		if c.Description != "" {
+			d := c.Description
+			clip.Description = &d
+		}
+		if len(c.Hashtags) > 0 {
+			clip.Hashtags = append([]string(nil), c.Hashtags...)
 		}
 		clipItems = append(clipItems, clip)
 	}

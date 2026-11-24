@@ -90,11 +90,14 @@ type llmJSON struct {
 		EndMs   int64  `json:"endMs"`
 	} `json:"chapters"`
 	Clips []struct {
-		StartMs int64   `json:"startMs"`
-		EndMs   int64   `json:"endMs"`
-		Score   float64 `json:"score"`
-		Hook    string  `json:"hook"`
-		Reason  string  `json:"reason"`
+		StartMs     int64           `json:"startMs"`
+		EndMs       int64           `json:"endMs"`
+		Score       float64         `json:"score"`
+		Hook        string          `json:"hook"`
+		Reason      string          `json:"reason"`
+		Title       string          `json:"title"`
+		Description string          `json:"description"`
+		Hashtags    json.RawMessage `json:"hashtags"`
 	} `json:"clips"`
 }
 
@@ -197,10 +200,66 @@ func (a *OpenAICompatibleAnalyzer) Analyze(ctx context.Context, words []Word, ta
 				Score:         score,
 				Hook:          c.Hook,
 				Reason:        c.Reason,
+				Title:         truncateRunes(strings.TrimSpace(c.Title), 200),
+				Description:   truncateRunes(strings.TrimSpace(c.Description), 4000),
+				Hashtags:      normalizeHashtags(c.Hashtags),
 			})
 		}
 	}
 	return out, nil
+}
+
+func normalizeHashtags(raw json.RawMessage) []string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var tags []string
+	if err := json.Unmarshal(raw, &tags); err == nil {
+		return clampHashtags(tags)
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return nil
+	}
+	parts := strings.FieldsFunc(s, func(r rune) bool {
+		return r == ',' || r == ' ' || r == ';'
+	})
+	return clampHashtags(parts)
+}
+
+func clampHashtags(in []string) []string {
+	out := make([]string, 0, len(in))
+	for _, t := range in {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		if !strings.HasPrefix(t, "#") {
+			t = "#" + t
+		}
+		if len(t) > 64 {
+			t = t[:64]
+		}
+		out = append(out, t)
+		if len(out) >= 8 {
+			break
+		}
+	}
+	return out
+}
+
+func truncateRunes(s string, max int) string {
+	if max <= 0 || s == "" {
+		return s
+	}
+	rs := []rune(s)
+	if len(rs) <= max {
+		return s
+	}
+	if max <= 1 {
+		return string(rs[:max])
+	}
+	return string(rs[:max-1]) + "…"
 }
 
 func buildPrompt(words []Word, want map[string]bool, language string) string {
@@ -222,7 +281,7 @@ func buildPrompt(words []Word, want map[string]bool, language string) string {
 		tasks = append(tasks, "viral clips")
 	}
 	b.WriteString(strings.Join(tasks, ", "))
-	b.WriteString("\nReturn JSON: {\"sponsors\":[{\"startMs\":0,\"endMs\":0,\"confidence\":0.8,\"reason\":\"\"}],\"chapters\":[{\"title\":\"\",\"startMs\":0,\"endMs\":0}],\"clips\":[{\"startMs\":0,\"endMs\":0,\"score\":0.7,\"hook\":\"\",\"reason\":\"\"}]}\nOmit unused arrays as [].\n\n")
+	b.WriteString("\nReturn JSON: {\"sponsors\":[{\"startMs\":0,\"endMs\":0,\"confidence\":0.8,\"reason\":\"\"}],\"chapters\":[{\"title\":\"\",\"startMs\":0,\"endMs\":0}],\"clips\":[{\"startMs\":0,\"endMs\":0,\"score\":0.7,\"hook\":\"\",\"reason\":\"\",\"title\":\"\",\"description\":\"\",\"hashtags\":[\"#tag\"]}]}\nFor viral clips also fill title, description and 3-8 hashtags.\nOmit unused arrays as [].\n\n")
 	limit := len(words)
 	if limit > 2500 {
 		limit = 2500

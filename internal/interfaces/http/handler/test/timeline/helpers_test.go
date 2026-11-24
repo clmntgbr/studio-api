@@ -196,6 +196,7 @@ func mount(h *handler.TimelineHandler, withUser bool) *fiber.App {
 		app.Get("/api/projects/:id/timeline/export.fcpxml", auth, h.GetExportFCPXML)
 		app.Get("/api/projects/:id/timeline/export.edl", auth, h.GetExportEDL)
 		app.Get("/api/projects/:id/timeline/export.otio", auth, h.GetExportOTIO)
+		app.Get("/api/projects/:id/timeline/export.premiere.xml", auth, h.GetExportPremiere)
 		app.Post("/api/projects/:id/timeline/preview", auth, h.Preview)
 		app.Post("/api/projects/:id/timeline/validate", auth, h.Validate)
 		return app
@@ -207,6 +208,7 @@ func mount(h *handler.TimelineHandler, withUser bool) *fiber.App {
 	app.Get("/api/projects/:id/timeline/export.fcpxml", h.GetExportFCPXML)
 	app.Get("/api/projects/:id/timeline/export.edl", h.GetExportEDL)
 	app.Get("/api/projects/:id/timeline/export.otio", h.GetExportOTIO)
+	app.Get("/api/projects/:id/timeline/export.premiere.xml", h.GetExportPremiere)
 	app.Post("/api/projects/:id/timeline/preview", h.Preview)
 	app.Post("/api/projects/:id/timeline/validate", h.Validate)
 	return app

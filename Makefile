@@ -132,5 +132,12 @@ migrate-down: cli-build
 migrate-check: cli-build
 	@$(COMPOSE_DEV) exec api ./bin/cli migrate check
 
+# Retention: delete derived media objects older than N days (default 7).
+# Usage: make purge-retention  OR  make purge-retention DAYS=14 DRY_RUN=1
+purge-retention: cli-build
+	@$(COMPOSE_DEV) exec api ./bin/cli purge retention \
+		--days=$${DAYS:-7} \
+		$$( [ "$${DRY_RUN}" = "1" ] && echo --dry-run || true )
+
 shell:
 	$(COMPOSE_DEV) exec api sh

@@ -121,12 +121,16 @@ func (a *MockAnalyzer) buildClips(words []Word) []ClipHit {
 	}
 	score := 0.61
 	hook := words[first].Text
+	title := truncateRunes("Highlight: "+hook, 80)
 	return []ClipHit{{
 		SourceStartMs: words[first].SourceStartMs,
 		SourceEndMs:   words[last].SourceEndMs,
 		Score:         score,
 		Hook:          hook,
 		Reason:        "heuristic mid-video highlight",
+		Title:         title,
+		Description:   "Auto-generated clip from the mid section of the transcript.",
+		Hashtags:      []string{"#shorts", "#clip", "#highlight"},
 	}}
 }
 

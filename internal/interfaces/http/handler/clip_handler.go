@@ -88,6 +88,29 @@ func (h *ClipHandler) ListByProject(c fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(presenter.NewClipListResponse(items))
 }
 
+// NumberedPack returns selected clips as a CapCut-style 001.mp4, 002.mp4… manifest.
+func (h *ClipHandler) NumberedPack(c fiber.Ctx) error {
+	if _, err := httpctx.GetUser(c); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
+	}
+	projectID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+	}
+	items, err := h.listHandler.Handle(c.Context(), queryclip.ListQuery{ProjectID: projectID})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list clips"})
+	}
+	format := strings.ToLower(c.Query("format", "json"))
+	pack := presenter.NewNumberedClipsPack(items)
+	if format == "txt" || format == "manifest" {
+		c.Set("Content-Type", "text/plain; charset=utf-8")
+		c.Set("Content-Disposition", `attachment; filename="clips-pack.txt"`)
+		return c.Status(fiber.StatusOK).SendString(presenter.NumberedClipsManifestText(pack))
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"clips": pack})
+}
+
 func (h *ClipHandler) Create(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})

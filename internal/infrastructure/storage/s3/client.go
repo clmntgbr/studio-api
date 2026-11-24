@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -98,6 +99,53 @@ func (c *Client) Ping(ctx context.Context, bucket string) error {
 	_, err := c.inner.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)})
 	if err != nil {
 		return fmt.Errorf("head bucket %s: %w", bucket, err)
+	}
+	return nil
+}
+
+// ObjectInfo is a listed object under a bucket/prefix.
+type ObjectInfo struct {
+	Key          string
+	Size         int64
+	LastModified time.Time
+}
+
+// ListPrefix lists objects under prefix (paginated).
+func (c *Client) ListPrefix(ctx context.Context, bucket, prefix string) ([]ObjectInfo, error) {
+	var out []ObjectInfo
+	var token *string
+	for {
+		resp, err := c.inner.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            aws.String(bucket),
+			Prefix:            aws.String(prefix),
+			ContinuationToken: token,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("list s3://%s/%s: %w", bucket, prefix, err)
+		}
+		for _, obj := range resp.Contents {
+			info := ObjectInfo{Key: aws.ToString(obj.Key), Size: aws.ToInt64(obj.Size)}
+			if obj.LastModified != nil {
+				info.LastModified = *obj.LastModified
+			}
+			out = append(out, info)
+		}
+		if !aws.ToBool(resp.IsTruncated) {
+			break
+		}
+		token = resp.NextContinuationToken
+	}
+	return out, nil
+}
+
+// DeleteObject removes one key.
+func (c *Client) DeleteObject(ctx context.Context, bucket, key string) error {
+	_, err := c.inner.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("delete s3://%s/%s: %w", bucket, key, err)
 	}
 	return nil
 }

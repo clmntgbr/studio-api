@@ -83,6 +83,41 @@ func TestToOTIO(t *testing.T) {
 	}
 }
 
+func TestToPremiereXML(t *testing.T) {
+	doc := ToPremiereXML(sampleInput())
+	if !strings.Contains(doc, `<xmeml version="4">`) {
+		t.Fatal(doc)
+	}
+	if !strings.Contains(doc, "<clipitem id=") {
+		t.Fatal("missing clipitem")
+	}
+	if !strings.Contains(doc, "file://localhost/media/take1.mp4") {
+		t.Fatal("missing pathurl")
+	}
+	// Same media used twice: full file once, then empty reference.
+	if strings.Count(doc, "<pathurl>") != 1 {
+		t.Fatalf("expected one pathurl, got %d\n%s", strings.Count(doc, "<pathurl>"), doc)
+	}
+	if !strings.Contains(doc, `file id="file-01960000-0000-7000-8000-000000000003"/>`) {
+		t.Fatal("missing empty file reference for second cut")
+	}
+	if !strings.Contains(doc, "<audio>") || !strings.Contains(doc, "-audio") {
+		t.Fatal("missing linked audio clipitems")
+	}
+}
+
+func TestNumberedClipsPack(t *testing.T) {
+	id := uuid.MustParse("01960000-0000-7000-8000-000000000003")
+	pack := NumberedClipsPack([]NumberedClip{{ClipID: id, Title: "A"}, {ClipID: id, Hook: "B"}})
+	if len(pack) != 2 || pack[0].Filename != "001.mp4" || pack[1].Filename != "002.mp4" {
+		t.Fatalf("%+v", pack)
+	}
+	manifest := NumberedClipsManifest(pack)
+	if !strings.Contains(manifest, "001.mp4") {
+		t.Fatal(manifest)
+	}
+}
+
 func TestFormatSMPTE(t *testing.T) {
 	if got := FormatSMPTE(0, 30); got != "00:00:00:00" {
 		t.Fatalf("got=%s", got)

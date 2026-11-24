@@ -20,6 +20,30 @@ func TestClipHandler_ListByProject_Success(t *testing.T) {
 	}
 }
 
+func TestClipHandler_NumberedPack_Success(t *testing.T) {
+	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips/numbered-pack", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
+func TestClipHandler_NumberedPack_Manifest(t *testing.T) {
+	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips/numbered-pack?format=txt", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
 func TestClipHandler_ListByProject_Unauthorized(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, false)
 	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips", nil)

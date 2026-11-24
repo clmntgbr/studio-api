@@ -58,6 +58,20 @@ func TestTimelineHandler_GetExportOTIO_Success(t *testing.T) {
 	}
 }
 
+func TestTimelineHandler_GetExportPremiere_Success(t *testing.T) {
+	exp := &mockGetExport{body: "<xmeml/>", ctype: "application/xml", filename: "timeline.premiere.xml"}
+	h := newHandlerFull(nil, nil, nil, nil, nil, exp)
+	app := mount(h, true)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.premiere.xml", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || exp.last.Format != "premiere" {
+		t.Fatalf("status=%d format=%s", resp.StatusCode, exp.last.Format)
+	}
+}
+
 func TestTimelineHandler_GetExportFCPXML_Unauthorized(t *testing.T) {
 	h := newHandlerFull(nil, nil, nil, nil, nil, nil)
 	app := mount(h, false)

@@ -104,6 +104,7 @@ func setupTimelineRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/projects/:id/timeline/export.fcpxml", container.TimelineHandler.GetExportFCPXML)
 	api.Get("/projects/:id/timeline/export.edl", container.TimelineHandler.GetExportEDL)
 	api.Get("/projects/:id/timeline/export.otio", container.TimelineHandler.GetExportOTIO)
+	api.Get("/projects/:id/timeline/export.premiere.xml", container.TimelineHandler.GetExportPremiere)
 	api.Post("/projects/:id/timeline/preview", container.TimelineHandler.Preview)
 	api.Post("/projects/:id/timeline/validate", container.TimelineHandler.Validate)
 }
@@ -122,6 +123,7 @@ func setupRenderRoutes(api fiber.Router, container *di.Container) {
 
 func setupClipRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/projects/:id/clips", container.ClipHandler.ListByProject)
+	api.Get("/projects/:id/clips/numbered-pack", container.ClipHandler.NumberedPack)
 	api.Post("/projects/:id/clips", container.ClipHandler.Create)
 	api.Post("/projects/:id/clips/analyze", container.ClipHandler.Analyze)
 	api.Patch("/clips/:id", container.ClipHandler.Update)

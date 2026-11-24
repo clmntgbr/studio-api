@@ -2,10 +2,13 @@ package presenter
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	domainclip "go-api/internal/domain/clip"
 	domainllm "go-api/internal/domain/llmartifact"
+	"go-api/internal/export"
 )
 
 type ClipResponse struct {
@@ -54,6 +57,70 @@ func NewClipListResponse(items []domainclip.Clip) []ClipResponse {
 		out = append(out, NewClipResponse(&items[i]))
 	}
 	return out
+}
+
+type NumberedClipResponse struct {
+	Index    int      `json:"index"`
+	Filename string   `json:"filename"`
+	ClipID   string   `json:"clipId"`
+	Title    string   `json:"title,omitempty"`
+	Hook     string   `json:"hook,omitempty"`
+	Hashtags []string `json:"hashtags,omitempty"`
+}
+
+// NewNumberedClipsPack orders selected clips first, then others, as 001.mp4…
+func NewNumberedClipsPack(items []domainclip.Clip) []NumberedClipResponse {
+	ordered := make([]domainclip.Clip, 0, len(items))
+	for i := range items {
+		if items[i].Selected {
+			ordered = append(ordered, items[i])
+		}
+	}
+	if len(ordered) == 0 {
+		ordered = items
+	}
+	raw := make([]export.NumberedClip, 0, len(ordered))
+	for i := range ordered {
+		c := &ordered[i]
+		entry := export.NumberedClip{ClipID: c.ID}
+		if c.Title != nil {
+			entry.Title = *c.Title
+		}
+		if c.Hook != nil {
+			entry.Hook = *c.Hook
+		}
+		raw = append(raw, entry)
+	}
+	pack := export.NumberedClipsPack(raw)
+	out := make([]NumberedClipResponse, 0, len(pack))
+	for i, p := range pack {
+		tags := ordered[i].Hashtags
+		out = append(out, NumberedClipResponse{
+			Index:    p.Index,
+			Filename: p.Filename,
+			ClipID:   p.ClipID.String(),
+			Title:    p.Title,
+			Hook:     p.Hook,
+			Hashtags: tags,
+		})
+	}
+	return out
+}
+
+func NumberedClipsManifestText(pack []NumberedClipResponse) string {
+	var b strings.Builder
+	b.WriteString("# Studio numbered clips pack (CapCut)\n")
+	for _, c := range pack {
+		title := c.Title
+		if title == "" {
+			title = c.Hook
+		}
+		if title == "" {
+			title = c.ClipID
+		}
+		fmt.Fprintf(&b, "%s\t%s\t%s\n", c.Filename, c.ClipID, title)
+	}
+	return b.String()
 }
 
 type LLMArtifactResponse struct {

@@ -355,6 +355,7 @@ services:
       mc ilm rule add --expire-days 3 myminio/${S3_BUCKET_WORK:-work} 2>/dev/null ||
         mc ilm add --expiry-days 3 myminio/${S3_BUCKET_WORK:-work} 2>/dev/null ||
         true;
+      # Renders are not auto-expired (download URLs would break). Use: make purge-retention
       mc version enable myminio/${S3_BUCKET_ASSETS:-assets} || true;
       mc admin config set myminio notify_webhook:media endpoint='http://api:3000/webhooks/minio/object-created' auth_token='${MINIO_WEBHOOK_SECRET:-dev-minio-webhook-secret}' || true;
       mc admin service restart myminio --json || true;

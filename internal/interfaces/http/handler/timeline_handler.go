@@ -210,6 +210,10 @@ func (h *TimelineHandler) GetExportOTIO(c fiber.Ctx) error {
 	return h.getExport(c, "otio")
 }
 
+func (h *TimelineHandler) GetExportPremiere(c fiber.Ctx) error {
+	return h.getExport(c, "premiere")
+}
+
 func (h *TimelineHandler) getExport(c fiber.Ctx, format string) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})

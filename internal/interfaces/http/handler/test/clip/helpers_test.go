@@ -173,6 +173,7 @@ func mount(list *mockList, create *mockCreate, update *mockUpdate, analyze *mock
 	auth := testutil.WithUserWithoutProject(testutil.TestUserID)
 	if withUser {
 		app.Get("/api/projects/:id/clips", auth, h.ListByProject)
+		app.Get("/api/projects/:id/clips/numbered-pack", auth, h.NumberedPack)
 		app.Post("/api/projects/:id/clips", auth, h.Create)
 		app.Post("/api/projects/:id/clips/analyze", auth, h.Analyze)
 		app.Patch("/api/clips/:id", auth, h.Update)
@@ -181,6 +182,7 @@ func mount(list *mockList, create *mockCreate, update *mockUpdate, analyze *mock
 		return app
 	}
 	app.Get("/api/projects/:id/clips", h.ListByProject)
+	app.Get("/api/projects/:id/clips/numbered-pack", h.NumberedPack)
 	app.Post("/api/projects/:id/clips", h.Create)
 	app.Post("/api/projects/:id/clips/analyze", h.Analyze)
 	app.Patch("/api/clips/:id", h.Update)
