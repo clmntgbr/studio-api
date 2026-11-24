@@ -27,6 +27,11 @@ func main() {
 	defer cancel()
 
 	go container.Relay.Start(ctx)
+	go func() {
+		if err := container.ResultsConsumer.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("results consumer stopped: %v", err)
+		}
+	}()
 
 	if err := container.Consumer.Start(ctx); err != nil {
 		log.Fatalf("worker stopped with error: %v", err)

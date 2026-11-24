@@ -37,6 +37,40 @@ func DeclareExchanges(ch *amqp.Channel) error {
 	return nil
 }
 
+// DeclareResultsQueue declares q.results (+ retry/dlq) bound to studio.results#.
+func DeclareResultsQueue(ch *amqp.Channel, retryTTLMs int) error {
+	if retryTTLMs <= 0 {
+		retryTTLMs = 30000
+	}
+	main := "q.results"
+	retry := main + ".retry"
+	dlq := main + ".dlq"
+
+	if _, err := ch.QueueDeclare(dlq, true, false, false, false, nil); err != nil {
+		return fmt.Errorf("declare %s: %w", dlq, err)
+	}
+	if _, err := ch.QueueDeclare(main, true, false, false, false, amqp.Table{
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": dlq,
+	}); err != nil {
+		return fmt.Errorf("declare %s: %w", main, err)
+	}
+	if _, err := ch.QueueDeclare(retry, true, false, false, false, amqp.Table{
+		"x-message-ttl":             int32(retryTTLMs),
+		"x-dead-letter-exchange":    "",
+		"x-dead-letter-routing-key": main,
+	}); err != nil {
+		return fmt.Errorf("declare %s: %w", retry, err)
+	}
+	if err := ch.QueueBind(main, "result.#", ExchangeResults, false, nil); err != nil {
+		return fmt.Errorf("bind %s: %w", main, err)
+	}
+	if err := ch.QueueBind(retry, "retry.results", ExchangeRetry, false, nil); err != nil {
+		return fmt.Errorf("bind %s: %w", retry, err)
+	}
+	return nil
+}
+
 // DeclareJobQueue declares q.<job>, q.<job>.retry, q.<job>.dlq and bindings.
 // Retry uses a fixed TTL (default 30s) DLX back to the main queue.
 func DeclareJobQueue(ch *amqp.Channel, jobType string, retryTTLMs int) error {

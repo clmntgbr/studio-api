@@ -190,10 +190,10 @@ Les événements passent par l'outbox puis `studio.events`. Les handlers du core
 
 | Événement | Déclenche |
 | --- | --- |
-| `media.uploaded`, `media.fetched` | job `probe` |
-| `media.probed` | jobs `audio` et `proxy` |
-| `media.audio_ready` | jobs `silence`, `transcribe`, `waveform` |
-| `media.proxy_ready` | jobs `scenes` et `reframe` |
+| `media.source_ready` (upload: complete multipart et/ou webhook MinIO `object-created` ; fetch: `result.fetch.succeeded` — les deux appellent `MarkSourceReady`) | handler outbox → job `probe` |
+| `media.probed` | jobs `audio` **et** `proxy` **en parallèle** (audio omis si pas de piste) |
+| `media.audio_ready` | jobs `waveform` (+ `silence` / `transcribe` dès que les workers studio existent) **en parallèle** |
+| `media.proxy_ready` | jobs `scenes` et `reframe` **en parallèle** (quand les workers studio existent) |
 | `transcript.completed` | jobs `text` et `llm` |
 | `detections.updated` | `timeline.rebuild_requested` (délai de 2 s pour regrouper) |
 | `timeline.rebuilt` | notification temps réel, statut « à valider » |

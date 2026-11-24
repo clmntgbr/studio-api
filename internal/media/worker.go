@@ -228,28 +228,69 @@ func handleAudio(ctx context.Context, bus *topology.Bus, store *s3store.Client, 
 	txPath := filepath.Join(workDir, "transcription.m4a")
 	masterPath := filepath.Join(workDir, "master.flac")
 
-	if err := pipeline.ExtractAnalysisAudio(ctx, local, analysisPath, pipeline.AudioAnalysisSpec{}); err != nil {
-		return finish(ctx, bus, d, msg, "audio", false, nil, "AUDIO_ANALYSIS", err.Error(), false)
+	type extractErr struct {
+		code string
+		err  error
 	}
-	if err := pipeline.ExtractTranscriptionAudio(ctx, local, txPath, pipeline.AudioTranscriptionSpec{}); err != nil {
-		return finish(ctx, bus, d, msg, "audio", false, nil, "AUDIO_TRANSCRIPTION", err.Error(), false)
-	}
-	if err := pipeline.ExtractMasterAudio(ctx, local, masterPath, pipeline.AudioMasterSpec{}); err != nil {
-		return finish(ctx, bus, d, msg, "audio", false, nil, "AUDIO_MASTER", err.Error(), false)
+	errCh := make(chan extractErr, 3)
+	var extractWG sync.WaitGroup
+	extractWG.Add(3)
+	go func() {
+		defer extractWG.Done()
+		if err := pipeline.ExtractAnalysisAudio(ctx, local, analysisPath, pipeline.AudioAnalysisSpec{}); err != nil {
+			errCh <- extractErr{"AUDIO_ANALYSIS", err}
+		}
+	}()
+	go func() {
+		defer extractWG.Done()
+		if err := pipeline.ExtractTranscriptionAudio(ctx, local, txPath, pipeline.AudioTranscriptionSpec{}); err != nil {
+			errCh <- extractErr{"AUDIO_TRANSCRIPTION", err}
+		}
+	}()
+	go func() {
+		defer extractWG.Done()
+		if err := pipeline.ExtractMasterAudio(ctx, local, masterPath, pipeline.AudioMasterSpec{}); err != nil {
+			errCh <- extractErr{"AUDIO_MASTER", err}
+		}
+	}()
+	extractWG.Wait()
+	close(errCh)
+	if first, ok := <-errCh; ok {
+		return finish(ctx, bus, d, msg, "audio", false, nil, first.code, first.err.Error(), false)
 	}
 
 	analysisKey := fmt.Sprintf("media/%s/audio/analysis_16k_mono.wav", req.MediaID)
 	txKey := fmt.Sprintf("media/%s/audio/transcription.m4a", req.MediaID)
 	masterKey := fmt.Sprintf("media/%s/audio/master.flac", req.MediaID)
 
-	if err := store.UploadFile(ctx, cfg.MediaBucket, analysisKey, analysisPath, "audio/wav"); err != nil {
-		return finish(ctx, bus, d, msg, "audio", false, nil, "UPLOAD", err.Error(), true)
+	type uploadErr struct {
+		err error
 	}
-	if err := store.UploadFile(ctx, cfg.MediaBucket, txKey, txPath, "audio/mp4"); err != nil {
-		return finish(ctx, bus, d, msg, "audio", false, nil, "UPLOAD", err.Error(), true)
-	}
-	if err := store.UploadFile(ctx, cfg.MediaBucket, masterKey, masterPath, "audio/flac"); err != nil {
-		return finish(ctx, bus, d, msg, "audio", false, nil, "UPLOAD", err.Error(), true)
+	upCh := make(chan uploadErr, 3)
+	var upWG sync.WaitGroup
+	upWG.Add(3)
+	go func() {
+		defer upWG.Done()
+		if err := store.UploadFile(ctx, cfg.MediaBucket, analysisKey, analysisPath, "audio/wav"); err != nil {
+			upCh <- uploadErr{err}
+		}
+	}()
+	go func() {
+		defer upWG.Done()
+		if err := store.UploadFile(ctx, cfg.MediaBucket, txKey, txPath, "audio/mp4"); err != nil {
+			upCh <- uploadErr{err}
+		}
+	}()
+	go func() {
+		defer upWG.Done()
+		if err := store.UploadFile(ctx, cfg.MediaBucket, masterKey, masterPath, "audio/flac"); err != nil {
+			upCh <- uploadErr{err}
+		}
+	}()
+	upWG.Wait()
+	close(upCh)
+	if first, ok := <-upCh; ok {
+		return finish(ctx, bus, d, msg, "audio", false, nil, "UPLOAD", first.err.Error(), true)
 	}
 	sha, _, err := pipeline.FileSHA256(analysisPath)
 	if err != nil {

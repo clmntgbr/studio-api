@@ -17,9 +17,9 @@ import (
 )
 
 type mockGetUserByExternalIDHandler struct {
-	calls  int
-	users  []*domainuser.User
-	errs   []error
+	calls int
+	users []*domainuser.User
+	errs  []error
 }
 
 func (m *mockGetUserByExternalIDHandler) Handle(_ context.Context, externalID string) (*domainuser.User, error) {

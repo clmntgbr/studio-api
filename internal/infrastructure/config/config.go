@@ -35,6 +35,13 @@ type Config struct {
 	CentrifugoAPIKey      string
 	CentrifugoTokenSecret string
 	CentrifugoPublicWSURL string
+	S3Endpoint            string
+	S3PublicEndpoint      string
+	S3AccessKey           string
+	S3SecretKey           string
+	S3Region              string
+	S3BucketMedia         string
+	MinioWebhookSecret    string
 }
 
 func Load() *Config {
@@ -61,7 +68,7 @@ func Load() *Config {
 		RabbitMQURL:          getEnv("RABBITMQ_URL"),
 		RabbitMQExchange:     getEnvOrDefault("RABBITMQ_EXCHANGE", "domain.events"),
 		RabbitMQQueue:        getEnvOrDefault("RABBITMQ_QUEUE", "domain.events"),
-		RabbitMQRoutingKey:   getEnvOrDefault("RABBITMQ_ROUTING_KEY", "user.#"),
+		RabbitMQRoutingKey:   getEnvOrDefault("RABBITMQ_ROUTING_KEY", "user.#,media.#"),
 		RabbitMQRetryTTLMS:   getEnvIntOrDefault("RABBITMQ_RETRY_TTL_MS", 30000),
 		WorkerMaxRetries:     getEnvIntOrDefault("WORKER_MAX_RETRIES", 3),
 		OutboxPollInterval:   getEnvDuration("OUTBOX_POLL_INTERVAL", 2*time.Second),
@@ -70,6 +77,13 @@ func Load() *Config {
 		CentrifugoAPIKey:      getEnv("CENTRIFUGO_API_KEY"),
 		CentrifugoTokenSecret: getEnv("CENTRIFUGO_TOKEN_SECRET"),
 		CentrifugoPublicWSURL: getEnvOrDefault("CENTRIFUGO_PUBLIC_WS_URL", ""),
+		S3Endpoint:            getEnvOrDefault("S3_ENDPOINT", "http://minio:9000"),
+		S3PublicEndpoint:      getEnvOrDefault("S3_PUBLIC_ENDPOINT", "http://localhost:9000"),
+		S3AccessKey:           getEnvOrDefault("S3_ACCESS_KEY", "devuser"),
+		S3SecretKey:           getEnvOrDefault("S3_SECRET_KEY", "devpassword"),
+		S3Region:              getEnvOrDefault("S3_REGION", "us-east-1"),
+		S3BucketMedia:         getEnvOrDefault("S3_BUCKET_MEDIA", "media"),
+		MinioWebhookSecret:    getEnvOrDefault("MINIO_WEBHOOK_SECRET", "dev-minio-webhook-secret"),
 	}
 }
 

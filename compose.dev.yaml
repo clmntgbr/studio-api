@@ -284,7 +284,7 @@ services:
         mc ilm add --expiry-days 3 myminio/${S3_BUCKET_WORK:-work} 2>/dev/null ||
         true;
       mc version enable myminio/${S3_BUCKET_ASSETS:-assets} || true;
-      mc admin config set myminio notify_webhook:media endpoint='http://api:3000/webhooks/minio/object-created' auth_token='${MINIO_WEBHOOK_SECRET:-}' || true;
+      mc admin config set myminio notify_webhook:media endpoint='http://api:3000/webhooks/minio/object-created' auth_token='${MINIO_WEBHOOK_SECRET:-dev-minio-webhook-secret}' || true;
       mc admin service restart myminio --json || true;
       sleep 5;
       mc event remove myminio/${S3_BUCKET_MEDIA:-media} --force || true;

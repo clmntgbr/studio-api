@@ -5,14 +5,20 @@ import (
 
 	authcmd "go-api/internal/application/command/auth"
 	identitycmd "go-api/internal/application/command/identity"
+	mediacmd "go-api/internal/application/command/media"
+	projectcmd "go-api/internal/application/command/project"
 	usercmd "go-api/internal/application/command/user"
+	querymedia "go-api/internal/application/query/media"
+	queryproject "go-api/internal/application/query/project"
 	queryuser "go-api/internal/application/query/user"
-	infraClerk "go-api/internal/infrastructure/clerk"
 	"go-api/internal/infrastructure/centrifugo"
+	infraClerk "go-api/internal/infrastructure/clerk"
 	"go-api/internal/infrastructure/config"
+	"go-api/internal/infrastructure/messaging/studiojobs"
 	"go-api/internal/infrastructure/persistence/outbox"
 	"go-api/internal/infrastructure/persistence/read"
 	"go-api/internal/infrastructure/persistence/write"
+	s3store "go-api/internal/infrastructure/storage/s3"
 	httphandler "go-api/internal/interfaces/http/handler"
 	"go-api/internal/interfaces/http/middleware"
 
@@ -23,8 +29,12 @@ type Container struct {
 	AuthenticateMiddleware *middleware.AuthenticateMiddleware
 	UserWebhookMiddleware  *middleware.UserWebhookMiddleware
 	UserWebhookHandler     *httphandler.UserWebhookHandler
+	MinioWebhookMiddleware *middleware.MinioWebhookMiddleware
+	MinioWebhookHandler    *httphandler.MinioWebhookHandler
 	UserHandler            *httphandler.UserHandler
 	RealtimeHandler        *httphandler.RealtimeHandler
+	ProjectHandler         *httphandler.ProjectHandler
+	MediaHandler           *httphandler.MediaHandler
 }
 
 func NewContainer(db *gorm.DB, env *config.Config) *Container {
@@ -36,6 +46,25 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	userWriteRepo := write.NewUserWriteRepository(db)
 	userReadRepo := read.NewUserReadRepository(db)
 	outboxRepo := outbox.NewRepository(db)
+	projectWriteRepo := write.NewProjectWriteRepository(db)
+	projectReadRepo := read.NewProjectReadRepository(db)
+	mediaWriteRepo := write.NewMediaWriteRepository(db)
+	mediaReadRepo := read.NewMediaReadRepository(db)
+
+	storage, err := s3store.New(s3store.Config{
+		Endpoint:  env.S3Endpoint,
+		Region:    env.S3Region,
+		AccessKey: env.S3AccessKey,
+		SecretKey: env.S3SecretKey,
+	})
+	if err != nil {
+		log.Fatalf("failed to create s3 client: %v", err)
+	}
+
+	jobPublisher, err := studiojobs.NewPublisher(env.RabbitMQURL)
+	if err != nil {
+		log.Fatalf("failed to create job publisher: %v", err)
+	}
 
 	createUserHandler := usercmd.NewCreateUserHandler(userWriteRepo, outboxRepo)
 	updateUserHandler := usercmd.NewUpdateUserHandler(userWriteRepo, outboxRepo)
@@ -44,6 +73,23 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	validateTokenHandler := authcmd.NewValidateTokenHandler(jwksProvider, userWriteRepo)
 	fetchUserHandler := identitycmd.NewFetchUserHandler(infraClerk.NewUserGateway(env.ClerkSecretKey))
 	getUserByIDHandler := queryuser.NewGetUserByIDHandler(userReadRepo)
+
+	createProjectHandler := projectcmd.NewCreateProjectHandler(projectWriteRepo, outboxRepo)
+	updateProjectHandler := projectcmd.NewUpdateProjectHandler(projectWriteRepo)
+	deleteProjectHandler := projectcmd.NewDeleteProjectHandler(projectWriteRepo)
+	getProjectHandler := queryproject.NewGetProjectHandler(projectReadRepo)
+	listProjectsHandler := queryproject.NewListProjectsHandler(projectReadRepo)
+
+	initiateUploadHandler := mediacmd.NewInitiateUploadHandler(
+		projectWriteRepo, mediaWriteRepo, outboxRepo, storage, env.S3BucketMedia, env.S3PublicEndpoint,
+	)
+	presignPartsHandler := mediacmd.NewPresignPartsHandler(mediaWriteRepo, storage, env.S3BucketMedia, env.S3PublicEndpoint)
+	markSourceReadyHandler := mediacmd.NewMarkSourceReadyHandler(mediaWriteRepo, outboxRepo)
+	completeUploadHandler := mediacmd.NewCompleteUploadHandler(mediaWriteRepo, storage, env.S3BucketMedia, markSourceReadyHandler)
+	fromURLHandler := mediacmd.NewFromURLHandler(projectWriteRepo, mediaWriteRepo, outboxRepo, jobPublisher)
+	deleteMediaHandler := mediacmd.NewDeleteMediaHandler(mediaWriteRepo)
+	getMediaHandler := querymedia.NewGetMediaHandler(mediaReadRepo)
+	listMediaHandler := querymedia.NewListMediaHandler(mediaReadRepo)
 
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
@@ -58,7 +104,25 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			updateUserHandler,
 			deleteUserByExternalIDHandler,
 		),
-		UserHandler:     httphandler.NewUserHandler(getUserByIDHandler),
-		RealtimeHandler: httphandler.NewRealtimeHandler(centrifugo.NewConnectionInfoCreator(env)),
+		MinioWebhookMiddleware: middleware.NewMinioWebhookMiddleware(env.MinioWebhookSecret),
+		MinioWebhookHandler:    httphandler.NewMinioWebhookHandler(markSourceReadyHandler, env.S3BucketMedia),
+		UserHandler:            httphandler.NewUserHandler(getUserByIDHandler),
+		RealtimeHandler:        httphandler.NewRealtimeHandler(centrifugo.NewConnectionInfoCreator(env)),
+		ProjectHandler: httphandler.NewProjectHandler(
+			createProjectHandler,
+			updateProjectHandler,
+			deleteProjectHandler,
+			getProjectHandler,
+			listProjectsHandler,
+		),
+		MediaHandler: httphandler.NewMediaHandler(
+			initiateUploadHandler,
+			presignPartsHandler,
+			completeUploadHandler,
+			fromURLHandler,
+			deleteMediaHandler,
+			getMediaHandler,
+			listMediaHandler,
+		),
 	}
 }

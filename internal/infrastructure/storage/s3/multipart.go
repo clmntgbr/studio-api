@@ -1,0 +1,134 @@
+package s3
+
+import (
+	"context"
+	"fmt"
+	"net/url"
+	"strings"
+	"time"
+
+	"go-api/internal/domain/port"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+)
+
+func (c *Client) CreateMultipartUpload(ctx context.Context, bucket, key, contentType string) (uploadID string, err error) {
+	in := &s3.CreateMultipartUploadInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+	if contentType != "" {
+		in.ContentType = aws.String(contentType)
+	}
+	out, err := c.inner.CreateMultipartUpload(ctx, in)
+	if err != nil {
+		return "", fmt.Errorf("create multipart: %w", err)
+	}
+	if out.UploadId == nil || *out.UploadId == "" {
+		return "", fmt.Errorf("create multipart: empty upload id")
+	}
+	return *out.UploadId, nil
+}
+
+func (c *Client) PresignUploadParts(
+	ctx context.Context,
+	bucket, key, uploadID string,
+	partNumbers []int32,
+	expiry time.Duration,
+	publicBase string,
+) ([]port.UploadPartURL, error) {
+	presigner := s3.NewPresignClient(c.inner)
+	if expiry <= 0 {
+		expiry = time.Hour
+	}
+	out := make([]port.UploadPartURL, 0, len(partNumbers))
+	for _, n := range partNumbers {
+		res, err := presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
+			Bucket:     aws.String(bucket),
+			Key:        aws.String(key),
+			UploadId:   aws.String(uploadID),
+			PartNumber: aws.Int32(n),
+		}, s3.WithPresignExpires(expiry))
+		if err != nil {
+			return nil, fmt.Errorf("presign part %d: %w", n, err)
+		}
+		out = append(out, port.UploadPartURL{
+			PartNumber: n,
+			URL:        rewritePublicURL(res.URL, publicBase),
+		})
+	}
+	return out, nil
+}
+
+func (c *Client) CompleteMultipartUpload(
+	ctx context.Context,
+	bucket, key, uploadID string,
+	parts []port.CompletedUploadPart,
+) error {
+	completed := make([]types.CompletedPart, 0, len(parts))
+	for _, p := range parts {
+		etag := p.ETag
+		completed = append(completed, types.CompletedPart{
+			ETag:       aws.String(etag),
+			PartNumber: aws.Int32(p.PartNumber),
+		})
+	}
+	_, err := c.inner.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:   aws.String(bucket),
+		Key:      aws.String(key),
+		UploadId: aws.String(uploadID),
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: completed,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("complete multipart: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) AbortMultipartUpload(ctx context.Context, bucket, key, uploadID string) error {
+	_, err := c.inner.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
+		Bucket:   aws.String(bucket),
+		Key:      aws.String(key),
+		UploadId: aws.String(uploadID),
+	})
+	if err != nil {
+		return fmt.Errorf("abort multipart: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) HeadObjectSize(ctx context.Context, bucket, key string) (int64, error) {
+	out, err := c.inner.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("head object: %w", err)
+	}
+	if out.ContentLength == nil {
+		return 0, nil
+	}
+	return *out.ContentLength, nil
+}
+
+func rewritePublicURL(signed, publicBase string) string {
+	publicBase = strings.TrimRight(publicBase, "/")
+	if publicBase == "" {
+		return signed
+	}
+	u, err := url.Parse(signed)
+	if err != nil {
+		return signed
+	}
+	pub, err := url.Parse(publicBase)
+	if err != nil {
+		return signed
+	}
+	u.Scheme = pub.Scheme
+	u.Host = pub.Host
+	return u.String()
+}

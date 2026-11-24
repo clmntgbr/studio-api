@@ -16,6 +16,7 @@ func setupRoutes(app *fiber.App, container *di.Container) {
 func setupWebhooks(app *fiber.App, container *di.Container) {
 	webhooks := app.Group("/webhooks")
 	webhooks.Post("/clerk", container.UserWebhookMiddleware.Protected(), container.UserWebhookHandler.Execute)
+	webhooks.Post("/minio/object-created", container.MinioWebhookMiddleware.Protected(), container.MinioWebhookHandler.ObjectCreated)
 }
 
 func setupHealthChecks(app *fiber.App) {
@@ -30,6 +31,8 @@ func setupAPIRoutes(app *fiber.App, container *di.Container) {
 	protected := public.Group("", container.AuthenticateMiddleware.Protected())
 	setupUserRoutes(protected, container)
 	setupRealtimeRoutes(protected, container)
+	setupProjectRoutes(protected, container)
+	setupMediaRoutes(protected, container)
 }
 
 func setupRealtimeRoutes(api fiber.Router, container *di.Container) {
@@ -38,4 +41,23 @@ func setupRealtimeRoutes(api fiber.Router, container *di.Container) {
 
 func setupUserRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/users/me", container.UserHandler.GetUser)
+}
+
+func setupProjectRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/projects", container.ProjectHandler.List)
+	api.Post("/projects", container.ProjectHandler.Create)
+	api.Get("/projects/:id", container.ProjectHandler.GetByID)
+	api.Patch("/projects/:id", container.ProjectHandler.Update)
+	api.Delete("/projects/:id", container.ProjectHandler.Delete)
+
+	api.Get("/projects/:id/media", container.MediaHandler.ListByProject)
+	api.Post("/projects/:id/media/uploads", container.MediaHandler.InitiateUpload)
+	api.Post("/projects/:id/media/from-url", container.MediaHandler.FromURL)
+}
+
+func setupMediaRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/media/:id", container.MediaHandler.GetByID)
+	api.Delete("/media/:id", container.MediaHandler.Delete)
+	api.Post("/media/:id/uploads/parts", container.MediaHandler.PresignParts)
+	api.Post("/media/:id/uploads/complete", container.MediaHandler.CompleteUpload)
 }
