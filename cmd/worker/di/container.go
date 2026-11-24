@@ -117,6 +117,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	))
 	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
 		dedupRepo,
+		"enqueue_scenes_on_proxy_ready",
+		eventmedia.NewEnqueueScenesHandler(jobPublisher, mediaWriteRepo).Handle,
+	))
+	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
+		dedupRepo,
 		"enqueue_reframe_on_proxy_ready",
 		eventmedia.NewEnqueueReframeHandler(jobPublisher, mediaWriteRepo).Handle,
 	))
@@ -165,11 +170,12 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	clipWriteRepo := write.NewClipWriteRepository(db)
 	llmArtifactWriteRepo := write.NewLLMArtifactWriteRepository(db)
 	applyLLM := detectioncmd.NewApplyLLMResultHandler(mediaWriteRepo, detectionWriteRepo, llmArtifactWriteRepo, clipWriteRepo, outboxRepo)
+	applyScenes := detectioncmd.NewApplyScenesResultHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
 	applyReframe := mediacmd.NewApplyReframeResultHandler(mediaWriteRepo)
 	renderWriteRepo := write.NewRenderWriteRepository(db)
 	applyRender := rendercmd.NewApplyResultHandler(renderWriteRepo, realtimePublisher)
 	resultsConsumer := studiojobs.NewResultsConsumer(
-		env.RabbitMQURL, mediaWriteRepo, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence, applyTranscript, applyText, applyLLM, applyReframe, applyRender,
+		env.RabbitMQURL, mediaWriteRepo, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence, applyTranscript, applyText, applyLLM, applyScenes, applyReframe, applyRender,
 	)
 	progressConsumer := studiojobs.NewProgressConsumer(
 		env.RabbitMQURL,

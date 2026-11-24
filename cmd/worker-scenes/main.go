@@ -1,20 +1,14 @@
+// Deprecated: worker-scenes runs as the Python service under workers/scenes.
+// Compose builds workers/scenes/Dockerfile. This binary remains so `go build ./...`
+// and the production multi-binary image stay green; it only prints a hint.
 package main
 
 import (
-	"context"
-	"log"
+	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
-
-	"go-api/internal/workerstub"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	if err := workerstub.Run(ctx, "scenes"); err != nil {
-		log.Fatalf("worker-scenes stopped: %v", err)
-	}
+	fmt.Fprintln(os.Stderr, "worker-scenes is the Python PySceneDetect service (workers/scenes). Use the compose worker-scenes image.")
+	os.Exit(1)
 }

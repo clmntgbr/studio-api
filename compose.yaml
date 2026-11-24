@@ -163,9 +163,23 @@ services:
       replicas: 2
 
   worker-scenes:
-    <<: *pipeline-worker
-    command: ["./worker-scenes"]
-    networks: [egress, backend]
+    build:
+      context: .
+      dockerfile: workers/scenes/Dockerfile
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      SCENES_CONTENT_THRESHOLD: ${SCENES_CONTENT_THRESHOLD:-27}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks: [backend]
+    restart: unless-stopped
+    deploy:
+      replicas: 1
 
   worker-silence:
     <<: *pipeline-worker

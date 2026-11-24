@@ -53,6 +53,10 @@ func (h *ReanalyzeHandler) Handle(ctx context.Context, cmd ReanalyzeCommand) err
 			if err := h.requeueLLM(ctx, m); err != nil {
 				return err
 			}
+		case string(domainmedia.StepScenes):
+			if err := h.requeueScenes(ctx, m); err != nil {
+				return err
+			}
 		case string(domainmedia.StepReframe):
 			if err := h.requeueReframe(ctx, m); err != nil {
 				return err
@@ -234,6 +238,47 @@ func (h *ReanalyzeHandler) requeueLLM(ctx context.Context, m *domainmedia.MediaF
 		Tasks:          []string{"sponsors", "chapters", "viral"},
 		SponsorsAction: string(cfg.SponsorsAction),
 	})
+}
+
+func (h *ReanalyzeHandler) requeueScenes(ctx context.Context, m *domainmedia.MediaFile) error {
+	asset, err := h.media.GetAssetByKind(ctx, m.ID, domainmedia.AssetKindProxy)
+	if err != nil {
+		return err
+	}
+	if asset == nil || asset.StorageKey == "" {
+		return errors.New("proxy not ready")
+	}
+
+	now := time.Now().UTC()
+	step, err := h.media.GetStep(ctx, m.ID, domainmedia.StepScenes)
+	if err != nil {
+		return err
+	}
+	if step == nil {
+		step = domainmedia.NewProcessingStep(m.ID, domainmedia.StepScenes)
+		step.Status = domainmedia.StepStatusQueued
+		step.QueuedAt = &now
+		step.Attempt = 1
+		if err := h.media.SaveStep(ctx, step); err != nil {
+			return err
+		}
+	} else {
+		step.Status = domainmedia.StepStatusQueued
+		step.Progress = 0
+		step.ErrorMessage = nil
+		step.StartedAt = nil
+		step.CompletedAt = nil
+		step.QueuedAt = &now
+		step.Attempt++
+		if step.Attempt < 1 {
+			step.Attempt = 1
+		}
+		if err := h.media.UpdateStep(ctx, step); err != nil {
+			return err
+		}
+	}
+
+	return h.jobs.PublishScenesJob(ctx, m.ID.String(), asset.StorageKey, step.Attempt)
 }
 
 func (h *ReanalyzeHandler) requeueReframe(ctx context.Context, m *domainmedia.MediaFile) error {

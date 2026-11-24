@@ -34,6 +34,7 @@ type ResultsConsumer struct {
 	applyTranscript *transcriptcmd.ApplyResultHandler
 	applyText       *detectioncmd.ApplyTextResultHandler
 	applyLLM        *detectioncmd.ApplyLLMResultHandler
+	applyScenes     *detectioncmd.ApplyScenesResultHandler
 	applyReframe    *mediacmd.ApplyReframeResultHandler
 	applyRender     *rendercmd.ApplyResultHandler
 }
@@ -51,6 +52,7 @@ func NewResultsConsumer(
 	applyTranscript *transcriptcmd.ApplyResultHandler,
 	applyText *detectioncmd.ApplyTextResultHandler,
 	applyLLM *detectioncmd.ApplyLLMResultHandler,
+	applyScenes *detectioncmd.ApplyScenesResultHandler,
 	applyReframe *mediacmd.ApplyReframeResultHandler,
 	applyRender *rendercmd.ApplyResultHandler,
 ) *ResultsConsumer {
@@ -66,7 +68,8 @@ func NewResultsConsumer(
 		applySilence:    applySilence,
 		applyTranscript: applyTranscript,
 		applyText:       applyText,
-		applyLLM:        applyLLM,
+		applyLLM:       applyLLM,
+		applyScenes:     applyScenes,
 		applyReframe:    applyReframe,
 		applyRender:     applyRender,
 	}
@@ -150,13 +153,15 @@ func (c *ResultsConsumer) handle(ctx context.Context, bus *topology.Bus, d amqp.
 		handleErr = c.onTextSucceeded(ctx, msg)
 	case "result.llm.succeeded":
 		handleErr = c.onLLMSucceeded(ctx, msg)
+	case "result.scenes.succeeded":
+		handleErr = c.onScenesSucceeded(ctx, msg)
 	case "result.reframe.succeeded":
 		handleErr = c.onReframeSucceeded(ctx, msg)
 	case "result.render.succeeded":
 		handleErr = c.onRenderSucceeded(ctx, msg)
 	case "result.render.failed":
 		handleErr = c.onRenderFailed(ctx, msg)
-	case "result.probe.failed", "result.audio.failed", "result.proxy.failed", "result.waveform.failed", "result.silence.failed", "result.transcribe.failed", "result.text.failed", "result.llm.failed", "result.reframe.failed":
+	case "result.probe.failed", "result.audio.failed", "result.proxy.failed", "result.waveform.failed", "result.silence.failed", "result.transcribe.failed", "result.text.failed", "result.llm.failed", "result.scenes.failed", "result.reframe.failed":
 		handleErr = c.onStepFailed(ctx, msg)
 	default:
 		return bus.Ack(d)
@@ -534,6 +539,57 @@ func (c *ResultsConsumer) onLLMSucceeded(ctx context.Context, msg *envelope.Mess
 	})
 }
 
+type scenesAdCandidate struct {
+	SourceStartMs int64    `json:"sourceStartMs"`
+	SourceEndMs   int64    `json:"sourceEndMs"`
+	Confidence    *float64 `json:"confidence"`
+	Reason        string   `json:"reason"`
+	CutCount      int      `json:"cutCount"`
+}
+
+type scenesOutput struct {
+	ScenesKey       string               `json:"scenesKey"`
+	AdCandidatesKey string               `json:"adCandidatesKey"`
+	Detector        string               `json:"detector"`
+	SceneCount      int                  `json:"sceneCount"`
+	AdCandidates    []scenesAdCandidate  `json:"adCandidates"`
+}
+
+func (c *ResultsConsumer) onScenesSucceeded(ctx context.Context, msg *envelope.Message) error {
+	if c.applyScenes == nil {
+		return nil
+	}
+	mediaID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return fmt.Errorf("invalid correlationId: %w", err)
+	}
+	out, err := decodeResult[scenesOutput](msg)
+	if err != nil {
+		return err
+	}
+	ads := make([]detectioncmd.ScenesAdCandidate, 0, len(out.AdCandidates))
+	for _, a := range out.AdCandidates {
+		ads = append(ads, detectioncmd.ScenesAdCandidate{
+			SourceStartMs: a.SourceStartMs,
+			SourceEndMs:   a.SourceEndMs,
+			Confidence:    a.Confidence,
+			Reason:        a.Reason,
+			CutCount:      a.CutCount,
+		})
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	return c.applyScenes.Handle(hCtx, detectioncmd.ApplyScenesResultCommand{
+		MediaID:         mediaID,
+		ScenesKey:       out.ScenesKey,
+		AdCandidatesKey: out.AdCandidatesKey,
+		Detector:        out.Detector,
+		SceneCount:      out.SceneCount,
+		Attempt:         msg.Attempt,
+		AdCandidates:    ads,
+	})
+}
+
 type reframeOutput struct {
 	CropPathKey string `json:"cropPathKey"`
 	SampleCount int    `json:"sampleCount"`
@@ -649,6 +705,8 @@ func failedResultStepKind(msgType string) (domainmedia.StepKind, bool) {
 		return domainmedia.StepText, true
 	case "result.llm.failed":
 		return domainmedia.StepLLM, true
+	case "result.scenes.failed":
+		return domainmedia.StepScenes, true
 	case "result.reframe.failed":
 		return domainmedia.StepReframe, true
 	default:

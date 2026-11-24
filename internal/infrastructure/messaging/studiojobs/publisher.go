@@ -31,7 +31,7 @@ func NewPublisher(rabbitURL string) (*Publisher, error) {
 		_ = conn.Close()
 		return nil, err
 	}
-	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform", "silence", "transcribe", "text", "llm", "reframe", "render"} {
+	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform", "silence", "transcribe", "text", "llm", "scenes", "reframe", "render"} {
 		if err := topology.DeclareJobQueue(ch, job, 30000); err != nil {
 			_ = ch.Close()
 			_ = conn.Close()
@@ -214,6 +214,20 @@ func (p *Publisher) PublishReframeJob(ctx context.Context, mediaID, proxyKey str
 		return err
 	}
 	return p.bus.PublishJob(ctx, "job.reframe", body, msg.MessageID, mediaID)
+}
+
+func (p *Publisher) PublishScenesJob(ctx context.Context, mediaID, proxyKey string, attempt int) error {
+	if attempt < 1 {
+		attempt = 1
+	}
+	msg, body, err := envelope.NewJob("scenes", mediaID, "", attempt, map[string]any{
+		"mediaId":  mediaID,
+		"proxyKey": proxyKey,
+	})
+	if err != nil {
+		return err
+	}
+	return p.bus.PublishJob(ctx, "job.scenes", body, msg.MessageID, mediaID)
 }
 
 var _ port.JobPublisher = (*Publisher)(nil)

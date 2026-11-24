@@ -17,6 +17,7 @@ type JobPublisher interface {
 	PublishTextJob(ctx context.Context, mediaID, wordsKey string, opts TextJobOptions) error
 	PublishLLMJob(ctx context.Context, mediaID, wordsKey string, opts LLMJobOptions) error
 	PublishReframeJob(ctx context.Context, mediaID, proxyKey string) error
+	PublishScenesJob(ctx context.Context, mediaID, proxyKey string, attempt int) error
 	PublishRenderJob(ctx context.Context, renderID string, plan json.RawMessage) error
 }
 

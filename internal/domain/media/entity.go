@@ -36,6 +36,7 @@ const (
 	AssetKindWords         = "words"
 	AssetKindSRT           = "srt"
 	AssetKindScenes        = "scenes"
+	AssetKindAdCandidates  = "ad_candidates"
 	AssetKindCropPath      = "crop_path"
 )
 
