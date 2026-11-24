@@ -264,7 +264,7 @@ func truncateRunes(s string, max int) string {
 
 func buildPrompt(words []Word, want map[string]bool, language string) string {
 	var b strings.Builder
-	b.WriteString("Transcript lines as [startMs-endMs] text. Language hint: ")
+	b.WriteString("Transcript segments as [startMs-endMs] text. Language hint: ")
 	if language == "" {
 		language = "auto"
 	}
@@ -282,15 +282,49 @@ func buildPrompt(words []Word, want map[string]bool, language string) string {
 	}
 	b.WriteString(strings.Join(tasks, ", "))
 	b.WriteString("\nReturn JSON: {\"sponsors\":[{\"startMs\":0,\"endMs\":0,\"confidence\":0.8,\"reason\":\"\"}],\"chapters\":[{\"title\":\"\",\"startMs\":0,\"endMs\":0}],\"clips\":[{\"startMs\":0,\"endMs\":0,\"score\":0.7,\"hook\":\"\",\"reason\":\"\",\"title\":\"\",\"description\":\"\",\"hashtags\":[\"#tag\"]}]}\nFor viral clips also fill title, description and 3-8 hashtags.\nOmit unused arrays as [].\n\n")
-	limit := len(words)
-	if limit > 2500 {
-		limit = 2500
-	}
-	for i := 0; i < limit; i++ {
-		w := words[i]
-		fmt.Fprintf(&b, "[%d-%d] %s\n", w.SourceStartMs, w.SourceEndMs, w.Text)
-	}
+	writePackedTranscript(&b, words, 18, 12_000)
 	return b.String()
+}
+
+// writePackedTranscript groups words into timed lines to stay under free-tier TPM budgets
+// (e.g. Groq free ~8k TPM). Stops once maxChars of transcript body is reached.
+func writePackedTranscript(b *strings.Builder, words []Word, wordsPerLine, maxChars int) {
+	if wordsPerLine < 1 {
+		wordsPerLine = 18
+	}
+	if maxChars < 1 {
+		maxChars = 12_000
+	}
+	written := 0
+	for i := 0; i < len(words); {
+		if written >= maxChars {
+			b.WriteString("…(truncated)\n")
+			return
+		}
+		end := i + wordsPerLine
+		if end > len(words) {
+			end = len(words)
+		}
+		parts := make([]string, 0, end-i)
+		for j := i; j < end; j++ {
+			t := strings.TrimSpace(words[j].Text)
+			if t != "" {
+				parts = append(parts, t)
+			}
+		}
+		if len(parts) == 0 {
+			i = end
+			continue
+		}
+		line := fmt.Sprintf("[%d-%d] %s\n", words[i].SourceStartMs, words[end-1].SourceEndMs, strings.Join(parts, " "))
+		if written+len(line) > maxChars && written > 0 {
+			b.WriteString("…(truncated)\n")
+			return
+		}
+		b.WriteString(line)
+		written += len(line)
+		i = end
+	}
 }
 
 func truncate(s string, n int) string {
