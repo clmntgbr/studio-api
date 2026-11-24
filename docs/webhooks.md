@@ -19,13 +19,14 @@ Verified payload is set on `c.Locals("payload", dto.ClerkEvent)` before the hand
 | Event | Action |
 |-------|--------|
 | `user.created` | Create user if not exists (`201`) |
-| `user.updated` | Update profile (`204`) |
+| `user.updated` | Update profile, or provision if missing (`204`) |
 | `user.deleted` | Delete by Clerk ID (`204`) |
 | Unknown | `200` (ignored) |
 
 ### Idempotence
 
 `user.created` skips creation if the Clerk ID already exists.
+`user.updated` provisions the user when the Clerk ID is unknown (avoids Svix infinite retries on 404).
 
 ### Errors
 
@@ -34,7 +35,6 @@ Verified payload is set on `c.Locals("payload", dto.ClerkEvent)` before the hand
 | Invalid signature / payload (middleware) | `401` + `{ "message": "…" }` |
 | Invalid JSON body | `400` |
 | Validation failed | `400` + field `errors` |
-| User not found on update | `404` |
 | Handler failure | `500` (generic `message`, no internal leak) |
 
 ## Code map

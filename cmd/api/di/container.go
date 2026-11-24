@@ -171,13 +171,18 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	analyzeClips := clipcmd.NewAnalyzeHandler(mediaWriteRepo, jobPublisher)
 	listLLMArtifacts := queryllm.NewListHandler(llmArtifactReadRepo)
 
+	userWebhookMiddleware, err := middleware.NewUserWebhookMiddleware(env.ClerkWebhookSecret)
+	if err != nil {
+		log.Fatalf("invalid CLERK_WEBHOOK_SECRET: %v", err)
+	}
+
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
 			validateTokenHandler,
 			fetchUserHandler,
 			createUserHandler,
 		),
-		UserWebhookMiddleware: middleware.NewUserWebhookMiddleware(env.ClerkWebhookSecret),
+		UserWebhookMiddleware: userWebhookMiddleware,
 		UserWebhookHandler: httphandler.NewUserWebhookHandler(
 			getUserByExternalIDHandler,
 			createUserHandler,
