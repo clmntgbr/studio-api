@@ -26,9 +26,9 @@ type LLMSponsorInterval struct {
 }
 
 type LLMChapter struct {
-	Title         string
-	SourceStartMs int64
-	SourceEndMs   int64
+	Title         string `json:"title"`
+	SourceStartMs int64  `json:"sourceStartMs"`
+	SourceEndMs   int64  `json:"sourceEndMs"`
 }
 
 type LLMClipCandidate struct {
