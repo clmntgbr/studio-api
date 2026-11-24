@@ -31,8 +31,15 @@ func NewPublisher(rabbitURL string) (*Publisher, error) {
 		_ = conn.Close()
 		return nil, err
 	}
-	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform", "silence", "transcribe", "text", "llm", "scenes", "reframe", "render"} {
-		if err := topology.DeclareJobQueue(ch, job, 30000); err != nil {
+	// Retry TTLs must match each worker's DeclareJobQueue (RabbitMQ rejects inequivalent args).
+	jobRetryTTLMs := map[string]int{
+		"fetch": 30000, "probe": 30000, "audio": 30000, "proxy": 30000, "waveform": 30000,
+		"silence": 30000, "transcribe": 30000, "text": 30000,
+		"llm": 300000, "scenes": 30000, "reframe": 30000,
+		"render": 7200000,
+	}
+	for job, ttl := range jobRetryTTLMs {
+		if err := topology.DeclareJobQueue(ch, job, ttl); err != nil {
 			_ = ch.Close()
 			_ = conn.Close()
 			return nil, err
