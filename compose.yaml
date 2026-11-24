@@ -153,6 +153,11 @@ services:
   worker-transcribe:
     <<: *pipeline-worker
     command: ["./worker-transcribe"]
+    environment:
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY:-}
+      TRANSCRIBE_PREFETCH: ${TRANSCRIBE_PREFETCH:-2}
     networks: [egress, backend]
     deploy:
       replicas: 2
@@ -169,6 +174,17 @@ services:
       <<: *s3-env
       WORK_DIR: ${WORK_DIR:-/tmp/work}
       SILENCE_PREFETCH: ${SILENCE_PREFETCH:-2}
+    networks: [backend]
+    deploy:
+      replicas: 2
+
+  worker-text:
+    <<: *pipeline-worker
+    command: ["./worker-text"]
+    environment:
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      TEXT_PREFETCH: ${TEXT_PREFETCH:-4}
     networks: [backend]
     deploy:
       replicas: 2

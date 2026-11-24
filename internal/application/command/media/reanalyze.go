@@ -45,6 +45,10 @@ func (h *ReanalyzeHandler) Handle(ctx context.Context, cmd ReanalyzeCommand) err
 			if err := h.requeueSilence(ctx, m); err != nil {
 				return err
 			}
+		case string(domainmedia.StepText):
+			if err := h.requeueText(ctx, m); err != nil {
+				return err
+			}
 		default:
 			return errors.New("unsupported reanalyze step")
 		}
@@ -88,9 +92,13 @@ func (h *ReanalyzeHandler) requeueSilence(ctx context.Context, m *domainmedia.Me
 		step.Status = domainmedia.StepStatusQueued
 		step.Progress = 0
 		step.ErrorMessage = nil
+		step.StartedAt = nil
 		step.CompletedAt = nil
 		step.QueuedAt = &now
 		step.Attempt++
+		if step.Attempt < 1 {
+			step.Attempt = 1
+		}
 		if err := h.media.UpdateStep(ctx, step); err != nil {
 			return err
 		}
@@ -100,5 +108,66 @@ func (h *ReanalyzeHandler) requeueSilence(ctx context.Context, m *domainmedia.Me
 		ThresholdMode:      cfg.ThresholdMode,
 		SilenceThresholdDb: cfg.SilenceThresholdDB,
 		NoiseFloorOffsetDb: cfg.NoiseFloorOffsetDb(),
+	})
+}
+
+func (h *ReanalyzeHandler) requeueText(ctx context.Context, m *domainmedia.MediaFile) error {
+	asset, err := h.media.GetAssetByKind(ctx, m.ID, domainmedia.AssetKindWords)
+	if err != nil {
+		return err
+	}
+	if asset == nil || asset.StorageKey == "" {
+		return errors.New("words not ready")
+	}
+	cfg, err := h.media.GetConfiguration(ctx, m.ID)
+	if err != nil {
+		return err
+	}
+	if cfg == nil {
+		cfg = domainmedia.DefaultConfiguration(m.ID)
+	}
+	if !cfg.FillersEnabled && !cfg.RepetitionsEnabled && !cfg.FalseStartsEnabled {
+		return nil
+	}
+
+	now := time.Now().UTC()
+	step, err := h.media.GetStep(ctx, m.ID, domainmedia.StepText)
+	if err != nil {
+		return err
+	}
+	if step == nil {
+		step = domainmedia.NewProcessingStep(m.ID, domainmedia.StepText)
+		step.Status = domainmedia.StepStatusQueued
+		step.QueuedAt = &now
+		step.Attempt = 1
+		if err := h.media.SaveStep(ctx, step); err != nil {
+			return err
+		}
+	} else {
+		step.Status = domainmedia.StepStatusQueued
+		step.Progress = 0
+		step.ErrorMessage = nil
+		step.StartedAt = nil
+		step.CompletedAt = nil
+		step.QueuedAt = &now
+		step.Attempt++
+		if step.Attempt < 1 {
+			step.Attempt = 1
+		}
+		if err := h.media.UpdateStep(ctx, step); err != nil {
+			return err
+		}
+	}
+
+	lang := ""
+	if cfg.Language != nil {
+		lang = *cfg.Language
+	}
+	return h.jobs.PublishTextJob(ctx, m.ID.String(), asset.StorageKey, port.TextJobOptions{
+		Language:           lang,
+		DetectionLevel:     cfg.DetectionLevel,
+		FillersEnabled:     cfg.FillersEnabled,
+		RepetitionsEnabled: cfg.RepetitionsEnabled,
+		FalseStartsEnabled: cfg.FalseStartsEnabled,
 	})
 }

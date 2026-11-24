@@ -26,12 +26,14 @@ type WriteRepository interface {
 	SaveStep(ctx context.Context, step *ProcessingStep) error
 	UpdateStep(ctx context.Context, step *ProcessingStep) error
 	GetStep(ctx context.Context, mediaFileID uuid.UUID, kind StepKind) (*ProcessingStep, error)
+	SaveStepRun(ctx context.Context, run *ProcessingStepRun) error
 }
 
 type ReadRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*FileView, error)
 	ListByProject(ctx context.Context, projectID uuid.UUID, query paginate.PaginateQuery) ([]FileView, int64, error)
 	ListSteps(ctx context.Context, mediaFileID uuid.UUID) ([]StepView, error)
+	ListStepRuns(ctx context.Context, mediaFileID uuid.UUID) ([]StepRunView, error)
 	GetConfiguration(ctx context.Context, mediaFileID uuid.UUID) (*Configuration, error)
 }
 
@@ -67,4 +69,17 @@ type StepView struct {
 	QueuedAt     *time.Time
 	StartedAt    *time.Time
 	CompletedAt  *time.Time
+	DurationMs   *int64
+}
+
+type StepRunView struct {
+	ID           uuid.UUID
+	Kind         StepKind
+	Attempt      int
+	Status       StepStatus
+	StartedAt    time.Time
+	CompletedAt  *time.Time
+	DurationMs   *int64
+	ErrorMessage *string
+	CreatedAt    time.Time
 }

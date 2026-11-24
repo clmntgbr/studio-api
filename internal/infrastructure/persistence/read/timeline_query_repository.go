@@ -50,6 +50,23 @@ func (r *timelineReadRepository) FindHeadByProject(ctx context.Context, projectI
 	return timelineFromScan(row), nil
 }
 
+func (r *timelineReadRepository) ListByProject(ctx context.Context, projectID uuid.UUID) ([]domaintimeline.Timeline, error) {
+	var rows []timelineScan
+	err := r.db.WithContext(ctx).
+		Table("timeline").
+		Where("project_id = ?", projectID).
+		Order("version DESC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domaintimeline.Timeline, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, *timelineFromScan(row))
+	}
+	return out, nil
+}
+
 func (r *timelineReadRepository) ListSegments(ctx context.Context, timelineID uuid.UUID) ([]domaintimeline.Segment, error) {
 	type segScan struct {
 		ID                  uuid.UUID `gorm:"column:id"`

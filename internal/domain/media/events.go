@@ -10,8 +10,9 @@ const (
 	EventTypeMediaAudioReady     = "media.audio_ready.v1"
 	EventTypeMediaProxyReady     = "media.proxy_ready.v1"
 	EventTypeMediaWaveformReady  = "media.waveform_ready.v1"
-	EventTypeMediaReady          = "media.ready.v1"
+	EventTypeMediaReady             = "media.ready.v1"
 	EventTypeMediaDetectionsUpdated = "media.detections_updated.v1"
+	EventTypeMediaTranscribed       = "media.transcribed.v1"
 )
 
 type MediaUploaded struct {
@@ -134,3 +135,17 @@ func (e DetectionsUpdated) EventID() string       { return e.ID }
 func (e DetectionsUpdated) EventType() string     { return EventTypeMediaDetectionsUpdated }
 func (e DetectionsUpdated) AggregateID() string   { return e.MediaID }
 func (e DetectionsUpdated) OccurredAt() time.Time { return e.Timestamp }
+
+type MediaTranscribed struct {
+	ID        string    `json:"eventId"`
+	MediaID   string    `json:"mediaId"`
+	ProjectID string    `json:"projectId"`
+	WordsKey  string    `json:"wordsKey"`
+	Language  string    `json:"language,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e MediaTranscribed) EventID() string       { return e.ID }
+func (e MediaTranscribed) EventType() string     { return EventTypeMediaTranscribed }
+func (e MediaTranscribed) AggregateID() string   { return e.MediaID }
+func (e MediaTranscribed) OccurredAt() time.Time { return e.Timestamp }

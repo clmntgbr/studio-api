@@ -128,6 +128,17 @@ func (m *mockReanalyze) Handle(_ context.Context, cmd cmdmedia.ReanalyzeCommand)
 	return m.err
 }
 
+type mockListStepRuns struct {
+	calls int
+	out   *querymedia.ListStepRunsResult
+	err   error
+}
+
+func (m *mockListStepRuns) Handle(_ context.Context, _ querymedia.ListStepRunsQuery) (*querymedia.ListStepRunsResult, error) {
+	m.calls++
+	return m.out, m.err
+}
+
 func sampleMedia() *domainmedia.MediaFile {
 	now := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
 	key := "media/" + testutil.TestMediaID.String() + "/source/original.mp4"
@@ -159,7 +170,7 @@ func newHandler(
 	get *mockGet,
 	list *mockList,
 ) *handler.MediaHandler {
-	return newHandlerWithConfig(init, presign, complete, fromURL, del, get, list, nil, nil, nil)
+	return newHandlerWithConfig(init, presign, complete, fromURL, del, get, list, nil, nil, nil, nil)
 }
 
 func newHandlerWithConfig(
@@ -173,6 +184,7 @@ func newHandlerWithConfig(
 	updateCfg *mockUpdateConfig,
 	getCfg *mockGetConfig,
 	reanalyze *mockReanalyze,
+	listSteps *mockListStepRuns,
 ) *handler.MediaHandler {
 	if init == nil {
 		init = &mockInitiate{}
@@ -204,7 +216,10 @@ func newHandlerWithConfig(
 	if reanalyze == nil {
 		reanalyze = &mockReanalyze{}
 	}
-	return handler.NewMediaHandler(init, presign, complete, fromURL, del, get, list, updateCfg, getCfg, reanalyze)
+	if listSteps == nil {
+		listSteps = &mockListStepRuns{}
+	}
+	return handler.NewMediaHandler(init, presign, complete, fromURL, del, get, list, updateCfg, getCfg, reanalyze, listSteps)
 }
 
 func mount(h *handler.MediaHandler, withUser bool) *fiber.App {
@@ -227,6 +242,7 @@ func mount(h *handler.MediaHandler, withUser bool) *fiber.App {
 	register(fiber.MethodGet, "/api/media/:id/configuration", h.GetConfiguration)
 	register(fiber.MethodPatch, "/api/media/:id/configuration", h.UpdateConfiguration)
 	register(fiber.MethodPost, "/api/media/:id/reanalyze", h.Reanalyze)
+	register(fiber.MethodGet, "/api/media/:id/steps", h.ListSteps)
 	return app
 }
 

@@ -307,6 +307,20 @@ CREATE TABLE processing_step (
   UNIQUE (media_file_id, kind)
 );
 
+-- historique des exécutions (durée mesurée par étape / tentative)
+CREATE TABLE processing_step_run (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  media_file_id UUID NOT NULL REFERENCES media_file(id) ON DELETE CASCADE,
+  kind step_kind NOT NULL,
+  attempt INTEGER NOT NULL DEFAULT 1,
+  status step_status NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  duration_ms BIGINT,
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE transcript (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   media_file_id UUID NOT NULL UNIQUE REFERENCES media_file(id) ON DELETE CASCADE,
@@ -717,7 +731,7 @@ Conventions : JSON en camelCase, authentification `Authorization: Bearer <clé>`
 | Projets | `GET, POST /api/projects` ; `GET, PATCH, DELETE /api/projects/:id` |
 | Upload | `POST /api/projects/:id/media/uploads` (initie le multipart), `POST /api/media/:id/uploads/parts` (URLs présignées par lot), `POST /api/media/:id/uploads/complete` |
 | Lien | `POST /api/projects/:id/media/from-url` |
-| Médias | `GET /api/projects/:id/media`, `GET, DELETE /api/media/:id` (avec l'état de chaque étape), `PATCH /api/media/:id/configuration`, `POST /api/media/:id/reanalyze` (étapes à relancer), `POST /api/media/:id/steps/:step/retry` |
+| Médias | `GET /api/projects/:id/media`, `GET, DELETE /api/media/:id` (avec l'état de chaque étape), `GET /api/media/:id/steps` (état courant + historique des durées), `PATCH /api/media/:id/configuration`, `POST /api/media/:id/reanalyze` (étapes à relancer), `POST /api/media/:id/steps/:step/retry` |
 | Transcript | `GET /api/media/:id/transcript?fromMs=&toMs=`, `GET /api/media/:id/transcript.srt` |
 | Détections | `GET /api/media/:id/detections?kind=&fromMs=&toMs=` |
 | Overrides | `POST /api/media/:id/overrides` (keep, remove, coupe manuelle), `DELETE /api/overrides/:id` |

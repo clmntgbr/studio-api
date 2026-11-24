@@ -94,3 +94,16 @@ func (h *PublishRealtimeHandler) OnDetectionsUpdated(ctx context.Context, payloa
 		"kind":    evt.Kind,
 	})
 }
+
+func (h *PublishRealtimeHandler) OnTranscribed(ctx context.Context, payload []byte) error {
+	var evt domainmedia.MediaTranscribed
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	return h.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.ProjectID, map[string]any{
+		"mediaId":  evt.MediaID,
+		"step":     "transcribe",
+		"wordsKey": evt.WordsKey,
+		"language": evt.Language,
+	})
+}

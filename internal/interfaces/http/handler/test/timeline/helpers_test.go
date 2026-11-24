@@ -52,6 +52,17 @@ func (m *mockGet) Handle(_ context.Context, _ querytimeline.GetTimelineQuery) (*
 	return m.view, m.err
 }
 
+type mockListVersions struct {
+	calls int
+	items []domaintimeline.Timeline
+	err   error
+}
+
+func (m *mockListVersions) Handle(_ context.Context, _ querytimeline.ListVersionsQuery) ([]domaintimeline.Timeline, error) {
+	m.calls++
+	return m.items, m.err
+}
+
 func sampleTimeline() *domaintimeline.Timeline {
 	now := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
 	return &domaintimeline.Timeline{
@@ -101,6 +112,15 @@ func samplePreview() *cmdtimeline.PreviewResult {
 }
 
 func newHandler(preview *mockPreview, validate *mockValidate, get *mockGet) *handler.TimelineHandler {
+	return newHandlerFull(preview, validate, get, nil)
+}
+
+func newHandlerFull(
+	preview *mockPreview,
+	validate *mockValidate,
+	get *mockGet,
+	list *mockListVersions,
+) *handler.TimelineHandler {
 	if preview == nil {
 		preview = &mockPreview{}
 	}
@@ -110,7 +130,10 @@ func newHandler(preview *mockPreview, validate *mockValidate, get *mockGet) *han
 	if get == nil {
 		get = &mockGet{}
 	}
-	return handler.NewTimelineHandler(preview, validate, get)
+	if list == nil {
+		list = &mockListVersions{}
+	}
+	return handler.NewTimelineHandler(preview, validate, get, list)
 }
 
 func mount(h *handler.TimelineHandler, withUser bool) *fiber.App {
@@ -118,11 +141,13 @@ func mount(h *handler.TimelineHandler, withUser bool) *fiber.App {
 	auth := testutil.WithUserWithoutProject(testutil.TestUserID)
 	if withUser {
 		app.Get("/api/projects/:id/timeline", auth, h.Get)
+		app.Get("/api/projects/:id/timeline/versions", auth, h.ListVersions)
 		app.Post("/api/projects/:id/timeline/preview", auth, h.Preview)
 		app.Post("/api/projects/:id/timeline/validate", auth, h.Validate)
 		return app
 	}
 	app.Get("/api/projects/:id/timeline", h.Get)
+	app.Get("/api/projects/:id/timeline/versions", h.ListVersions)
 	app.Post("/api/projects/:id/timeline/preview", h.Preview)
 	app.Post("/api/projects/:id/timeline/validate", h.Validate)
 	return app

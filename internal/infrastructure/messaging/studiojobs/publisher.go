@@ -30,7 +30,7 @@ func NewPublisher(rabbitURL string) (*Publisher, error) {
 		_ = conn.Close()
 		return nil, err
 	}
-	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform", "silence"} {
+	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform", "silence", "transcribe", "text"} {
 		if err := topology.DeclareJobQueue(ch, job, 30000); err != nil {
 			_ = ch.Close()
 			_ = conn.Close()
@@ -129,6 +129,44 @@ func (p *Publisher) PublishSilenceJob(ctx context.Context, mediaID, audioKey str
 		return err
 	}
 	return p.bus.PublishJob(ctx, "job.silence", body, msg.MessageID, mediaID)
+}
+
+func (p *Publisher) PublishTranscribeJob(ctx context.Context, mediaID, audioKey string, opts port.TranscribeJobOptions) error {
+	payload := map[string]any{
+		"mediaId":  mediaID,
+		"audioKey": audioKey,
+	}
+	if opts.Language != nil && *opts.Language != "" {
+		payload["language"] = *opts.Language
+	}
+	msg, body, err := envelope.NewJob("transcribe", mediaID, "", 1, payload)
+	if err != nil {
+		return err
+	}
+	return p.bus.PublishJob(ctx, "job.transcribe", body, msg.MessageID, mediaID)
+}
+
+func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string, opts port.TextJobOptions) error {
+	if opts.Language == "" {
+		opts.Language = "fr"
+	}
+	if opts.DetectionLevel == "" {
+		opts.DetectionLevel = "aggressive"
+	}
+	payload := map[string]any{
+		"mediaId":              mediaID,
+		"wordsKey":             wordsKey,
+		"language":             opts.Language,
+		"detectionLevel":       opts.DetectionLevel,
+		"fillersEnabled":       opts.FillersEnabled,
+		"repetitionsEnabled":   opts.RepetitionsEnabled,
+		"falseStartsEnabled":   opts.FalseStartsEnabled,
+	}
+	msg, body, err := envelope.NewJob("text", mediaID, "", 1, payload)
+	if err != nil {
+		return err
+	}
+	return p.bus.PublishJob(ctx, "job.text", body, msg.MessageID, mediaID)
 }
 
 var _ port.JobPublisher = (*Publisher)(nil)

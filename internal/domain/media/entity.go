@@ -265,6 +265,19 @@ func (m *MediaFile) RecordWaveformReady(peaksKey string) {
 	})
 }
 
+func (m *MediaFile) RecordTranscribed(wordsKey, language string) {
+	now := time.Now().UTC()
+	m.UpdatedAt = now
+	m.recordEvent(MediaTranscribed{
+		ID:        uuid.New().String(),
+		MediaID:   m.ID.String(),
+		ProjectID: m.ProjectID.String(),
+		WordsKey:  wordsKey,
+		Language:  language,
+		Timestamp: now,
+	})
+}
+
 type Asset struct {
 	ID          uuid.UUID
 	MediaFileID uuid.UUID
@@ -364,5 +377,45 @@ func NewProcessingStep(mediaFileID uuid.UUID, kind StepKind) *ProcessingStep {
 		Kind:        kind,
 		Status:      StepStatusPending,
 		CreatedAt:   time.Now().UTC(),
+	}
+}
+
+// ProcessingStepRun is one execution attempt of a pipeline step for a media file.
+// processing_step holds current state; runs keep history and measured durations.
+type ProcessingStepRun struct {
+	ID           uuid.UUID
+	MediaFileID  uuid.UUID
+	Kind         StepKind
+	Attempt      int
+	Status       StepStatus
+	StartedAt    time.Time
+	CompletedAt  *time.Time
+	DurationMs   *int64
+	ErrorMessage *string
+	CreatedAt    time.Time
+}
+
+func NewProcessingStepRun(mediaFileID uuid.UUID, kind StepKind, attempt int, startedAt, completedAt time.Time, status StepStatus, errMsg *string) *ProcessingStepRun {
+	var dur *int64
+	if !completedAt.IsZero() && !startedAt.IsZero() && !completedAt.Before(startedAt) {
+		ms := completedAt.Sub(startedAt).Milliseconds()
+		dur = &ms
+	}
+	var completed *time.Time
+	if !completedAt.IsZero() {
+		c := completedAt
+		completed = &c
+	}
+	return &ProcessingStepRun{
+		ID:           uuid.New(),
+		MediaFileID:  mediaFileID,
+		Kind:         kind,
+		Attempt:      attempt,
+		Status:       status,
+		StartedAt:    startedAt,
+		CompletedAt:  completed,
+		DurationMs:   dur,
+		ErrorMessage: errMsg,
+		CreatedAt:    time.Now().UTC(),
 	}
 }

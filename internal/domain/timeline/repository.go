@@ -18,6 +18,7 @@ type WriteRepository interface {
 type ReadRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Timeline, error)
 	FindHeadByProject(ctx context.Context, projectID uuid.UUID) (*Timeline, error)
+	ListByProject(ctx context.Context, projectID uuid.UUID) ([]Timeline, error)
 	ListSegments(ctx context.Context, timelineID uuid.UUID) ([]Segment, error)
 	ListDecisions(ctx context.Context, timelineID uuid.UUID) ([]Decision, error)
 }

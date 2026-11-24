@@ -76,6 +76,9 @@ func (h *ApplyAudioResultHandler) Handle(ctx context.Context, cmd ApplyAudioResu
 		if err := queueStep(txCtx, h.media, m.ID, domainmedia.StepSilence, now); err != nil {
 			return err
 		}
+		if err := queueStep(txCtx, h.media, m.ID, domainmedia.StepTranscribe, now); err != nil {
+			return err
+		}
 		return h.outbox.StoreEvents(txCtx, m.PullEvents())
 	})
 	if err != nil {

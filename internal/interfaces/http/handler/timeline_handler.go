@@ -15,20 +15,23 @@ import (
 )
 
 type TimelineHandler struct {
-	previewHandler  timelinePreviewHandler
-	validateHandler timelineValidateHandler
-	getHandler      timelineGetHandler
+	previewHandler      timelinePreviewHandler
+	validateHandler     timelineValidateHandler
+	getHandler          timelineGetHandler
+	listVersionsHandler timelineListVersionsHandler
 }
 
 func NewTimelineHandler(
 	previewHandler timelinePreviewHandler,
 	validateHandler timelineValidateHandler,
 	getHandler timelineGetHandler,
+	listVersionsHandler timelineListVersionsHandler,
 ) *TimelineHandler {
 	return &TimelineHandler{
-		previewHandler:  previewHandler,
-		validateHandler: validateHandler,
-		getHandler:      getHandler,
+		previewHandler:      previewHandler,
+		validateHandler:     validateHandler,
+		getHandler:          getHandler,
+		listVersionsHandler: listVersionsHandler,
 	}
 }
 
@@ -56,6 +59,21 @@ func (h *TimelineHandler) Get(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to get timeline"})
 	}
 	return c.Status(fiber.StatusOK).JSON(presenter.NewTimelineResponseFromView(view))
+}
+
+func (h *TimelineHandler) ListVersions(c fiber.Ctx) error {
+	if _, err := httpctx.GetUser(c); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
+	}
+	projectID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+	}
+	items, err := h.listVersionsHandler.Handle(c.Context(), querytimeline.ListVersionsQuery{ProjectID: projectID})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list timeline versions"})
+	}
+	return c.Status(fiber.StatusOK).JSON(presenter.NewTimelineVersionListResponse(items))
 }
 
 func (h *TimelineHandler) Preview(c fiber.Ctx) error {

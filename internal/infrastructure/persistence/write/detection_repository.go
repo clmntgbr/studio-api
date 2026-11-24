@@ -50,6 +50,10 @@ func (r *detectionWriteRepository) SaveOverride(ctx context.Context, o *domainde
 	return DBWithContext(ctx, r.db).Create(overrideModelFromDomain(o)).Error
 }
 
+func (r *detectionWriteRepository) DeleteOverride(ctx context.Context, id uuid.UUID) error {
+	return DBWithContext(ctx, r.db).Where("id = ?", id).Delete(&UserOverrideModel{}).Error
+}
+
 func (r *detectionWriteRepository) DeleteOverridesByMedia(ctx context.Context, mediaFileID uuid.UUID) error {
 	return DBWithContext(ctx, r.db).Where("media_file_id = ?", mediaFileID).Delete(&UserOverrideModel{}).Error
 }

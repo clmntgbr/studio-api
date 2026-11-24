@@ -4,6 +4,7 @@ import (
 	"log"
 
 	authcmd "go-api/internal/application/command/auth"
+	detectioncmd "go-api/internal/application/command/detection"
 	identitycmd "go-api/internal/application/command/identity"
 	mediacmd "go-api/internal/application/command/media"
 	projectcmd "go-api/internal/application/command/project"
@@ -13,6 +14,7 @@ import (
 	querymedia "go-api/internal/application/query/media"
 	queryproject "go-api/internal/application/query/project"
 	querytimeline "go-api/internal/application/query/timeline"
+	querytranscript "go-api/internal/application/query/transcript"
 	queryuser "go-api/internal/application/query/user"
 	"go-api/internal/infrastructure/centrifugo"
 	infraClerk "go-api/internal/infrastructure/clerk"
@@ -39,6 +41,8 @@ type Container struct {
 	ProjectHandler         *httphandler.ProjectHandler
 	MediaHandler           *httphandler.MediaHandler
 	DetectionHandler       *httphandler.DetectionHandler
+	OverrideHandler        *httphandler.OverrideHandler
+	TranscriptHandler      *httphandler.TranscriptHandler
 	TimelineHandler        *httphandler.TimelineHandler
 }
 
@@ -55,7 +59,9 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	projectReadRepo := read.NewProjectReadRepository(db)
 	mediaWriteRepo := write.NewMediaWriteRepository(db)
 	mediaReadRepo := read.NewMediaReadRepository(db)
+	detectionWriteRepo := write.NewDetectionWriteRepository(db)
 	detectionReadRepo := read.NewDetectionReadRepository(db)
+	transcriptReadRepo := read.NewTranscriptReadRepository(db)
 	timelineWriteRepo := write.NewTimelineWriteRepository(db)
 	timelineReadRepo := read.NewTimelineReadRepository(db)
 
@@ -101,11 +107,17 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	updateConfigHandler := mediacmd.NewUpdateConfigurationHandler(mediaWriteRepo)
 	getConfigHandler := querymedia.NewGetConfigurationHandler(mediaReadRepo)
 	reanalyzeHandler := mediacmd.NewReanalyzeHandler(mediaWriteRepo, jobPublisher)
+	listStepRunsHandler := querymedia.NewListStepRunsHandler(mediaReadRepo)
 	listDetectionsHandler := querydetection.NewListDetectionsHandler(detectionReadRepo)
+	createOverrideHandler := detectioncmd.NewCreateOverrideHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
+	deleteOverrideHandler := detectioncmd.NewDeleteOverrideHandler(mediaWriteRepo, detectionWriteRepo, detectionReadRepo, outboxRepo)
+	getTranscriptHandler := querytranscript.NewGetTranscriptHandler(transcriptReadRepo)
+	getTranscriptSRTHandler := querytranscript.NewGetSRTHandler(transcriptReadRepo)
 
 	previewTimeline := timelinecmd.NewPreviewHandler(mediaWriteRepo, mediaReadRepo, detectionReadRepo)
 	validateTimeline := timelinecmd.NewValidateHandler(timelineWriteRepo, timelineReadRepo)
 	getTimeline := querytimeline.NewGetTimelineHandler(timelineReadRepo)
+	listTimelineVersions := querytimeline.NewListVersionsHandler(timelineReadRepo)
 
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
@@ -142,12 +154,16 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			updateConfigHandler,
 			getConfigHandler,
 			reanalyzeHandler,
+			listStepRunsHandler,
 		),
-		DetectionHandler: httphandler.NewDetectionHandler(listDetectionsHandler),
+		DetectionHandler:  httphandler.NewDetectionHandler(listDetectionsHandler),
+		OverrideHandler:   httphandler.NewOverrideHandler(createOverrideHandler, deleteOverrideHandler),
+		TranscriptHandler: httphandler.NewTranscriptHandler(getTranscriptHandler, getTranscriptSRTHandler),
 		TimelineHandler: httphandler.NewTimelineHandler(
 			previewTimeline,
 			validateTimeline,
 			getTimeline,
+			listTimelineVersions,
 		),
 	}
 }

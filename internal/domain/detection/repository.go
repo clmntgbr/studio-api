@@ -12,10 +12,12 @@ type WriteRepository interface {
 	SaveMany(ctx context.Context, items []*Detection) error
 	DeleteByMediaAndKind(ctx context.Context, mediaFileID uuid.UUID, kind Kind) error
 	SaveOverride(ctx context.Context, o *Override) error
+	DeleteOverride(ctx context.Context, id uuid.UUID) error
 	DeleteOverridesByMedia(ctx context.Context, mediaFileID uuid.UUID) error
 }
 
 type ReadRepository interface {
 	ListByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]Detection, error)
+	GetOverrideByID(ctx context.Context, id uuid.UUID) (*Override, error)
 	ListOverridesByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]Override, error)
 }

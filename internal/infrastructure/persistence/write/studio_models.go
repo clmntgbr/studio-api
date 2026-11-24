@@ -94,6 +94,21 @@ type ProcessingStepModel struct {
 
 func (ProcessingStepModel) TableName() string { return "processing_step" }
 
+type ProcessingStepRunModel struct {
+	ID           uuid.UUID  `gorm:"column:id;primaryKey"`
+	MediaFileID  uuid.UUID  `gorm:"column:media_file_id"`
+	Kind         string     `gorm:"column:kind"`
+	Attempt      int        `gorm:"column:attempt"`
+	Status       string     `gorm:"column:status"`
+	StartedAt    time.Time  `gorm:"column:started_at"`
+	CompletedAt  *time.Time `gorm:"column:completed_at"`
+	DurationMs   *int64     `gorm:"column:duration_ms"`
+	ErrorMessage *string    `gorm:"column:error_message"`
+	CreatedAt    time.Time  `gorm:"column:created_at"`
+}
+
+func (ProcessingStepRunModel) TableName() string { return "processing_step_run" }
+
 type TranscriptModel struct {
 	ID            uuid.UUID `gorm:"column:id;primaryKey"`
 	MediaFileID   uuid.UUID `gorm:"column:media_file_id"`

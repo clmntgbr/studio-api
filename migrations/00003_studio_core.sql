@@ -301,6 +301,7 @@ DROP TABLE IF EXISTS user_override;
 DROP TABLE IF EXISTS detection;
 DROP TABLE IF EXISTS transcript_word;
 DROP TABLE IF EXISTS transcript;
+DROP TABLE IF EXISTS processing_step_run;
 DROP TABLE IF EXISTS processing_step;
 DROP TABLE IF EXISTS media_configuration;
 DROP TABLE IF EXISTS media_asset;

@@ -21,6 +21,7 @@ func Models() []any {
 		&write.MediaAssetModel{},
 		&write.MediaConfigurationModel{},
 		&write.ProcessingStepModel{},
+		&write.ProcessingStepRunModel{},
 		&write.TranscriptModel{},
 		&write.TranscriptWordModel{},
 		&write.DetectionModel{},

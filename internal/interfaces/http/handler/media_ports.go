@@ -48,3 +48,7 @@ type mediaGetConfigurationHandler interface {
 type mediaReanalyzeHandler interface {
 	Handle(ctx context.Context, cmd cmdmedia.ReanalyzeCommand) error
 }
+
+type mediaListStepRunsHandler interface {
+	Handle(ctx context.Context, q querymedia.ListStepRunsQuery) (*querymedia.ListStepRunsResult, error)
+}

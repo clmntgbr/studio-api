@@ -132,6 +132,25 @@ func (r *mediaWriteRepository) GetStep(ctx context.Context, mediaFileID uuid.UUI
 	return processingStepDomainFromModel(&model), nil
 }
 
+func (r *mediaWriteRepository) SaveStepRun(ctx context.Context, run *domainmedia.ProcessingStepRun) error {
+	return DBWithContext(ctx, r.db).Create(processingStepRunModelFromDomain(run)).Error
+}
+
+func processingStepRunModelFromDomain(r *domainmedia.ProcessingStepRun) *ProcessingStepRunModel {
+	return &ProcessingStepRunModel{
+		ID:           r.ID,
+		MediaFileID:  r.MediaFileID,
+		Kind:         string(r.Kind),
+		Attempt:      r.Attempt,
+		Status:       string(r.Status),
+		StartedAt:    r.StartedAt,
+		CompletedAt:  r.CompletedAt,
+		DurationMs:   r.DurationMs,
+		ErrorMessage: r.ErrorMessage,
+		CreatedAt:    r.CreatedAt,
+	}
+}
+
 func processingStepDomainFromModel(s *ProcessingStepModel) *domainmedia.ProcessingStep {
 	return &domainmedia.ProcessingStep{
 		ID:           s.ID,

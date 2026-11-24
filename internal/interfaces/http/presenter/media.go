@@ -16,6 +16,24 @@ type MediaStepResponse struct {
 	QueuedAt     *time.Time `json:"queuedAt,omitempty"`
 	StartedAt    *time.Time `json:"startedAt,omitempty"`
 	CompletedAt  *time.Time `json:"completedAt,omitempty"`
+	DurationMs   *int64     `json:"durationMs,omitempty"`
+}
+
+type MediaStepRunResponse struct {
+	ID           string     `json:"id"`
+	Kind         string     `json:"kind"`
+	Attempt      int        `json:"attempt"`
+	Status       string     `json:"status"`
+	StartedAt    time.Time  `json:"startedAt"`
+	CompletedAt  *time.Time `json:"completedAt,omitempty"`
+	DurationMs   *int64     `json:"durationMs,omitempty"`
+	ErrorMessage *string    `json:"errorMessage,omitempty"`
+	CreatedAt    time.Time  `json:"createdAt"`
+}
+
+type MediaStepsResponse struct {
+	Steps []MediaStepResponse    `json:"steps"`
+	Runs  []MediaStepRunResponse `json:"runs"`
 }
 
 type MediaResponse struct {
@@ -41,15 +59,7 @@ type MediaResponse struct {
 func NewMediaResponseFromView(v domainmedia.FileView) MediaResponse {
 	steps := make([]MediaStepResponse, 0, len(v.Steps))
 	for _, s := range v.Steps {
-		steps = append(steps, MediaStepResponse{
-			Kind:         string(s.Kind),
-			Status:       string(s.Status),
-			Progress:     s.Progress,
-			ErrorMessage: s.ErrorMessage,
-			QueuedAt:     s.QueuedAt,
-			StartedAt:    s.StartedAt,
-			CompletedAt:  s.CompletedAt,
-		})
+		steps = append(steps, NewMediaStepResponse(s))
 	}
 	return MediaResponse{
 		ID:               v.ID.String(),
@@ -100,6 +110,41 @@ func NewMediaListResponseFromViews(views []domainmedia.FileView) []MediaResponse
 		out = append(out, NewMediaResponseFromView(v))
 	}
 	return out
+}
+
+func NewMediaStepResponse(s domainmedia.StepView) MediaStepResponse {
+	return MediaStepResponse{
+		Kind:         string(s.Kind),
+		Status:       string(s.Status),
+		Progress:     s.Progress,
+		ErrorMessage: s.ErrorMessage,
+		QueuedAt:     s.QueuedAt,
+		StartedAt:    s.StartedAt,
+		CompletedAt:  s.CompletedAt,
+		DurationMs:   s.DurationMs,
+	}
+}
+
+func NewMediaStepsResponse(steps []domainmedia.StepView, runs []domainmedia.StepRunView) MediaStepsResponse {
+	stepOut := make([]MediaStepResponse, 0, len(steps))
+	for _, s := range steps {
+		stepOut = append(stepOut, NewMediaStepResponse(s))
+	}
+	runOut := make([]MediaStepRunResponse, 0, len(runs))
+	for _, r := range runs {
+		runOut = append(runOut, MediaStepRunResponse{
+			ID:           r.ID.String(),
+			Kind:         string(r.Kind),
+			Attempt:      r.Attempt,
+			Status:       string(r.Status),
+			StartedAt:    r.StartedAt,
+			CompletedAt:  r.CompletedAt,
+			DurationMs:   r.DurationMs,
+			ErrorMessage: r.ErrorMessage,
+			CreatedAt:    r.CreatedAt,
+		})
+	}
+	return MediaStepsResponse{Steps: stepOut, Runs: runOut}
 }
 
 type UploadPartResponse struct {

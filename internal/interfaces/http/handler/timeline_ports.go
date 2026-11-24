@@ -19,3 +19,7 @@ type timelineValidateHandler interface {
 type timelineGetHandler interface {
 	Handle(ctx context.Context, q querytimeline.GetTimelineQuery) (*querytimeline.TimelineView, error)
 }
+
+type timelineListVersionsHandler interface {
+	Handle(ctx context.Context, q querytimeline.ListVersionsQuery) ([]domaintimeline.Timeline, error)
+}

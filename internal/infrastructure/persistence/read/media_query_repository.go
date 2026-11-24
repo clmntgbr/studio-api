@@ -92,6 +92,62 @@ func (r *mediaReadRepository) ListSteps(ctx context.Context, mediaFileID uuid.UU
 			QueuedAt:     row.QueuedAt,
 			StartedAt:    row.StartedAt,
 			CompletedAt:  row.CompletedAt,
+			DurationMs:   stepDurationMs(row.StartedAt, row.QueuedAt, row.CompletedAt),
+		})
+	}
+	return out, nil
+}
+
+func stepDurationMs(startedAt, queuedAt, completedAt *time.Time) *int64 {
+	if completedAt == nil {
+		return nil
+	}
+	start := startedAt
+	if start == nil {
+		start = queuedAt
+	}
+	if start == nil {
+		return nil
+	}
+	ms := completedAt.Sub(*start).Milliseconds()
+	if ms < 0 {
+		ms = 0
+	}
+	return &ms
+}
+
+func (r *mediaReadRepository) ListStepRuns(ctx context.Context, mediaFileID uuid.UUID) ([]domainmedia.StepRunView, error) {
+	var rows []struct {
+		ID           uuid.UUID  `gorm:"column:id"`
+		Kind         string     `gorm:"column:kind"`
+		Attempt      int        `gorm:"column:attempt"`
+		Status       string     `gorm:"column:status"`
+		StartedAt    time.Time  `gorm:"column:started_at"`
+		CompletedAt  *time.Time `gorm:"column:completed_at"`
+		DurationMs   *int64     `gorm:"column:duration_ms"`
+		ErrorMessage *string    `gorm:"column:error_message"`
+		CreatedAt    time.Time  `gorm:"column:created_at"`
+	}
+	err := r.db.WithContext(ctx).
+		Table("processing_step_run").
+		Where("media_file_id = ?", mediaFileID).
+		Order("created_at ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domainmedia.StepRunView, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domainmedia.StepRunView{
+			ID:           row.ID,
+			Kind:         domainmedia.StepKind(row.Kind),
+			Attempt:      row.Attempt,
+			Status:       domainmedia.StepStatus(row.Status),
+			StartedAt:    row.StartedAt,
+			CompletedAt:  row.CompletedAt,
+			DurationMs:   row.DurationMs,
+			ErrorMessage: row.ErrorMessage,
+			CreatedAt:    row.CreatedAt,
 		})
 	}
 	return out, nil

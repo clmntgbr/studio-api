@@ -9,27 +9,128 @@ import (
 	"github.com/google/uuid"
 )
 
+// CompleteStep marks a processing step completed and appends a timing run.
+func CompleteStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {
+	return completeStep(ctx, repo, mediaID, kind, at)
+}
+
 func completeStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {
+	step, err := repo.GetStep(ctx, mediaID, kind)
+	if err != nil {
+		return err
+	}
+	created := false
+	if step == nil {
+		step = domainmedia.NewProcessingStep(mediaID, kind)
+		created = true
+	}
+	if !created && step.Status == domainmedia.StepStatusCompleted {
+		return nil
+	}
+
+	started := at
+	if step.StartedAt != nil {
+		started = *step.StartedAt
+	} else if step.QueuedAt != nil {
+		started = *step.QueuedAt
+	} else if !step.CreatedAt.IsZero() {
+		started = step.CreatedAt
+	}
+	step.StartedAt = &started
+	step.Status = domainmedia.StepStatusCompleted
+	step.Progress = 1
+	completed := at
+	step.CompletedAt = &completed
+	if step.Attempt < 1 {
+		step.Attempt = 1
+	}
+
+	run := domainmedia.NewProcessingStepRun(mediaID, kind, step.Attempt, started, at, domainmedia.StepStatusCompleted, nil)
+
+	if created {
+		if err := repo.SaveStep(ctx, step); err != nil {
+			return err
+		}
+	} else {
+		if err := repo.UpdateStep(ctx, step); err != nil {
+			return err
+		}
+	}
+	return repo.SaveStepRun(ctx, run)
+}
+
+// MarkStepRunning sets a step to running (first progress tick). Idempotent for completed steps.
+func MarkStepRunning(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {
 	step, err := repo.GetStep(ctx, mediaID, kind)
 	if err != nil {
 		return err
 	}
 	if step == nil {
 		step = domainmedia.NewProcessingStep(mediaID, kind)
-		step.Status = domainmedia.StepStatusCompleted
-		step.Progress = 1
-		completed := at
-		step.CompletedAt = &completed
+		step.Status = domainmedia.StepStatusRunning
+		step.QueuedAt = &at
+		step.StartedAt = &at
 		return repo.SaveStep(ctx, step)
 	}
-	if step.Status == domainmedia.StepStatusCompleted {
+	if step.Status == domainmedia.StepStatusCompleted ||
+		step.Status == domainmedia.StepStatusFailed ||
+		step.Status == domainmedia.StepStatusCancelled ||
+		step.Status == domainmedia.StepStatusRunning {
 		return nil
 	}
-	step.Status = domainmedia.StepStatusCompleted
-	step.Progress = 1
+	step.Status = domainmedia.StepStatusRunning
+	if step.StartedAt == nil {
+		step.StartedAt = &at
+	}
+	return repo.UpdateStep(ctx, step)
+}
+
+// FailStep marks a processing step as failed and records a timing run.
+func FailStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time, errMsg string) error {
+	step, err := repo.GetStep(ctx, mediaID, kind)
+	if err != nil {
+		return err
+	}
+	created := false
+	if step == nil {
+		step = domainmedia.NewProcessingStep(mediaID, kind)
+		created = true
+	}
+	if !created && (step.Status == domainmedia.StepStatusCompleted || step.Status == domainmedia.StepStatusFailed) {
+		return nil
+	}
+	started := at
+	if step.StartedAt != nil {
+		started = *step.StartedAt
+	} else if step.QueuedAt != nil {
+		started = *step.QueuedAt
+	}
+	step.StartedAt = &started
+	step.Status = domainmedia.StepStatusFailed
+	msg := errMsg
+	if msg == "" {
+		msg = "step failed"
+	}
+	step.ErrorMessage = &msg
 	completed := at
 	step.CompletedAt = &completed
-	return repo.UpdateStep(ctx, step)
+	if step.Attempt < 1 {
+		step.Attempt = 1
+	}
+	run := domainmedia.NewProcessingStepRun(mediaID, kind, step.Attempt, started, at, domainmedia.StepStatusFailed, &msg)
+	if created {
+		if err := repo.SaveStep(ctx, step); err != nil {
+			return err
+		}
+	} else if err := repo.UpdateStep(ctx, step); err != nil {
+		return err
+	}
+	return repo.SaveStepRun(ctx, run)
+}
+
+// QueueStep marks a processing step as queued.
+func QueueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {
+	return queueStep(ctx, repo, mediaID, kind, at)
 }
 
 func queueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {

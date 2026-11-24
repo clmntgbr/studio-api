@@ -129,3 +129,31 @@ func NewTimelineResponseFromEntity(t *domaintimeline.Timeline, out eng.Output) T
 	resp.CreatedAt = &created
 	return resp
 }
+
+type TimelineVersionResponse struct {
+	ID          string     `json:"id"`
+	ProjectID   string     `json:"projectId"`
+	Version     int        `json:"version"`
+	Status      string     `json:"status"`
+	Fingerprint string     `json:"fingerprint"`
+	DurationMs  int64      `json:"durationMs"`
+	ValidatedAt *time.Time `json:"validatedAt,omitempty"`
+	CreatedAt   time.Time  `json:"createdAt"`
+}
+
+func NewTimelineVersionListResponse(items []domaintimeline.Timeline) []TimelineVersionResponse {
+	out := make([]TimelineVersionResponse, 0, len(items))
+	for _, t := range items {
+		out = append(out, TimelineVersionResponse{
+			ID:          t.ID.String(),
+			ProjectID:   t.ProjectID.String(),
+			Version:     t.Version,
+			Status:      string(t.Status),
+			Fingerprint: t.Fingerprint,
+			DurationMs:  t.DurationMs,
+			ValidatedAt: t.ValidatedAt,
+			CreatedAt:   t.CreatedAt,
+		})
+	}
+	return out
+}

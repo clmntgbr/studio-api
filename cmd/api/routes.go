@@ -34,6 +34,8 @@ func setupAPIRoutes(app *fiber.App, container *di.Container) {
 	setupProjectRoutes(protected, container)
 	setupMediaRoutes(protected, container)
 	setupDetectionRoutes(protected, container)
+	setupOverrideRoutes(protected, container)
+	setupTranscriptRoutes(protected, container)
 	setupTimelineRoutes(protected, container)
 }
 
@@ -59,6 +61,7 @@ func setupProjectRoutes(api fiber.Router, container *di.Container) {
 
 func setupMediaRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/media/:id", container.MediaHandler.GetByID)
+	api.Get("/media/:id/steps", container.MediaHandler.ListSteps)
 	api.Delete("/media/:id", container.MediaHandler.Delete)
 	api.Post("/media/:id/uploads/parts", container.MediaHandler.PresignParts)
 	api.Post("/media/:id/uploads/complete", container.MediaHandler.CompleteUpload)
@@ -71,8 +74,19 @@ func setupDetectionRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/media/:id/detections", container.DetectionHandler.ListByMedia)
 }
 
+func setupOverrideRoutes(api fiber.Router, container *di.Container) {
+	api.Post("/media/:id/overrides", container.OverrideHandler.Create)
+	api.Delete("/overrides/:id", container.OverrideHandler.Delete)
+}
+
+func setupTranscriptRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/media/:id/transcript.srt", container.TranscriptHandler.GetSRT)
+	api.Get("/media/:id/transcript", container.TranscriptHandler.GetByMedia)
+}
+
 func setupTimelineRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/projects/:id/timeline", container.TimelineHandler.Get)
+	api.Get("/projects/:id/timeline/versions", container.TimelineHandler.ListVersions)
 	api.Post("/projects/:id/timeline/preview", container.TimelineHandler.Preview)
 	api.Post("/projects/:id/timeline/validate", container.TimelineHandler.Validate)
 }

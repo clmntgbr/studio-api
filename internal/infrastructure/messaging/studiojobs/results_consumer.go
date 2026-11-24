@@ -7,7 +7,10 @@ import (
 	"log"
 	"time"
 
+	detectioncmd "go-api/internal/application/command/detection"
 	mediacmd "go-api/internal/application/command/media"
+	transcriptcmd "go-api/internal/application/command/transcript"
+	domainmedia "go-api/internal/domain/media"
 	"go-api/internal/pipeline"
 	"go-api/internal/studio/envelope"
 	"go-api/internal/studio/topology"
@@ -18,18 +21,22 @@ import (
 
 // ResultsConsumer consumes studio.results (q.results) and runs shared post-source orchestration.
 type ResultsConsumer struct {
-	url          string
-	markReady    *mediacmd.MarkSourceReadyHandler
-	markFail     *mediacmd.MarkFetchFailedHandler
-	applyProbe   *mediacmd.ApplyProbeResultHandler
-	applyAudio   *mediacmd.ApplyAudioResultHandler
-	applyProxy   *mediacmd.ApplyProxyResultHandler
-	applyWave    *mediacmd.ApplyWaveformResultHandler
-	applySilence *mediacmd.ApplySilenceResultHandler
+	url             string
+	media           domainmedia.WriteRepository
+	markReady       *mediacmd.MarkSourceReadyHandler
+	markFail        *mediacmd.MarkFetchFailedHandler
+	applyProbe      *mediacmd.ApplyProbeResultHandler
+	applyAudio      *mediacmd.ApplyAudioResultHandler
+	applyProxy      *mediacmd.ApplyProxyResultHandler
+	applyWave       *mediacmd.ApplyWaveformResultHandler
+	applySilence    *mediacmd.ApplySilenceResultHandler
+	applyTranscript *transcriptcmd.ApplyResultHandler
+	applyText       *detectioncmd.ApplyTextResultHandler
 }
 
 func NewResultsConsumer(
 	rabbitURL string,
+	media domainmedia.WriteRepository,
 	markReady *mediacmd.MarkSourceReadyHandler,
 	markFail *mediacmd.MarkFetchFailedHandler,
 	applyProbe *mediacmd.ApplyProbeResultHandler,
@@ -37,16 +44,21 @@ func NewResultsConsumer(
 	applyProxy *mediacmd.ApplyProxyResultHandler,
 	applyWave *mediacmd.ApplyWaveformResultHandler,
 	applySilence *mediacmd.ApplySilenceResultHandler,
+	applyTranscript *transcriptcmd.ApplyResultHandler,
+	applyText *detectioncmd.ApplyTextResultHandler,
 ) *ResultsConsumer {
 	return &ResultsConsumer{
-		url:          rabbitURL,
-		markReady:    markReady,
-		markFail:     markFail,
-		applyProbe:   applyProbe,
-		applyAudio:   applyAudio,
-		applyProxy:   applyProxy,
-		applyWave:    applyWave,
-		applySilence: applySilence,
+		url:             rabbitURL,
+		media:           media,
+		markReady:       markReady,
+		markFail:        markFail,
+		applyProbe:      applyProbe,
+		applyAudio:      applyAudio,
+		applyProxy:      applyProxy,
+		applyWave:       applyWave,
+		applySilence:    applySilence,
+		applyTranscript: applyTranscript,
+		applyText:       applyText,
 	}
 }
 
@@ -122,9 +134,12 @@ func (c *ResultsConsumer) handle(ctx context.Context, bus *topology.Bus, d amqp.
 		handleErr = c.onWaveformSucceeded(ctx, msg)
 	case "result.silence.succeeded":
 		handleErr = c.onSilenceSucceeded(ctx, msg)
-	case "result.probe.failed", "result.audio.failed", "result.proxy.failed", "result.waveform.failed", "result.silence.failed":
-		log.Printf("pipeline step failed type=%s correlationId=%s", msg.Type, msg.CorrelationID)
-		handleErr = nil
+	case "result.transcribe.succeeded":
+		handleErr = c.onTranscribeSucceeded(ctx, msg)
+	case "result.text.succeeded":
+		handleErr = c.onTextSucceeded(ctx, msg)
+	case "result.probe.failed", "result.audio.failed", "result.proxy.failed", "result.waveform.failed", "result.silence.failed", "result.transcribe.failed", "result.text.failed":
+		handleErr = c.onStepFailed(ctx, msg)
 	default:
 		return bus.Ack(d)
 	}
@@ -319,6 +334,144 @@ func (c *ResultsConsumer) onSilenceSucceeded(ctx context.Context, msg *envelope.
 		CalculatedThresholdDb: out.CalculatedThresholdDb,
 		Intervals:             intervals,
 	})
+}
+
+type transcriptWordOut struct {
+	Text          string   `json:"text"`
+	SourceStartMs int64    `json:"sourceStartMs"`
+	SourceEndMs   int64    `json:"sourceEndMs"`
+	Confidence    *float64 `json:"confidence"`
+	Speaker       *string  `json:"speaker"`
+}
+
+type transcriptOutput struct {
+	WordsKey      string              `json:"wordsKey"`
+	Language      string              `json:"language"`
+	Text          string              `json:"text"`
+	Provider      string              `json:"provider"`
+	ProviderJobID string              `json:"providerJobId"`
+	Words         []transcriptWordOut `json:"words"`
+}
+
+func (c *ResultsConsumer) onTranscribeSucceeded(ctx context.Context, msg *envelope.Message) error {
+	mediaID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return fmt.Errorf("invalid correlationId: %w", err)
+	}
+	out, err := decodeResult[transcriptOutput](msg)
+	if err != nil {
+		return err
+	}
+	words := make([]transcriptcmd.WordInput, 0, len(out.Words))
+	for _, w := range out.Words {
+		words = append(words, transcriptcmd.WordInput{
+			Text:          w.Text,
+			SourceStartMs: w.SourceStartMs,
+			SourceEndMs:   w.SourceEndMs,
+			Confidence:    w.Confidence,
+			Speaker:       w.Speaker,
+		})
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+	return c.applyTranscript.Handle(hCtx, transcriptcmd.ApplyResultCommand{
+		MediaID:       mediaID,
+		WordsKey:      out.WordsKey,
+		Language:      out.Language,
+		Text:          out.Text,
+		Provider:      out.Provider,
+		ProviderJobID: out.ProviderJobID,
+		Words:         words,
+	})
+}
+
+type textIntervalOut struct {
+	Kind          string   `json:"kind"`
+	SourceStartMs int64    `json:"sourceStartMs"`
+	SourceEndMs   int64    `json:"sourceEndMs"`
+	FirstWord     *int     `json:"firstWord"`
+	LastWord      *int     `json:"lastWord"`
+	Confidence    *float64 `json:"confidence"`
+}
+
+type textOutput struct {
+	DetectionsKey string            `json:"detectionsKey"`
+	Detector      string            `json:"detector"`
+	Intervals     []textIntervalOut `json:"intervals"`
+}
+
+func (c *ResultsConsumer) onTextSucceeded(ctx context.Context, msg *envelope.Message) error {
+	mediaID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return fmt.Errorf("invalid correlationId: %w", err)
+	}
+	out, err := decodeResult[textOutput](msg)
+	if err != nil {
+		return err
+	}
+	intervals := make([]detectioncmd.TextInterval, 0, len(out.Intervals))
+	for _, iv := range out.Intervals {
+		intervals = append(intervals, detectioncmd.TextInterval{
+			Kind:          iv.Kind,
+			SourceStartMs: iv.SourceStartMs,
+			SourceEndMs:   iv.SourceEndMs,
+			FirstWord:     iv.FirstWord,
+			LastWord:      iv.LastWord,
+			Confidence:    iv.Confidence,
+		})
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	return c.applyText.Handle(hCtx, detectioncmd.ApplyTextResultCommand{
+		MediaID:       mediaID,
+		DetectionsKey: out.DetectionsKey,
+		Detector:      out.Detector,
+		Intervals:     intervals,
+	})
+}
+
+func (c *ResultsConsumer) onStepFailed(ctx context.Context, msg *envelope.Message) error {
+	log.Printf("pipeline step failed type=%s correlationId=%s", msg.Type, msg.CorrelationID)
+	if c.media == nil {
+		return nil
+	}
+	mediaID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return nil
+	}
+	kind, ok := failedResultStepKind(msg.Type)
+	if !ok {
+		return nil
+	}
+	errMsg := "step failed"
+	var rp envelope.ResultPayload
+	if err := json.Unmarshal(msg.Payload, &rp); err == nil && rp.Error != nil && rp.Error.Message != "" {
+		errMsg = rp.Error.Message
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	return mediacmd.FailStep(hCtx, c.media, mediaID, kind, time.Now().UTC(), errMsg)
+}
+
+func failedResultStepKind(msgType string) (domainmedia.StepKind, bool) {
+	switch msgType {
+	case "result.probe.failed":
+		return domainmedia.StepProbe, true
+	case "result.audio.failed":
+		return domainmedia.StepAudio, true
+	case "result.proxy.failed":
+		return domainmedia.StepProxy, true
+	case "result.waveform.failed":
+		return domainmedia.StepWaveform, true
+	case "result.silence.failed":
+		return domainmedia.StepSilence, true
+	case "result.transcribe.failed":
+		return domainmedia.StepTranscribe, true
+	case "result.text.failed":
+		return domainmedia.StepText, true
+	default:
+		return "", false
+	}
 }
 
 func decodeResult[T any](msg *envelope.Message) (T, error) {

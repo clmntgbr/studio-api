@@ -17,16 +17,17 @@ import (
 )
 
 type MediaHandler struct {
-	initiateHandler   mediaInitiateUploadHandler
-	presignHandler    mediaPresignPartsHandler
-	completeHandler   mediaCompleteUploadHandler
-	fromURLHandler    mediaFromURLHandler
-	deleteHandler     mediaDeleteHandler
-	getHandler        mediaGetHandler
-	listHandler       mediaListHandler
+	initiateHandler     mediaInitiateUploadHandler
+	presignHandler      mediaPresignPartsHandler
+	completeHandler     mediaCompleteUploadHandler
+	fromURLHandler      mediaFromURLHandler
+	deleteHandler       mediaDeleteHandler
+	getHandler          mediaGetHandler
+	listHandler         mediaListHandler
 	updateConfigHandler mediaUpdateConfigurationHandler
 	getConfigHandler    mediaGetConfigurationHandler
 	reanalyzeHandler    mediaReanalyzeHandler
+	listStepRunsHandler mediaListStepRunsHandler
 }
 
 func NewMediaHandler(
@@ -40,6 +41,7 @@ func NewMediaHandler(
 	updateConfigHandler mediaUpdateConfigurationHandler,
 	getConfigHandler mediaGetConfigurationHandler,
 	reanalyzeHandler mediaReanalyzeHandler,
+	listStepRunsHandler mediaListStepRunsHandler,
 ) *MediaHandler {
 	return &MediaHandler{
 		initiateHandler:     initiateHandler,
@@ -52,6 +54,7 @@ func NewMediaHandler(
 		updateConfigHandler: updateConfigHandler,
 		getConfigHandler:    getConfigHandler,
 		reanalyzeHandler:    reanalyzeHandler,
+		listStepRunsHandler: listStepRunsHandler,
 	}
 }
 
@@ -284,7 +287,22 @@ type updateConfigurationBody struct {
 }
 
 type reanalyzeBody struct {
-	Steps []string `json:"steps" validate:"omitempty,dive,oneof=silence"`
+	Steps []string `json:"steps" validate:"omitempty,dive,oneof=silence text"`
+}
+
+func (h *MediaHandler) ListSteps(c fiber.Ctx) error {
+	if _, err := httpctx.GetUser(c); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
+	}
+	out, err := h.listStepRunsHandler.Handle(c.Context(), querymedia.ListStepRunsQuery{MediaID: id})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list media steps"})
+	}
+	return c.Status(fiber.StatusOK).JSON(presenter.NewMediaStepsResponse(out.Steps, out.Runs))
 }
 
 func (h *MediaHandler) GetConfiguration(c fiber.Ctx) error {

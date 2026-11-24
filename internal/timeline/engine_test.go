@@ -67,6 +67,25 @@ func TestBuild_KeepOverridePreservesSilence(t *testing.T) {
 	}
 }
 
+func TestBuild_KeepOverrideSurvivesShiftedDetection(t *testing.T) {
+	// After a threshold re-run, detection bounds move slightly; keep still matches via ≥50% overlap.
+	kind := KindFiller
+	out := Build(Input{
+		MediaID:    uuid.New(),
+		DurationMs: 5000,
+		Detections: []Detection{{
+			ID: uuid.New(), Kind: KindFiller, SourceStartMs: 1100, SourceEndMs: 2900,
+		}},
+		Overrides: []Override{{
+			ID: uuid.New(), Kind: &kind, Action: ActionKeep, SourceStartMs: 1000, SourceEndMs: 3000,
+		}},
+		Config: Config{SilenceEnabled: false, SpeechMinDurationMs: 50},
+	})
+	if len(out.Decisions) != 1 || out.Decisions[0].Action != ActionKeep || out.Decisions[0].Origin != "user" {
+		t.Fatalf("decision=%+v", out.Decisions)
+	}
+}
+
 func TestBuild_ShortSilenceIgnored(t *testing.T) {
 	out := Build(Input{
 		MediaID:    uuid.New(),

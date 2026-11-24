@@ -112,6 +112,17 @@ func (h *EnqueueAfterAudioReadyHandler) Handle(ctx context.Context, payload []by
 			firstErr = err
 		}
 	}
+
+	txKey := evt.TranscriptionKey
+	if txKey == "" {
+		txKey = evt.AnalysisKey
+	}
+	if err := h.jobs.PublishTranscribeJob(ctx, evt.MediaID, txKey, port.TranscribeJobOptions{
+		Language: cfg.Language,
+	}); err != nil && firstErr == nil {
+		firstErr = err
+	}
+
 	if firstErr != nil {
 		return messaging.Retryable(firstErr)
 	}

@@ -3,8 +3,10 @@ package di
 import (
 	"log"
 
+	detectioncmd "go-api/internal/application/command/detection"
 	mediacmd "go-api/internal/application/command/media"
 	timelinecmd "go-api/internal/application/command/timeline"
+	transcriptcmd "go-api/internal/application/command/transcript"
 	"go-api/internal/application/event/dedup"
 	eventmedia "go-api/internal/application/event/media"
 	eventuser "go-api/internal/application/event/user"
@@ -58,6 +60,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	mediaWriteRepo := write.NewMediaWriteRepository(db)
 	detectionWriteRepo := write.NewDetectionWriteRepository(db)
 	detectionReadRepo := read.NewDetectionReadRepository(db)
+	transcriptWriteRepo := write.NewTranscriptWriteRepository(db)
 	timelineWriteRepo := write.NewTimelineWriteRepository(db)
 	timelineReadRepo := read.NewTimelineReadRepository(db)
 	rebuildTimeline := timelinecmd.NewRebuildHandler(mediaWriteRepo, detectionReadRepo, timelineWriteRepo, timelineReadRepo)
@@ -128,6 +131,14 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		"rebuild_timeline_on_detections_updated",
 		eventmedia.NewRebuildTimelineHandler(rebuildTimeline).OnDetectionsUpdated,
 	))
+	reg.Register(domainmedia.EventTypeMediaTranscribed, dedup.With(
+		dedupRepo, "publish_media_transcribed_realtime", publishMediaRealtime.OnTranscribed,
+	))
+	reg.Register(domainmedia.EventTypeMediaTranscribed, dedup.With(
+		dedupRepo,
+		"enqueue_text_on_transcribed",
+		eventmedia.NewEnqueueTextHandler(jobPublisher, mediaWriteRepo).Handle,
+	))
 
 	consumer := rabbitmq.NewConsumer(conn, reg, env.WorkerConcurrency, env.WorkerMaxRetries)
 
@@ -138,12 +149,15 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	applyProxy := mediacmd.NewApplyProxyResultHandler(mediaWriteRepo, outboxRepo)
 	applyWave := mediacmd.NewApplyWaveformResultHandler(mediaWriteRepo, outboxRepo)
 	applySilence := mediacmd.NewApplySilenceResultHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
+	applyTranscript := transcriptcmd.NewApplyResultHandler(mediaWriteRepo, transcriptWriteRepo, outboxRepo)
+	applyText := detectioncmd.NewApplyTextResultHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
 	resultsConsumer := studiojobs.NewResultsConsumer(
-		env.RabbitMQURL, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence,
+		env.RabbitMQURL, mediaWriteRepo, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence, applyTranscript, applyText,
 	)
 	progressConsumer := studiojobs.NewProgressConsumer(
 		env.RabbitMQURL,
 		read.NewMediaProjectResolver(db),
+		mediaWriteRepo,
 		realtimePublisher,
 	)
 

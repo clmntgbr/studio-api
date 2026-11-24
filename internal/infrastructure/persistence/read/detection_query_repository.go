@@ -3,6 +3,7 @@ package read
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	domaindetection "go-api/internal/domain/detection"
@@ -67,16 +68,50 @@ func (r *detectionReadRepository) ListByMedia(ctx context.Context, mediaFileID u
 	return out, nil
 }
 
-func (r *detectionReadRepository) ListOverridesByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]domaindetection.Override, error) {
-	type overrideScan struct {
-		ID            uuid.UUID `gorm:"column:id"`
-		MediaFileID   uuid.UUID `gorm:"column:media_file_id"`
-		Kind          *string   `gorm:"column:kind"`
-		Action        string    `gorm:"column:action"`
-		SourceStartMs int64     `gorm:"column:source_start_ms"`
-		SourceEndMs   int64     `gorm:"column:source_end_ms"`
-		CreatedAt     time.Time `gorm:"column:created_at"`
+type overrideScan struct {
+	ID            uuid.UUID `gorm:"column:id"`
+	MediaFileID   uuid.UUID `gorm:"column:media_file_id"`
+	Kind          *string   `gorm:"column:kind"`
+	Action        string    `gorm:"column:action"`
+	SourceStartMs int64     `gorm:"column:source_start_ms"`
+	SourceEndMs   int64     `gorm:"column:source_end_ms"`
+	CreatedAt     time.Time `gorm:"column:created_at"`
+}
+
+func overrideFromScan(row overrideScan) domaindetection.Override {
+	var kind *domaindetection.Kind
+	if row.Kind != nil {
+		k := domaindetection.Kind(*row.Kind)
+		kind = &k
 	}
+	return domaindetection.Override{
+		ID:            row.ID,
+		MediaFileID:   row.MediaFileID,
+		Kind:          kind,
+		Action:        domaindetection.DecisionAction(row.Action),
+		SourceStartMs: row.SourceStartMs,
+		SourceEndMs:   row.SourceEndMs,
+		CreatedAt:     row.CreatedAt,
+	}
+}
+
+func (r *detectionReadRepository) GetOverrideByID(ctx context.Context, id uuid.UUID) (*domaindetection.Override, error) {
+	var row overrideScan
+	err := r.db.WithContext(ctx).
+		Table("user_override").
+		Where("id = ?", id).
+		Take(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	o := overrideFromScan(row)
+	return &o, nil
+}
+
+func (r *detectionReadRepository) ListOverridesByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]domaindetection.Override, error) {
 	var rows []overrideScan
 	err := r.db.WithContext(ctx).
 		Table("user_override").
@@ -88,20 +123,7 @@ func (r *detectionReadRepository) ListOverridesByMedia(ctx context.Context, medi
 	}
 	out := make([]domaindetection.Override, 0, len(rows))
 	for _, row := range rows {
-		var kind *domaindetection.Kind
-		if row.Kind != nil {
-			k := domaindetection.Kind(*row.Kind)
-			kind = &k
-		}
-		out = append(out, domaindetection.Override{
-			ID:            row.ID,
-			MediaFileID:   row.MediaFileID,
-			Kind:          kind,
-			Action:        domaindetection.DecisionAction(row.Action),
-			SourceStartMs: row.SourceStartMs,
-			SourceEndMs:   row.SourceEndMs,
-			CreatedAt:     row.CreatedAt,
-		})
+		out = append(out, overrideFromScan(row))
 	}
 	return out, nil
 }
