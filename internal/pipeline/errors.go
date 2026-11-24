@@ -1,4 +1,4 @@
-package ingest
+package pipeline
 
 import "fmt"
 
@@ -36,16 +36,9 @@ func Classify(err error) *ClassifiedError {
 	}
 	return &ClassifiedError{
 		Class:   ErrorRetryable,
-		Code:    "INGEST_FAILED",
+		Code:    "PIPELINE_FAILED",
 		Message: err.Error(),
 	}
-}
-
-func WrapPermanent(code string, err error) error {
-	if err == nil {
-		return nil
-	}
-	return Permanent(code, err.Error())
 }
 
 func WrapRetryable(code string, err error) error {

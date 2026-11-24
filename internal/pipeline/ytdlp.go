@@ -1,4 +1,4 @@
-package ingest
+package pipeline
 
 import (
 	"context"
@@ -32,8 +32,8 @@ func (c YTDLPConfig) bin() string {
 	return "yt-dlp"
 }
 
-// DownloadURL downloads a public URL into workDir and returns the local file path + origin metadata.
-func DownloadURL(ctx context.Context, cfg YTDLPConfig, rawURL, workDir string) (localPath string, origin *OriginOut, err error) {
+// DownloadURL downloads a public URL into workDir and returns local path + origin metadata.
+func DownloadURL(ctx context.Context, cfg YTDLPConfig, rawURL, workDir string) (string, *Origin, error) {
 	if err := ValidatePublicHTTPURL(rawURL); err != nil {
 		return "", nil, err
 	}
@@ -42,7 +42,6 @@ func DownloadURL(ctx context.Context, cfg YTDLPConfig, rawURL, workDir string) (
 	if maxMB <= 0 {
 		maxMB = 8000
 	}
-	_ = cfg.MaxDurationS // enforced after download via ffprobe in the pipeline
 
 	outTemplate := filepath.Join(workDir, "original.%(ext)s")
 	args := []string{
@@ -71,7 +70,7 @@ func DownloadURL(ctx context.Context, cfg YTDLPConfig, rawURL, workDir string) (
 	if err != nil {
 		return "", nil, err
 	}
-	origin = &OriginOut{
+	origin := &Origin{
 		URL:       rawURL,
 		Title:     meta.Title,
 		Uploader:  meta.Uploader,
@@ -107,7 +106,7 @@ func findDownload(workDir string, ytOut []byte) (*downloadMeta, string, error) {
 		}
 		name := e.Name()
 		lower := strings.ToLower(name)
-		if strings.HasSuffix(lower, ".part") || strings.HasSuffix(lower, ".ytdl") || strings.Contains(lower, ".f") {
+		if strings.HasSuffix(lower, ".part") || strings.HasSuffix(lower, ".ytdl") {
 			continue
 		}
 		if !strings.HasPrefix(name, "original.") {

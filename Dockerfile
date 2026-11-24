@@ -56,7 +56,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     ./cmd/cli
 
 RUN set -eu; \
-    for name in ingest audio denoise transcribe scenes detect analyze reframe render translate; do \
+    for name in fetch media denoise transcribe scenes detect analyze reframe render translate; do \
       CGO_ENABLED=0 GOOS=linux go build \
         -a -installsuffix cgo \
         -ldflags="-w -s" \
@@ -80,16 +80,16 @@ USER appuser
 
 
 # ============================================
-# Production: all binaries in one image (cutflow-style).
-# Compose selects the process via command: ["./worker-ingest"], etc.
+# Production: all binaries in one image.
+# Compose selects the process via command: ["./worker-fetch"], etc.
 # ============================================
 FROM runtime AS production
 
 COPY --from=builder --chown=appuser:appuser /app/api .
 COPY --from=builder --chown=appuser:appuser /app/worker .
 COPY --from=builder --chown=appuser:appuser /app/cli .
-COPY --from=builder --chown=appuser:appuser /app/worker-ingest .
-COPY --from=builder --chown=appuser:appuser /app/worker-audio .
+COPY --from=builder --chown=appuser:appuser /app/worker-fetch .
+COPY --from=builder --chown=appuser:appuser /app/worker-media .
 COPY --from=builder --chown=appuser:appuser /app/worker-denoise .
 COPY --from=builder --chown=appuser:appuser /app/worker-transcribe .
 COPY --from=builder --chown=appuser:appuser /app/worker-scenes .
@@ -102,15 +102,22 @@ COPY --from=builder --chown=appuser:appuser /app/worker-translate .
 EXPOSE 3000
 CMD ["./api"]
 
-# Ingest needs ffmpeg + yt-dlp (Python zipapp). Keep them off the API image.
-FROM production AS worker-ingest
+# Fetch needs ffmpeg + yt-dlp (Python zipapp).
+FROM production AS worker-fetch
 USER root
 RUN apk --no-cache add ffmpeg curl ca-certificates python3 \
     && curl -fsSL -o /usr/local/bin/yt-dlp \
       https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp
 USER appuser
-CMD ["./worker-ingest"]
+CMD ["./worker-fetch"]
+
+# Media needs ffmpeg (probe / audio / proxy / waveform).
+FROM production AS worker-media
+USER root
+RUN apk --no-cache add ffmpeg ca-certificates
+USER appuser
+CMD ["./worker-media"]
 
 
 FROM production AS api

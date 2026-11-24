@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 
+	"go-api/internal/studio/topology"
+
 	"github.com/joho/godotenv"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -38,8 +40,11 @@ func Run(ctx context.Context, name string) error {
 	}
 	defer ch.Close()
 
-	if _, err := ch.QueueDeclare(queue, true, false, false, false, nil); err != nil {
-		return fmt.Errorf("declare queue %s: %w", queue, err)
+	if err := topology.DeclareExchanges(ch); err != nil {
+		return err
+	}
+	if err := topology.DeclareJobQueue(ch, name, 30000); err != nil {
+		return err
 	}
 
 	if err := ch.Qos(1, 0, false); err != nil {

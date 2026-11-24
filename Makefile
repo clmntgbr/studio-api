@@ -2,10 +2,10 @@ COMPOSE_DEV := docker compose -f compose.dev.yaml
 
 # Always-on app processes (excludes profile-only denoise/gpu workers)
 APP_SERVICES := api worker \
-	worker-ingest worker-audio worker-transcribe worker-scenes \
+	worker-fetch worker-media worker-transcribe worker-scenes \
 	worker-detect worker-analyze worker-reframe worker-render worker-translate
 
-PIPELINE_WORKERS := worker-ingest worker-audio worker-transcribe worker-scenes \
+PIPELINE_WORKERS := worker-fetch worker-media worker-transcribe worker-scenes \
 	worker-detect worker-analyze worker-reframe worker-render worker-translate
 
 # ============================================
@@ -36,11 +36,11 @@ worker-logs:
 pipeline-logs:
 	$(COMPOSE_DEV) logs -f $(PIPELINE_WORKERS)
 
-worker-ingest-logs:
-	$(COMPOSE_DEV) logs -f worker-ingest
+worker-fetch-logs:
+	$(COMPOSE_DEV) logs -f worker-fetch
 
-worker-audio-logs:
-	$(COMPOSE_DEV) logs -f worker-audio
+worker-media-logs:
+	$(COMPOSE_DEV) logs -f worker-media
 
 worker-denoise-logs:
 	$(COMPOSE_DEV) --profile denoise logs -f worker-denoise
@@ -73,6 +73,15 @@ dev-restart:
 dev-denoise:
 	$(COMPOSE_DEV) --profile denoise up -d worker-denoise
 
+# Publish a sample job.fetch to studio.jobs (requires rabbitmqadmin / curl + python).
+# Usage: make fetch-sample URL='https://www.youtube.com/watch?v=...'
+fetch-sample:
+	@test -n "$(URL)" || (echo "URL is required"; exit 1)
+	@MEDIA_ID=$${MEDIA_ID:-$$(uuidgen | tr '[:upper:]' '[:lower:]')}; \
+	BODY=$$(python3 -c "import json,uuid,datetime; media='$$MEDIA_ID'; url='$(URL)'; print(json.dumps({'messageId':str(uuid.uuid4()),'type':'job.fetch','version':1,'correlationId':media,'occurredAt':datetime.datetime.utcnow().isoformat()+'Z','attempt':1,'payload':{'mediaId':media,'url':url}}))"); \
+	docker exec broker rabbitmqadmin -u user -p password publish exchange=studio.jobs routing_key=job.fetch payload="$$BODY"; \
+	echo "published job.fetch media_id=$$MEDIA_ID"
+
 lint:
 	$(COMPOSE_DEV) exec api golangci-lint run --fix
 
@@ -90,7 +99,7 @@ coverage-html: coverage
 	$(COMPOSE_DEV) exec api go tool cover -html=coverage.out -o coverage.html
 
 unit-tests:
-	$(COMPOSE_DEV) exec api go test ./internal/domain/... ./internal/application/... ./internal/infrastructure/... ./internal/workerstub/... ./cmd/... -race -count=1
+	$(COMPOSE_DEV) exec api go test ./internal/domain/... ./internal/application/... ./internal/infrastructure/... ./internal/pipeline/... ./internal/studio/... ./internal/fetch/... ./internal/media/... ./internal/workerstub/... ./cmd/... -race -count=1
 
 # ============================================
 # CLI Commands (via Docker)

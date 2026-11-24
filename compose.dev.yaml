@@ -95,24 +95,31 @@ services:
         condition: service_started
     networks: [backend, data]
 
-  worker-ingest:
+  worker-fetch:
     <<: *pipeline-worker
-    container_name: worker-ingest
-    command: ["go", "run", "./cmd/worker-ingest"]
+    container_name: worker-fetch
+    command: ["go", "run", "./cmd/worker-fetch"]
     environment:
       <<: *s3-env
       WORK_DIR: ${WORK_DIR:-/tmp/work}
-      INGEST_CONCURRENCY: ${INGEST_CONCURRENCY:-2}
+      FETCH_CONCURRENCY: ${FETCH_CONCURRENCY:-2}
       YTDLP_BIN: ${YTDLP_BIN:-yt-dlp}
       YTDLP_MAX_FILESIZE_MB: ${YTDLP_MAX_FILESIZE_MB:-8000}
       YTDLP_MAX_DURATION_S: ${YTDLP_MAX_DURATION_S:-14400}
       YTDLP_COOKIES_FILE: ${YTDLP_COOKIES_FILE:-}
     networks: [egress, backend]
 
-  worker-audio:
+  worker-media:
     <<: *pipeline-worker
-    container_name: worker-audio
-    command: ["go", "run", "./cmd/worker-audio"]
+    container_name: worker-media
+    command: ["go", "run", "./cmd/worker-media"]
+    environment:
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      MEDIA_PREFETCH_PROBE: ${MEDIA_PREFETCH_PROBE:-4}
+      MEDIA_PREFETCH_AUDIO: ${MEDIA_PREFETCH_AUDIO:-4}
+      MEDIA_PREFETCH_PROXY: ${MEDIA_PREFETCH_PROXY:-1}
+      MEDIA_PREFETCH_WAVEFORM: ${MEDIA_PREFETCH_WAVEFORM:-4}
     networks: [backend]
 
   worker-denoise:

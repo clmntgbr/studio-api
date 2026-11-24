@@ -1,4 +1,4 @@
-package ingest
+package pipeline
 
 import (
 	"context"
@@ -16,15 +16,15 @@ type probeJSON struct {
 }
 
 type probeStream struct {
-	CodecType          string `json:"codec_type"`
-	CodecName          string `json:"codec_name"`
-	Width              int    `json:"width"`
-	Height             int    `json:"height"`
-	AvgFrameRate       string `json:"avg_frame_rate"`
-	RFrameRate         string `json:"r_frame_rate"`
-	Channels           int    `json:"channels"`
-	Tags               map[string]string `json:"tags"`
-	SideDataList       []map[string]any  `json:"side_data_list"`
+	CodecType    string            `json:"codec_type"`
+	CodecName    string            `json:"codec_name"`
+	Width        int               `json:"width"`
+	Height       int               `json:"height"`
+	AvgFrameRate string            `json:"avg_frame_rate"`
+	RFrameRate   string            `json:"r_frame_rate"`
+	Channels     int               `json:"channels"`
+	Tags         map[string]string `json:"tags"`
+	SideDataList []map[string]any  `json:"side_data_list"`
 }
 
 type probeFormat struct {
@@ -82,7 +82,6 @@ func ProbeFile(ctx context.Context, path string) (Probe, error) {
 	}
 	p.FPSNum, p.FPSDen = num, den
 	p.VFR = isVFR(avgRate, rRate)
-
 	return p, nil
 }
 
@@ -108,7 +107,6 @@ func isVFR(avg, r string) bool {
 	if ad == 0 || rd == 0 {
 		return false
 	}
-	// Compare as floats with small tolerance.
 	a := float64(an) / float64(ad)
 	b := float64(rn) / float64(rd)
 	return math.Abs(a-b) > 0.05
@@ -134,16 +132,4 @@ func rotationFromStream(s probeStream) int {
 		}
 	}
 	return 0
-}
-
-func needsMezzanine(p Probe) bool {
-	if p.VFR {
-		return true
-	}
-	switch strings.ToLower(p.VideoCodec) {
-	case "h264", "hevc", "av1", "vp9", "vp8":
-		return false
-	default:
-		return p.VideoCodec != ""
-	}
 }

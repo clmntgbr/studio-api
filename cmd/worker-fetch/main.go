@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"go-api/internal/ingest"
+	"go-api/internal/fetch"
 
 	"github.com/joho/godotenv"
 )
@@ -15,15 +15,15 @@ import (
 func main() {
 	_ = godotenv.Load()
 
-	cfg, err := ingest.LoadWorkerConfigFromEnv()
+	cfg, err := fetch.LoadConfigFromEnv()
 	if err != nil {
-		log.Fatalf("worker-ingest config: %v", err)
+		log.Fatalf("worker-fetch config: %v", err)
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	if err := ingest.RunWorker(ctx, cfg); err != nil {
-		log.Fatalf("worker-ingest stopped: %v", err)
+	if err := fetch.Run(ctx, cfg); err != nil {
+		log.Fatalf("worker-fetch stopped: %v", err)
 	}
 }

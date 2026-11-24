@@ -1,4 +1,4 @@
-package ingest
+package pipeline
 
 import (
 	"fmt"
@@ -7,8 +7,7 @@ import (
 	"strings"
 )
 
-// ValidatePublicHTTPURL rejects non-http(s) schemes and URLs whose host resolves
-// to private, loopback, or link-local addresses (features.md §26 SSRF).
+// ValidatePublicHTTPURL rejects non-http(s) schemes and private/loopback hosts.
 func ValidatePublicHTTPURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -47,7 +46,6 @@ func isBlockedIP(ip net.IP) bool {
 	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
 		return true
 	}
-	// Extra: CGNAT / metadata-ish ranges sometimes missed by IsPrivate on older Go.
 	if ip4 := ip.To4(); ip4 != nil {
 		if ip4[0] == 169 && ip4[1] == 254 {
 			return true

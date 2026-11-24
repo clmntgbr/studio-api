@@ -1,4 +1,4 @@
-package ingest
+package pipeline
 
 import (
 	"crypto/sha256"
