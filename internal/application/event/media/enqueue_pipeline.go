@@ -8,6 +8,8 @@ import (
 	"go-api/internal/application/messaging"
 	domainmedia "go-api/internal/domain/media"
 	"go-api/internal/domain/port"
+
+	"github.com/google/uuid"
 )
 
 // EnqueueProbeHandler starts the shared post-source pipeline (probe) from media.source_ready.v1.
@@ -66,13 +68,14 @@ func (h *EnqueueAfterProbedHandler) Handle(ctx context.Context, payload []byte) 
 	return nil
 }
 
-// EnqueueAfterAudioReadyHandler fans out waveform (silence/transcribe when workers exist).
+// EnqueueAfterAudioReadyHandler fans out waveform ∥ silence using media configuration.
 type EnqueueAfterAudioReadyHandler struct {
-	jobs port.JobPublisher
+	jobs  port.JobPublisher
+	media domainmedia.WriteRepository
 }
 
-func NewEnqueueAfterAudioReadyHandler(jobs port.JobPublisher) *EnqueueAfterAudioReadyHandler {
-	return &EnqueueAfterAudioReadyHandler{jobs: jobs}
+func NewEnqueueAfterAudioReadyHandler(jobs port.JobPublisher, media domainmedia.WriteRepository) *EnqueueAfterAudioReadyHandler {
+	return &EnqueueAfterAudioReadyHandler{jobs: jobs, media: media}
 }
 
 func (h *EnqueueAfterAudioReadyHandler) Handle(ctx context.Context, payload []byte) error {
@@ -83,13 +86,31 @@ func (h *EnqueueAfterAudioReadyHandler) Handle(ctx context.Context, payload []by
 	if evt.MediaID == "" || evt.AnalysisKey == "" {
 		return messaging.NonRetryable(fmt.Errorf("media.audio_ready payload missing mediaId or analysisKey"))
 	}
-	// Parallel fan-out: waveform ∥ silence (transcribe joins later).
+
 	var firstErr error
 	if err := h.jobs.PublishWaveformJob(ctx, evt.MediaID, evt.AnalysisKey); err != nil {
 		firstErr = err
 	}
-	if err := h.jobs.PublishSilenceJob(ctx, evt.MediaID, evt.AnalysisKey, "auto", nil); err != nil && firstErr == nil {
-		firstErr = err
+
+	mediaID, err := uuid.Parse(evt.MediaID)
+	if err != nil {
+		return messaging.NonRetryable(err)
+	}
+	cfg, err := h.media.GetConfiguration(ctx, mediaID)
+	if err != nil {
+		return messaging.Retryable(err)
+	}
+	if cfg == nil {
+		cfg = domainmedia.DefaultConfiguration(mediaID)
+	}
+	if cfg.SilenceEnabled {
+		if err := h.jobs.PublishSilenceJob(ctx, evt.MediaID, evt.AnalysisKey, port.SilenceJobOptions{
+			ThresholdMode:      cfg.ThresholdMode,
+			SilenceThresholdDb: cfg.SilenceThresholdDB,
+			NoiseFloorOffsetDb: cfg.NoiseFloorOffsetDb(),
+		}); err != nil && firstErr == nil {
+			firstErr = err
+		}
 	}
 	if firstErr != nil {
 		return messaging.Retryable(firstErr)

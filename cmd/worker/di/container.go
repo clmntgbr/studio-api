@@ -4,6 +4,7 @@ import (
 	"log"
 
 	mediacmd "go-api/internal/application/command/media"
+	timelinecmd "go-api/internal/application/command/timeline"
 	"go-api/internal/application/event/dedup"
 	eventmedia "go-api/internal/application/event/media"
 	eventuser "go-api/internal/application/event/user"
@@ -53,103 +54,83 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	realtimePublisher := centrifugo.NewPublisher(env)
 	publishUserRealtime := eventuser.NewPublishRealtimeHandler(realtimePublisher)
 	publishMediaRealtime := eventmedia.NewPublishRealtimeHandler(realtimePublisher)
-	reg := registry.NewHandlerRegistry()
 
-	reg.Register(domainuser.EventTypeUserCreated, dedup.With(
-		dedupRepo,
-		"user_created",
-		eventuser.NewUserCreatedHandler().Handle,
-	))
-	reg.Register(domainuser.EventTypeUserCreated, dedup.With(
-		dedupRepo,
-		"notify_user_on_created",
-		eventuser.NewNotifyUserOnCreatedHandler(notifier).Handle,
-	))
-	reg.Register(domainuser.EventTypeUserCreated, dedup.With(
-		dedupRepo,
-		"publish_user_created_realtime",
-		publishUserRealtime.OnCreated,
-	))
-	reg.Register(domainuser.EventTypeUserUpdated, dedup.With(
-		dedupRepo,
-		"user_updated",
-		eventuser.NewUserUpdatedHandler().Handle,
-	))
-	reg.Register(domainuser.EventTypeUserUpdated, dedup.With(
-		dedupRepo,
-		"publish_user_updated_realtime",
-		publishUserRealtime.OnUpdated,
-	))
-	reg.Register(domainuser.EventTypeUserDeleted, dedup.With(
-		dedupRepo,
-		"user_deleted",
-		eventuser.NewUserDeletedHandler().Handle,
-	))
-	reg.Register(domainuser.EventTypeUserDeleted, dedup.With(
-		dedupRepo,
-		"publish_user_deleted_realtime",
-		publishUserRealtime.OnDeleted,
-	))
+	mediaWriteRepo := write.NewMediaWriteRepository(db)
+	detectionWriteRepo := write.NewDetectionWriteRepository(db)
+	detectionReadRepo := read.NewDetectionReadRepository(db)
+	timelineWriteRepo := write.NewTimelineWriteRepository(db)
+	timelineReadRepo := read.NewTimelineReadRepository(db)
+	rebuildTimeline := timelinecmd.NewRebuildHandler(mediaWriteRepo, detectionReadRepo, timelineWriteRepo, timelineReadRepo)
 
 	jobPublisher, err := studiojobs.NewPublisher(env.RabbitMQURL)
 	if err != nil {
 		log.Fatalf("failed to create job publisher: %v", err)
 	}
+
+	reg := registry.NewHandlerRegistry()
+
+	reg.Register(domainuser.EventTypeUserCreated, dedup.With(
+		dedupRepo, "user_created", eventuser.NewUserCreatedHandler().Handle,
+	))
+	reg.Register(domainuser.EventTypeUserCreated, dedup.With(
+		dedupRepo, "notify_user_on_created", eventuser.NewNotifyUserOnCreatedHandler(notifier).Handle,
+	))
+	reg.Register(domainuser.EventTypeUserCreated, dedup.With(
+		dedupRepo, "publish_user_created_realtime", publishUserRealtime.OnCreated,
+	))
+	reg.Register(domainuser.EventTypeUserUpdated, dedup.With(
+		dedupRepo, "user_updated", eventuser.NewUserUpdatedHandler().Handle,
+	))
+	reg.Register(domainuser.EventTypeUserUpdated, dedup.With(
+		dedupRepo, "publish_user_updated_realtime", publishUserRealtime.OnUpdated,
+	))
+	reg.Register(domainuser.EventTypeUserDeleted, dedup.With(
+		dedupRepo, "user_deleted", eventuser.NewUserDeletedHandler().Handle,
+	))
+	reg.Register(domainuser.EventTypeUserDeleted, dedup.With(
+		dedupRepo, "publish_user_deleted_realtime", publishUserRealtime.OnDeleted,
+	))
+
 	reg.Register(domainmedia.EventTypeMediaSourceReady, dedup.With(
-		dedupRepo,
-		"enqueue_probe_on_source_ready",
-		eventmedia.NewEnqueueProbeHandler(jobPublisher).Handle,
+		dedupRepo, "enqueue_probe_on_source_ready", eventmedia.NewEnqueueProbeHandler(jobPublisher).Handle,
 	))
 	reg.Register(domainmedia.EventTypeMediaSourceReady, dedup.With(
-		dedupRepo,
-		"publish_media_source_ready_realtime",
-		publishMediaRealtime.OnSourceReady,
+		dedupRepo, "publish_media_source_ready_realtime", publishMediaRealtime.OnSourceReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaProbed, dedup.With(
-		dedupRepo,
-		"enqueue_audio_proxy_on_probed",
-		eventmedia.NewEnqueueAfterProbedHandler(jobPublisher).Handle,
+		dedupRepo, "enqueue_audio_proxy_on_probed", eventmedia.NewEnqueueAfterProbedHandler(jobPublisher).Handle,
 	))
 	reg.Register(domainmedia.EventTypeMediaProbed, dedup.With(
-		dedupRepo,
-		"publish_media_probed_realtime",
-		publishMediaRealtime.OnProbed,
+		dedupRepo, "publish_media_probed_realtime", publishMediaRealtime.OnProbed,
 	))
 	reg.Register(domainmedia.EventTypeMediaAudioReady, dedup.With(
 		dedupRepo,
 		"enqueue_waveform_silence_on_audio_ready",
-		eventmedia.NewEnqueueAfterAudioReadyHandler(jobPublisher).Handle,
+		eventmedia.NewEnqueueAfterAudioReadyHandler(jobPublisher, mediaWriteRepo).Handle,
 	))
 	reg.Register(domainmedia.EventTypeMediaAudioReady, dedup.With(
-		dedupRepo,
-		"publish_media_audio_ready_realtime",
-		publishMediaRealtime.OnAudioReady,
+		dedupRepo, "publish_media_audio_ready_realtime", publishMediaRealtime.OnAudioReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
-		dedupRepo,
-		"publish_media_proxy_ready_realtime",
-		publishMediaRealtime.OnProxyReady,
+		dedupRepo, "publish_media_proxy_ready_realtime", publishMediaRealtime.OnProxyReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaWaveformReady, dedup.With(
-		dedupRepo,
-		"publish_media_waveform_ready_realtime",
-		publishMediaRealtime.OnWaveformReady,
+		dedupRepo, "publish_media_waveform_ready_realtime", publishMediaRealtime.OnWaveformReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaReady, dedup.With(
-		dedupRepo,
-		"publish_media_ready_realtime",
-		publishMediaRealtime.OnReady,
+		dedupRepo, "publish_media_ready_realtime", publishMediaRealtime.OnReady,
+	))
+	reg.Register(domainmedia.EventTypeMediaDetectionsUpdated, dedup.With(
+		dedupRepo, "publish_detections_updated_realtime", publishMediaRealtime.OnDetectionsUpdated,
 	))
 	reg.Register(domainmedia.EventTypeMediaDetectionsUpdated, dedup.With(
 		dedupRepo,
-		"publish_detections_updated_realtime",
-		publishMediaRealtime.OnDetectionsUpdated,
+		"rebuild_timeline_on_detections_updated",
+		eventmedia.NewRebuildTimelineHandler(rebuildTimeline).OnDetectionsUpdated,
 	))
 
 	consumer := rabbitmq.NewConsumer(conn, reg, env.WorkerConcurrency, env.WorkerMaxRetries)
 
-	mediaWriteRepo := write.NewMediaWriteRepository(db)
-	detectionWriteRepo := write.NewDetectionWriteRepository(db)
 	markReady := mediacmd.NewMarkSourceReadyHandler(mediaWriteRepo, outboxRepo)
 	markFail := mediacmd.NewMarkFetchFailedHandler(mediaWriteRepo)
 	applyProbe := mediacmd.NewApplyProbeResultHandler(mediaWriteRepo, outboxRepo)

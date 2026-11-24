@@ -20,6 +20,9 @@ type WriteRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	SaveAsset(ctx context.Context, asset *Asset) error
 	SaveConfiguration(ctx context.Context, cfg *Configuration) error
+	GetConfiguration(ctx context.Context, mediaFileID uuid.UUID) (*Configuration, error)
+	UpdateConfiguration(ctx context.Context, cfg *Configuration) error
+	GetAssetByKind(ctx context.Context, mediaFileID uuid.UUID, kind string) (*Asset, error)
 	SaveStep(ctx context.Context, step *ProcessingStep) error
 	UpdateStep(ctx context.Context, step *ProcessingStep) error
 	GetStep(ctx context.Context, mediaFileID uuid.UUID, kind StepKind) (*ProcessingStep, error)
@@ -29,6 +32,7 @@ type ReadRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*FileView, error)
 	ListByProject(ctx context.Context, projectID uuid.UUID, query paginate.PaginateQuery) ([]FileView, int64, error)
 	ListSteps(ctx context.Context, mediaFileID uuid.UUID) ([]StepView, error)
+	GetConfiguration(ctx context.Context, mediaFileID uuid.UUID) (*Configuration, error)
 }
 
 type FileView struct {

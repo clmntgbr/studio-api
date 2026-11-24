@@ -79,6 +79,34 @@ func (r *mediaWriteRepository) SaveConfiguration(ctx context.Context, cfg *domai
 	return DBWithContext(ctx, r.db).Create(mediaConfigurationModelFromDomain(cfg)).Error
 }
 
+func (r *mediaWriteRepository) GetConfiguration(ctx context.Context, mediaFileID uuid.UUID) (*domainmedia.Configuration, error) {
+	var model MediaConfigurationModel
+	err := DBWithContext(ctx, r.db).First(&model, "media_file_id = ?", mediaFileID).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return mediaConfigurationDomainFromModel(&model), nil
+}
+
+func (r *mediaWriteRepository) UpdateConfiguration(ctx context.Context, cfg *domainmedia.Configuration) error {
+	return DBWithContext(ctx, r.db).Save(mediaConfigurationModelFromDomain(cfg)).Error
+}
+
+func (r *mediaWriteRepository) GetAssetByKind(ctx context.Context, mediaFileID uuid.UUID, kind string) (*domainmedia.Asset, error) {
+	var model MediaAssetModel
+	err := DBWithContext(ctx, r.db).First(&model, "media_file_id = ? AND kind = ?", mediaFileID, kind).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return mediaAssetDomainFromModel(&model), nil
+}
+
 func (r *mediaWriteRepository) SaveStep(ctx context.Context, step *domainmedia.ProcessingStep) error {
 	return DBWithContext(ctx, r.db).
 		Clauses(clause.OnConflict{
@@ -214,6 +242,48 @@ func mediaConfigurationModelFromDomain(c *domainmedia.Configuration) *MediaConfi
 		Language:             c.Language,
 		Settings:             dbtype.JSONB(settings),
 		UpdatedAt:            c.UpdatedAt,
+	}
+}
+
+func mediaConfigurationDomainFromModel(c *MediaConfigurationModel) *domainmedia.Configuration {
+	settings := json.RawMessage(c.Settings)
+	if len(settings) == 0 {
+		settings = json.RawMessage(`{}`)
+	}
+	return &domainmedia.Configuration{
+		MediaFileID:          c.MediaFileID,
+		SilenceEnabled:       c.SilenceEnabled,
+		ThresholdMode:        c.ThresholdMode,
+		SilenceThresholdDB:   c.SilenceThresholdDB,
+		DetectionLevel:       c.DetectionLevel,
+		SilenceMinDurationMs: c.SilenceMinDurationMs,
+		PaddingBeforeMs:      c.PaddingBeforeMs,
+		PaddingAfterMs:       c.PaddingAfterMs,
+		SpeechMinDurationMs:  c.SpeechMinDurationMs,
+		FillersEnabled:       c.FillersEnabled,
+		RepetitionsEnabled:   c.RepetitionsEnabled,
+		FalseStartsEnabled:   c.FalseStartsEnabled,
+		SponsorsAction:       domainmedia.DecisionAction(c.SponsorsAction),
+		AdsAction:            domainmedia.DecisionAction(c.AdsAction),
+		Language:             c.Language,
+		Settings:             settings,
+		UpdatedAt:            c.UpdatedAt,
+	}
+}
+
+func mediaAssetDomainFromModel(a *MediaAssetModel) *domainmedia.Asset {
+	meta := json.RawMessage(a.Meta)
+	if len(meta) == 0 {
+		meta = json.RawMessage(`{}`)
+	}
+	return &domainmedia.Asset{
+		ID:          a.ID,
+		MediaFileID: a.MediaFileID,
+		Kind:        a.Kind,
+		StorageKey:  a.StorageKey,
+		SizeBytes:   a.SizeBytes,
+		Meta:        meta,
+		CreatedAt:   a.CreatedAt,
 	}
 }
 

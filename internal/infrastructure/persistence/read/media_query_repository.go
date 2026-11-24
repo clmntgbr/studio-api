@@ -2,6 +2,7 @@ package read
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -117,6 +118,59 @@ func (r *mediaReadRepository) ListByProject(ctx context.Context, projectID uuid.
 		views = append(views, *scanMediaView(row))
 	}
 	return views, total, nil
+}
+
+func (r *mediaReadRepository) GetConfiguration(ctx context.Context, mediaFileID uuid.UUID) (*domainmedia.Configuration, error) {
+	type cfgScan struct {
+		MediaFileID          uuid.UUID       `gorm:"column:media_file_id"`
+		SilenceEnabled       bool            `gorm:"column:silence_enabled"`
+		ThresholdMode        string          `gorm:"column:threshold_mode"`
+		SilenceThresholdDB   *float64        `gorm:"column:silence_threshold_db"`
+		DetectionLevel       string          `gorm:"column:detection_level"`
+		SilenceMinDurationMs int             `gorm:"column:silence_min_duration_ms"`
+		PaddingBeforeMs      int             `gorm:"column:padding_before_ms"`
+		PaddingAfterMs       int             `gorm:"column:padding_after_ms"`
+		SpeechMinDurationMs  int             `gorm:"column:speech_min_duration_ms"`
+		FillersEnabled       bool            `gorm:"column:fillers_enabled"`
+		RepetitionsEnabled   bool            `gorm:"column:repetitions_enabled"`
+		FalseStartsEnabled   bool            `gorm:"column:false_starts_enabled"`
+		SponsorsAction       string          `gorm:"column:sponsors_action"`
+		AdsAction            string          `gorm:"column:ads_action"`
+		Language             *string         `gorm:"column:language"`
+		Settings             json.RawMessage `gorm:"column:settings"`
+		UpdatedAt            time.Time       `gorm:"column:updated_at"`
+	}
+	var row cfgScan
+	err := r.db.WithContext(ctx).Table("media_configuration").Where("media_file_id = ?", mediaFileID).First(&row).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	settings := row.Settings
+	if len(settings) == 0 {
+		settings = json.RawMessage(`{}`)
+	}
+	return &domainmedia.Configuration{
+		MediaFileID:          row.MediaFileID,
+		SilenceEnabled:       row.SilenceEnabled,
+		ThresholdMode:        row.ThresholdMode,
+		SilenceThresholdDB:   row.SilenceThresholdDB,
+		DetectionLevel:       row.DetectionLevel,
+		SilenceMinDurationMs: row.SilenceMinDurationMs,
+		PaddingBeforeMs:      row.PaddingBeforeMs,
+		PaddingAfterMs:       row.PaddingAfterMs,
+		SpeechMinDurationMs:  row.SpeechMinDurationMs,
+		FillersEnabled:       row.FillersEnabled,
+		RepetitionsEnabled:   row.RepetitionsEnabled,
+		FalseStartsEnabled:   row.FalseStartsEnabled,
+		SponsorsAction:       domainmedia.DecisionAction(row.SponsorsAction),
+		AdsAction:            domainmedia.DecisionAction(row.AdsAction),
+		Language:             row.Language,
+		Settings:             settings,
+		UpdatedAt:            row.UpdatedAt,
+	}, nil
 }
 
 func scanMediaView(m mediaScan) *domainmedia.FileView {

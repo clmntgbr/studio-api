@@ -26,9 +26,29 @@ func (h *DetectionHandler) ListByMedia(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
 	kind := c.Query("kind")
+	var fromMs, toMs *int64
+	if v := c.Query("fromMs"); v != "" {
+		n, err := parseInt64Query(v)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid fromMs"})
+		}
+		fromMs = &n
+	}
+	if v := c.Query("toMs"); v != "" {
+		n, err := parseInt64Query(v)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid toMs"})
+		}
+		toMs = &n
+	}
+	if fromMs != nil && toMs != nil && *fromMs > *toMs {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "fromMs must be <= toMs"})
+	}
 	items, err := h.listHandler.Handle(c.Context(), querydetection.ListDetectionsQuery{
 		MediaID: mediaID,
 		Kind:    kind,
+		FromMs:  fromMs,
+		ToMs:    toMs,
 	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list detections"})

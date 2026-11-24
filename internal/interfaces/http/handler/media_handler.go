@@ -17,13 +17,16 @@ import (
 )
 
 type MediaHandler struct {
-	initiateHandler mediaInitiateUploadHandler
-	presignHandler  mediaPresignPartsHandler
-	completeHandler mediaCompleteUploadHandler
-	fromURLHandler  mediaFromURLHandler
-	deleteHandler   mediaDeleteHandler
-	getHandler      mediaGetHandler
-	listHandler     mediaListHandler
+	initiateHandler   mediaInitiateUploadHandler
+	presignHandler    mediaPresignPartsHandler
+	completeHandler   mediaCompleteUploadHandler
+	fromURLHandler    mediaFromURLHandler
+	deleteHandler     mediaDeleteHandler
+	getHandler        mediaGetHandler
+	listHandler       mediaListHandler
+	updateConfigHandler mediaUpdateConfigurationHandler
+	getConfigHandler    mediaGetConfigurationHandler
+	reanalyzeHandler    mediaReanalyzeHandler
 }
 
 func NewMediaHandler(
@@ -34,15 +37,21 @@ func NewMediaHandler(
 	deleteHandler mediaDeleteHandler,
 	getHandler mediaGetHandler,
 	listHandler mediaListHandler,
+	updateConfigHandler mediaUpdateConfigurationHandler,
+	getConfigHandler mediaGetConfigurationHandler,
+	reanalyzeHandler mediaReanalyzeHandler,
 ) *MediaHandler {
 	return &MediaHandler{
-		initiateHandler: initiateHandler,
-		presignHandler:  presignHandler,
-		completeHandler: completeHandler,
-		fromURLHandler:  fromURLHandler,
-		deleteHandler:   deleteHandler,
-		getHandler:      getHandler,
-		listHandler:     listHandler,
+		initiateHandler:     initiateHandler,
+		presignHandler:      presignHandler,
+		completeHandler:     completeHandler,
+		fromURLHandler:      fromURLHandler,
+		deleteHandler:       deleteHandler,
+		getHandler:          getHandler,
+		listHandler:         listHandler,
+		updateConfigHandler: updateConfigHandler,
+		getConfigHandler:    getConfigHandler,
+		reanalyzeHandler:    reanalyzeHandler,
 	}
 }
 
@@ -255,4 +264,113 @@ func (h *MediaHandler) Delete(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to delete media"})
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+type updateConfigurationBody struct {
+	SilenceEnabled       *bool    `json:"silenceEnabled"`
+	ThresholdMode        *string  `json:"thresholdMode" validate:"omitempty,oneof=auto manual"`
+	SilenceThresholdDB   *float64 `json:"silenceThresholdDb"`
+	DetectionLevel       *string  `json:"detectionLevel" validate:"omitempty,oneof=gentle standard aggressive"`
+	SilenceMinDurationMs *int     `json:"silenceMinDurationMs" validate:"omitempty,min=0"`
+	PaddingBeforeMs      *int     `json:"paddingBeforeMs" validate:"omitempty,min=0"`
+	PaddingAfterMs       *int     `json:"paddingAfterMs" validate:"omitempty,min=0"`
+	SpeechMinDurationMs  *int     `json:"speechMinDurationMs" validate:"omitempty,min=0"`
+	FillersEnabled       *bool    `json:"fillersEnabled"`
+	RepetitionsEnabled   *bool    `json:"repetitionsEnabled"`
+	FalseStartsEnabled   *bool    `json:"falseStartsEnabled"`
+	SponsorsAction       *string  `json:"sponsorsAction" validate:"omitempty,oneof=remove suggest keep"`
+	AdsAction            *string  `json:"adsAction" validate:"omitempty,oneof=remove suggest keep"`
+	Language             *string  `json:"language" validate:"omitempty,max=10"`
+}
+
+type reanalyzeBody struct {
+	Steps []string `json:"steps" validate:"omitempty,dive,oneof=silence"`
+}
+
+func (h *MediaHandler) GetConfiguration(c fiber.Ctx) error {
+	if _, err := httpctx.GetUser(c); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
+	}
+	cfg, err := h.getConfigHandler.Handle(c.Context(), querymedia.GetConfigurationQuery{MediaID: id})
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Configuration not found"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to get configuration"})
+	}
+	return c.Status(fiber.StatusOK).JSON(presenter.NewMediaConfigurationResponse(cfg))
+}
+
+func (h *MediaHandler) UpdateConfiguration(c fiber.Ctx) error {
+	if _, err := httpctx.GetUser(c); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
+	}
+	var body updateConfigurationBody
+	if err := validation.BindBody(c, &body); err != nil {
+		return err
+	}
+	cfg, err := h.updateConfigHandler.Handle(c.Context(), cmdmedia.UpdateConfigurationCommand{
+		MediaID:              id,
+		SilenceEnabled:       body.SilenceEnabled,
+		ThresholdMode:        body.ThresholdMode,
+		SilenceThresholdDB:   body.SilenceThresholdDB,
+		DetectionLevel:       body.DetectionLevel,
+		SilenceMinDurationMs: body.SilenceMinDurationMs,
+		PaddingBeforeMs:      body.PaddingBeforeMs,
+		PaddingAfterMs:       body.PaddingAfterMs,
+		SpeechMinDurationMs:  body.SpeechMinDurationMs,
+		FillersEnabled:       body.FillersEnabled,
+		RepetitionsEnabled:   body.RepetitionsEnabled,
+		FalseStartsEnabled:   body.FalseStartsEnabled,
+		SponsorsAction:       body.SponsorsAction,
+		AdsAction:            body.AdsAction,
+		Language:             body.Language,
+	})
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Media not found"})
+		}
+		if strings.Contains(err.Error(), "must be") {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to update configuration"})
+	}
+	return c.Status(fiber.StatusOK).JSON(presenter.NewMediaConfigurationResponse(cfg))
+}
+
+func (h *MediaHandler) Reanalyze(c fiber.Ctx) error {
+	if _, err := httpctx.GetUser(c); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
+	}
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
+	}
+	var body reanalyzeBody
+	if len(c.Body()) > 0 {
+		if err := validation.BindBody(c, &body); err != nil {
+			return err
+		}
+	}
+	if err := h.reanalyzeHandler.Handle(c.Context(), cmdmedia.ReanalyzeCommand{
+		MediaID: id,
+		Steps:   body.Steps,
+	}); err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Media not found"})
+		}
+		if strings.Contains(err.Error(), "not ready") || strings.Contains(err.Error(), "unsupported") {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to reanalyze"})
+	}
+	return c.SendStatus(fiber.StatusAccepted)
 }

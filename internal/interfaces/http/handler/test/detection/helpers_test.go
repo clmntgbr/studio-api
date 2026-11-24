@@ -15,12 +15,14 @@ import (
 
 type mockList struct {
 	calls int
+	last  querydetection.ListDetectionsQuery
 	items []domaindetection.Detection
 	err   error
 }
 
-func (m *mockList) Handle(_ context.Context, _ querydetection.ListDetectionsQuery) ([]domaindetection.Detection, error) {
+func (m *mockList) Handle(_ context.Context, q querydetection.ListDetectionsQuery) ([]domaindetection.Detection, error) {
 	m.calls++
+	m.last = q
 	return m.items, m.err
 }
 

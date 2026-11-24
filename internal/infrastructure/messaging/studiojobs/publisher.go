@@ -108,18 +108,21 @@ func (p *Publisher) PublishWaveformJob(ctx context.Context, mediaID, audioKey st
 	return p.bus.PublishJob(ctx, "job.waveform", body, msg.MessageID, mediaID)
 }
 
-func (p *Publisher) PublishSilenceJob(ctx context.Context, mediaID, audioKey, thresholdMode string, silenceThresholdDb *float64) error {
-	if thresholdMode == "" {
-		thresholdMode = "auto"
+func (p *Publisher) PublishSilenceJob(ctx context.Context, mediaID, audioKey string, opts port.SilenceJobOptions) error {
+	if opts.ThresholdMode == "" {
+		opts.ThresholdMode = "auto"
+	}
+	if opts.NoiseFloorOffsetDb == 0 {
+		opts.NoiseFloorOffsetDb = 12
 	}
 	payload := map[string]any{
 		"mediaId":            mediaID,
 		"audioKey":           audioKey,
-		"thresholdMode":      thresholdMode,
-		"noiseFloorOffsetDb": 8.0,
+		"thresholdMode":      opts.ThresholdMode,
+		"noiseFloorOffsetDb": opts.NoiseFloorOffsetDb,
 	}
-	if silenceThresholdDb != nil {
-		payload["silenceThresholdDb"] = *silenceThresholdDb
+	if opts.SilenceThresholdDb != nil {
+		payload["silenceThresholdDb"] = *opts.SilenceThresholdDb
 	}
 	msg, body, err := envelope.NewJob("silence", mediaID, "", 1, payload)
 	if err != nil {

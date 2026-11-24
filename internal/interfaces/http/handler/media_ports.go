@@ -36,3 +36,15 @@ type mediaGetHandler interface {
 type mediaListHandler interface {
 	Handle(ctx context.Context, q querymedia.ListMediaQuery) ([]domainmedia.FileView, int64, error)
 }
+
+type mediaUpdateConfigurationHandler interface {
+	Handle(ctx context.Context, cmd cmdmedia.UpdateConfigurationCommand) (*domainmedia.Configuration, error)
+}
+
+type mediaGetConfigurationHandler interface {
+	Handle(ctx context.Context, q querymedia.GetConfigurationQuery) (*domainmedia.Configuration, error)
+}
+
+type mediaReanalyzeHandler interface {
+	Handle(ctx context.Context, cmd cmdmedia.ReanalyzeCommand) error
+}

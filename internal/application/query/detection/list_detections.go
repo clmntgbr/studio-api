@@ -11,6 +11,8 @@ import (
 type ListDetectionsQuery struct {
 	MediaID uuid.UUID
 	Kind    string
+	FromMs  *int64
+	ToMs    *int64
 }
 
 type ListDetectionsHandler struct {
@@ -26,14 +28,18 @@ func (h *ListDetectionsHandler) Handle(ctx context.Context, q ListDetectionsQuer
 	if err != nil {
 		return nil, err
 	}
-	if q.Kind == "" {
-		return items, nil
-	}
 	out := make([]domaindetection.Detection, 0, len(items))
 	for _, d := range items {
-		if string(d.Kind) == q.Kind {
-			out = append(out, d)
+		if q.Kind != "" && string(d.Kind) != q.Kind {
+			continue
 		}
+		if q.FromMs != nil && d.SourceEndMs < *q.FromMs {
+			continue
+		}
+		if q.ToMs != nil && d.SourceStartMs > *q.ToMs {
+			continue
+		}
+		out = append(out, d)
 	}
 	return out, nil
 }

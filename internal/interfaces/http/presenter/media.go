@@ -136,3 +136,43 @@ func NewUploadPartsResponse(parts []port.UploadPartURL) []UploadPartResponse {
 	}
 	return out
 }
+
+type MediaConfigurationResponse struct {
+	MediaFileID          string   `json:"mediaFileId"`
+	SilenceEnabled       bool     `json:"silenceEnabled"`
+	ThresholdMode        string   `json:"thresholdMode"`
+	SilenceThresholdDB   *float64 `json:"silenceThresholdDb,omitempty"`
+	DetectionLevel       string   `json:"detectionLevel"`
+	SilenceMinDurationMs int      `json:"silenceMinDurationMs"`
+	PaddingBeforeMs      int      `json:"paddingBeforeMs"`
+	PaddingAfterMs       int      `json:"paddingAfterMs"`
+	SpeechMinDurationMs  int      `json:"speechMinDurationMs"`
+	FillersEnabled       bool     `json:"fillersEnabled"`
+	RepetitionsEnabled   bool     `json:"repetitionsEnabled"`
+	FalseStartsEnabled   bool     `json:"falseStartsEnabled"`
+	SponsorsAction       string   `json:"sponsorsAction"`
+	AdsAction            string   `json:"adsAction"`
+	Language             *string  `json:"language,omitempty"`
+	UpdatedAt            time.Time `json:"updatedAt"`
+}
+
+func NewMediaConfigurationResponse(cfg *domainmedia.Configuration) MediaConfigurationResponse {
+	return MediaConfigurationResponse{
+		MediaFileID:          cfg.MediaFileID.String(),
+		SilenceEnabled:       cfg.SilenceEnabled,
+		ThresholdMode:        cfg.ThresholdMode,
+		SilenceThresholdDB:   cfg.SilenceThresholdDB,
+		DetectionLevel:       cfg.DetectionLevel,
+		SilenceMinDurationMs: cfg.SilenceMinDurationMs,
+		PaddingBeforeMs:      cfg.PaddingBeforeMs,
+		PaddingAfterMs:       cfg.PaddingAfterMs,
+		SpeechMinDurationMs:  cfg.SpeechMinDurationMs,
+		FillersEnabled:       cfg.FillersEnabled,
+		RepetitionsEnabled:   cfg.RepetitionsEnabled,
+		FalseStartsEnabled:   cfg.FalseStartsEnabled,
+		SponsorsAction:       string(cfg.SponsorsAction),
+		AdsAction:            string(cfg.AdsAction),
+		Language:             cfg.Language,
+		UpdatedAt:            cfg.UpdatedAt,
+	}
+}

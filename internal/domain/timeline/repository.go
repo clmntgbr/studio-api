@@ -11,6 +11,8 @@ type WriteRepository interface {
 	Save(ctx context.Context, t *Timeline, segments []Segment, decisions []Decision) error
 	Update(ctx context.Context, t *Timeline) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Timeline, error)
+	SupersedeDrafts(ctx context.Context, projectID uuid.UUID) error
+	NextVersion(ctx context.Context, projectID uuid.UUID) (int, error)
 }
 
 type ReadRepository interface {

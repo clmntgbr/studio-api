@@ -79,3 +79,78 @@ func TestDetectionHandler_ListByMedia_HandlerError(t *testing.T) {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
 }
+
+func TestDetectionHandler_ListByMedia_FromToMs_Success(t *testing.T) {
+	list := &mockList{items: []domaindetection.Detection{sampleDetection()}}
+	app := mount(list, true)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/media/"+testutil.TestMediaID.String()+"/detections?fromMs=500&toMs=3000",
+		nil,
+	)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if list.last.FromMs == nil || *list.last.FromMs != 500 {
+		t.Fatalf("fromMs=%v", list.last.FromMs)
+	}
+	if list.last.ToMs == nil || *list.last.ToMs != 3000 {
+		t.Fatalf("toMs=%v", list.last.ToMs)
+	}
+}
+
+func TestDetectionHandler_ListByMedia_InvalidFromMs(t *testing.T) {
+	app := mount(&mockList{}, true)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/media/"+testutil.TestMediaID.String()+"/detections?fromMs=abc",
+		nil,
+	)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
+func TestDetectionHandler_ListByMedia_InvalidToMs(t *testing.T) {
+	app := mount(&mockList{}, true)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/media/"+testutil.TestMediaID.String()+"/detections?toMs=nope",
+		nil,
+	)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
+func TestDetectionHandler_ListByMedia_FromMsGreaterThanToMs(t *testing.T) {
+	app := mount(&mockList{}, true)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/api/media/"+testutil.TestMediaID.String()+"/detections?fromMs=5000&toMs=1000",
+		nil,
+	)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}

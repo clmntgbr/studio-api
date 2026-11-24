@@ -330,6 +330,18 @@ func DefaultConfiguration(mediaFileID uuid.UUID) *Configuration {
 	}
 }
 
+// NoiseFloorOffsetDb returns the auto-mode offset above measured noise floor.
+func (c *Configuration) NoiseFloorOffsetDb() float64 {
+	switch c.DetectionLevel {
+	case "gentle":
+		return 6
+	case "standard":
+		return 9
+	default:
+		return 12 // aggressive
+	}
+}
+
 type ProcessingStep struct {
 	ID           uuid.UUID
 	MediaFileID  uuid.UUID

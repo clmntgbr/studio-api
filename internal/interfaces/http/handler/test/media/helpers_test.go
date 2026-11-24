@@ -92,6 +92,42 @@ func (m *mockList) Handle(_ context.Context, _ querymedia.ListMediaQuery) ([]dom
 	return m.views, m.total, m.err
 }
 
+type mockUpdateConfig struct {
+	calls int
+	cmd   cmdmedia.UpdateConfigurationCommand
+	out   *domainmedia.Configuration
+	err   error
+}
+
+func (m *mockUpdateConfig) Handle(_ context.Context, cmd cmdmedia.UpdateConfigurationCommand) (*domainmedia.Configuration, error) {
+	m.calls++
+	m.cmd = cmd
+	return m.out, m.err
+}
+
+type mockGetConfig struct {
+	calls int
+	out   *domainmedia.Configuration
+	err   error
+}
+
+func (m *mockGetConfig) Handle(_ context.Context, _ querymedia.GetConfigurationQuery) (*domainmedia.Configuration, error) {
+	m.calls++
+	return m.out, m.err
+}
+
+type mockReanalyze struct {
+	calls int
+	cmd   cmdmedia.ReanalyzeCommand
+	err   error
+}
+
+func (m *mockReanalyze) Handle(_ context.Context, cmd cmdmedia.ReanalyzeCommand) error {
+	m.calls++
+	m.cmd = cmd
+	return m.err
+}
+
 func sampleMedia() *domainmedia.MediaFile {
 	now := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
 	key := "media/" + testutil.TestMediaID.String() + "/source/original.mp4"
@@ -108,6 +144,12 @@ func sampleMedia() *domainmedia.MediaFile {
 	}
 }
 
+func sampleConfig() *domainmedia.Configuration {
+	cfg := domainmedia.DefaultConfiguration(testutil.TestMediaID)
+	cfg.UpdatedAt = time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
+	return cfg
+}
+
 func newHandler(
 	init *mockInitiate,
 	presign *mockPresign,
@@ -116,6 +158,21 @@ func newHandler(
 	del *mockDelete,
 	get *mockGet,
 	list *mockList,
+) *handler.MediaHandler {
+	return newHandlerWithConfig(init, presign, complete, fromURL, del, get, list, nil, nil, nil)
+}
+
+func newHandlerWithConfig(
+	init *mockInitiate,
+	presign *mockPresign,
+	complete *mockComplete,
+	fromURL *mockFromURL,
+	del *mockDelete,
+	get *mockGet,
+	list *mockList,
+	updateCfg *mockUpdateConfig,
+	getCfg *mockGetConfig,
+	reanalyze *mockReanalyze,
 ) *handler.MediaHandler {
 	if init == nil {
 		init = &mockInitiate{}
@@ -138,29 +195,38 @@ func newHandler(
 	if list == nil {
 		list = &mockList{}
 	}
-	return handler.NewMediaHandler(init, presign, complete, fromURL, del, get, list)
+	if updateCfg == nil {
+		updateCfg = &mockUpdateConfig{}
+	}
+	if getCfg == nil {
+		getCfg = &mockGetConfig{}
+	}
+	if reanalyze == nil {
+		reanalyze = &mockReanalyze{}
+	}
+	return handler.NewMediaHandler(init, presign, complete, fromURL, del, get, list, updateCfg, getCfg, reanalyze)
 }
 
 func mount(h *handler.MediaHandler, withUser bool) *fiber.App {
 	app := testutil.NewTestApp()
 	auth := testutil.WithUserWithoutProject(testutil.TestUserID)
-	if withUser {
-		app.Post("/api/projects/:id/media/uploads", auth, h.InitiateUpload)
-		app.Post("/api/projects/:id/media/from-url", auth, h.FromURL)
-		app.Get("/api/projects/:id/media", auth, h.ListByProject)
-		app.Get("/api/media/:id", auth, h.GetByID)
-		app.Delete("/api/media/:id", auth, h.Delete)
-		app.Post("/api/media/:id/uploads/parts", auth, h.PresignParts)
-		app.Post("/api/media/:id/uploads/complete", auth, h.CompleteUpload)
-		return app
+	register := func(method, path string, fn fiber.Handler) {
+		if withUser {
+			app.Add([]string{method}, path, auth, fn)
+			return
+		}
+		app.Add([]string{method}, path, fn)
 	}
-	app.Post("/api/projects/:id/media/uploads", h.InitiateUpload)
-	app.Post("/api/projects/:id/media/from-url", h.FromURL)
-	app.Get("/api/projects/:id/media", h.ListByProject)
-	app.Get("/api/media/:id", h.GetByID)
-	app.Delete("/api/media/:id", h.Delete)
-	app.Post("/api/media/:id/uploads/parts", h.PresignParts)
-	app.Post("/api/media/:id/uploads/complete", h.CompleteUpload)
+	register(fiber.MethodPost, "/api/projects/:id/media/uploads", h.InitiateUpload)
+	register(fiber.MethodPost, "/api/projects/:id/media/from-url", h.FromURL)
+	register(fiber.MethodGet, "/api/projects/:id/media", h.ListByProject)
+	register(fiber.MethodGet, "/api/media/:id", h.GetByID)
+	register(fiber.MethodDelete, "/api/media/:id", h.Delete)
+	register(fiber.MethodPost, "/api/media/:id/uploads/parts", h.PresignParts)
+	register(fiber.MethodPost, "/api/media/:id/uploads/complete", h.CompleteUpload)
+	register(fiber.MethodGet, "/api/media/:id/configuration", h.GetConfiguration)
+	register(fiber.MethodPatch, "/api/media/:id/configuration", h.UpdateConfiguration)
+	register(fiber.MethodPost, "/api/media/:id/reanalyze", h.Reanalyze)
 	return app
 }
 

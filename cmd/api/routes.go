@@ -34,6 +34,7 @@ func setupAPIRoutes(app *fiber.App, container *di.Container) {
 	setupProjectRoutes(protected, container)
 	setupMediaRoutes(protected, container)
 	setupDetectionRoutes(protected, container)
+	setupTimelineRoutes(protected, container)
 }
 
 func setupRealtimeRoutes(api fiber.Router, container *di.Container) {
@@ -61,8 +62,17 @@ func setupMediaRoutes(api fiber.Router, container *di.Container) {
 	api.Delete("/media/:id", container.MediaHandler.Delete)
 	api.Post("/media/:id/uploads/parts", container.MediaHandler.PresignParts)
 	api.Post("/media/:id/uploads/complete", container.MediaHandler.CompleteUpload)
+	api.Get("/media/:id/configuration", container.MediaHandler.GetConfiguration)
+	api.Patch("/media/:id/configuration", container.MediaHandler.UpdateConfiguration)
+	api.Post("/media/:id/reanalyze", container.MediaHandler.Reanalyze)
 }
 
 func setupDetectionRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/media/:id/detections", container.DetectionHandler.ListByMedia)
+}
+
+func setupTimelineRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/projects/:id/timeline", container.TimelineHandler.Get)
+	api.Post("/projects/:id/timeline/preview", container.TimelineHandler.Preview)
+	api.Post("/projects/:id/timeline/validate", container.TimelineHandler.Validate)
 }

@@ -155,7 +155,7 @@ func TestMediaHandler_FromURL_Success(t *testing.T) {
 	h := newHandler(nil, nil, nil, fromURL, nil, nil, nil)
 	app := mount(h, true)
 	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/media/from-url", map[string]any{
-		"url": "https://example.com/video.mp4",
+		"url": "https://1.1.1.1/video.mp4",
 	})
 	resp, err := app.Test(req)
 	if err != nil {

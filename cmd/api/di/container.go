@@ -7,10 +7,12 @@ import (
 	identitycmd "go-api/internal/application/command/identity"
 	mediacmd "go-api/internal/application/command/media"
 	projectcmd "go-api/internal/application/command/project"
+	timelinecmd "go-api/internal/application/command/timeline"
 	usercmd "go-api/internal/application/command/user"
 	querydetection "go-api/internal/application/query/detection"
 	querymedia "go-api/internal/application/query/media"
 	queryproject "go-api/internal/application/query/project"
+	querytimeline "go-api/internal/application/query/timeline"
 	queryuser "go-api/internal/application/query/user"
 	"go-api/internal/infrastructure/centrifugo"
 	infraClerk "go-api/internal/infrastructure/clerk"
@@ -37,6 +39,7 @@ type Container struct {
 	ProjectHandler         *httphandler.ProjectHandler
 	MediaHandler           *httphandler.MediaHandler
 	DetectionHandler       *httphandler.DetectionHandler
+	TimelineHandler        *httphandler.TimelineHandler
 }
 
 func NewContainer(db *gorm.DB, env *config.Config) *Container {
@@ -53,6 +56,8 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	mediaWriteRepo := write.NewMediaWriteRepository(db)
 	mediaReadRepo := read.NewMediaReadRepository(db)
 	detectionReadRepo := read.NewDetectionReadRepository(db)
+	timelineWriteRepo := write.NewTimelineWriteRepository(db)
+	timelineReadRepo := read.NewTimelineReadRepository(db)
 
 	storage, err := s3store.New(s3store.Config{
 		Endpoint:  env.S3Endpoint,
@@ -93,7 +98,14 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	deleteMediaHandler := mediacmd.NewDeleteMediaHandler(mediaWriteRepo)
 	getMediaHandler := querymedia.NewGetMediaHandler(mediaReadRepo)
 	listMediaHandler := querymedia.NewListMediaHandler(mediaReadRepo)
+	updateConfigHandler := mediacmd.NewUpdateConfigurationHandler(mediaWriteRepo)
+	getConfigHandler := querymedia.NewGetConfigurationHandler(mediaReadRepo)
+	reanalyzeHandler := mediacmd.NewReanalyzeHandler(mediaWriteRepo, jobPublisher)
 	listDetectionsHandler := querydetection.NewListDetectionsHandler(detectionReadRepo)
+
+	previewTimeline := timelinecmd.NewPreviewHandler(mediaWriteRepo, mediaReadRepo, detectionReadRepo)
+	validateTimeline := timelinecmd.NewValidateHandler(timelineWriteRepo, timelineReadRepo)
+	getTimeline := querytimeline.NewGetTimelineHandler(timelineReadRepo)
 
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
@@ -127,7 +139,15 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			deleteMediaHandler,
 			getMediaHandler,
 			listMediaHandler,
+			updateConfigHandler,
+			getConfigHandler,
+			reanalyzeHandler,
 		),
 		DetectionHandler: httphandler.NewDetectionHandler(listDetectionsHandler),
+		TimelineHandler: httphandler.NewTimelineHandler(
+			previewTimeline,
+			validateTimeline,
+			getTimeline,
+		),
 	}
 }
