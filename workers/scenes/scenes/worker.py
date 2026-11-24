@@ -248,3 +248,7 @@ def main() -> None:
                 connection.close()
             except Exception:  # noqa: BLE001
                 pass
+
+
+if __name__ == "__main__":
+    main()

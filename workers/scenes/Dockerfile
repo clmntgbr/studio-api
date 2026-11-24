@@ -14,4 +14,4 @@ COPY workers/scenes/scenes /app/scenes
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-CMD ["python", "-m", "scenes.worker"]
+CMD ["python", "-m", "scenes"]

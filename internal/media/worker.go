@@ -316,16 +316,19 @@ func handleProxy(ctx context.Context, bus *topology.Bus, store *s3store.Client, 
 		return finish(ctx, bus, d, msg, "proxy", false, nil, "INVALID_PAYLOAD", "mediaId and sourceKey required", false)
 	}
 
+	_ = publishProgress(ctx, bus, msg, "proxy", 1, "download", "Downloading source for proxy")
 	local, cleanup, err := downloadToWork(ctx, store, cfg, req.MediaID, req.SourceKey, "proxy")
 	if err != nil {
 		return finish(ctx, bus, d, msg, "proxy", false, nil, "DOWNLOAD", err.Error(), true)
 	}
 	defer cleanup()
 
+	_ = publishProgress(ctx, bus, msg, "proxy", 15, "ffmpeg", "Encoding 720p proxy")
 	dest := filepath.Join(filepath.Dir(local), "proxy_720p.mp4")
 	if err := pipeline.MakeProxy(ctx, local, dest, req.Proxy); err != nil {
 		return finish(ctx, bus, d, msg, "proxy", false, nil, "PROXY", err.Error(), false)
 	}
+	_ = publishProgress(ctx, bus, msg, "proxy", 90, "upload", "Uploading proxy")
 	proxyKey := fmt.Sprintf("media/%s/proxy/proxy_720p.mp4", req.MediaID)
 	if err := store.UploadFile(ctx, cfg.MediaBucket, proxyKey, dest, "video/mp4"); err != nil {
 		return finish(ctx, bus, d, msg, "proxy", false, nil, "UPLOAD", err.Error(), true)
@@ -409,6 +412,18 @@ func finish(ctx context.Context, bus *topology.Bus, d amqp.Delivery, msg *envelo
 		return err
 	}
 	return bus.Ack(d)
+}
+
+func publishProgress(ctx context.Context, bus *topology.Bus, msg *envelope.Message, job string, pct float64, stage, message string) error {
+	corr := msg.CorrelationID
+	if corr == "" {
+		corr = msg.MessageID
+	}
+	m, body, err := envelope.NewProgress(job, corr, msg.MessageID, msg.Attempt, pct, stage, message)
+	if err != nil {
+		return err
+	}
+	return bus.PublishProgress(ctx, body, m.MessageID, corr)
 }
 
 func envOr(k, def string) string {

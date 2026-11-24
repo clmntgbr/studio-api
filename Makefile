@@ -132,6 +132,11 @@ migrate-down: cli-build
 migrate-check: cli-build
 	@$(COMPOSE_DEV) exec api ./bin/cli migrate check
 
+# Empty project/media/pipeline tables; keeps users, goose_db_version, output_preset.
+# Usage: make purge
+purge: cli-build
+	@$(COMPOSE_DEV) exec api ./bin/cli purge --force
+
 # Retention: delete derived media objects older than N days (default 7).
 # Usage: make purge-retention  OR  make purge-retention DAYS=14 DRY_RUN=1
 purge-retention: cli-build

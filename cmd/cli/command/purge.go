@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"go-api/internal/infrastructure/config"
+	"go-api/internal/infrastructure/persistence/purge"
 	s3store "go-api/internal/infrastructure/storage/s3"
 
 	"github.com/spf13/cobra"
@@ -25,10 +27,38 @@ var derivedKeyParts = []string{
 }
 
 func NewPurgeCommand() *cobra.Command {
+	var force bool
 	cmd := &cobra.Command{
 		Use:   "purge",
-		Short: "Retention / cleanup commands",
+		Short: "Empty every table except " + strings.Join(purge.KeptTables, ", "),
+		Long: "Truncate project/media/pipeline tables for local reset. " +
+			"Keeps " + strings.Join(purge.KeptTables, ", ") + ". " +
+			"Refused when GO_ENV is production. Pass --force to apply.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			env := config.Load()
+			if config.IsProduction(env.Environment) {
+				return errors.New("purge is refused when GO_ENV is production")
+			}
+			db := config.ConnectDatabase(env)
+			if !force {
+				tables, err := purge.Tables(db)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Would empty %d tables: %s\n", len(tables), strings.Join(tables, ", "))
+				return errors.New("refusing to purge without --force")
+			}
+			tables, err := purge.Run(db)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Emptied %d tables: %s\n", len(tables), strings.Join(tables, ", "))
+			return nil
+		},
 	}
+	cmd.Flags().BoolVar(&force, "force", false, "actually truncate the tables")
 
 	var days int
 	var dryRun bool

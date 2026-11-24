@@ -120,14 +120,14 @@ func (c *ProgressConsumer) handle(ctx context.Context, d amqp.Delivery) error {
 		return c.handleRenderProgress(ctx, corrID, pp)
 	}
 
-	projectID, err := c.media.ProjectIDForMedia(ctx, corrID)
-	if err != nil || projectID == uuid.Nil {
-		return err
-	}
 	if c.steps != nil {
 		if kind, ok := progressStepKind(stepName); ok {
 			_ = mediacmd.MarkStepRunning(ctx, c.steps, corrID, kind, time.Now().UTC())
 		}
+	}
+	projectID, err := c.media.ProjectIDForMedia(ctx, corrID)
+	if err != nil || projectID == uuid.Nil {
+		return err
 	}
 	return c.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionProgress, projectID.String(), map[string]any{
 		"mediaId": corrID.String(),

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import shutil
+import threading
 from pathlib import Path
 
 import boto3
@@ -89,6 +90,29 @@ def publish(
     )
 
 
+def _run_track_keepalive(ch: pika.channel.Channel, video_path: str, sample_fps: float) -> dict:
+    """Run face tracking off the I/O thread while pumping AMQP heartbeats."""
+    box: dict = {}
+
+    def target() -> None:
+        tracker = FaceTracker()
+        try:
+            box["doc"] = tracker.track(video_path, sample_fps=sample_fps)
+        except Exception as exc:  # noqa: BLE001 — surfaced to caller
+            box["err"] = exc
+        finally:
+            tracker.close()
+
+    thread = threading.Thread(target=target, name="reframe-track", daemon=True)
+    thread.start()
+    while thread.is_alive():
+        ch.connection.process_data_events(time_limit=1)
+    thread.join()
+    if "err" in box:
+        raise box["err"]
+    return box["doc"]
+
+
 def handle(ch: pika.channel.Channel, method, body: bytes, store, bucket: str, work_dir: Path) -> None:
     try:
         msg = envelope.parse(body)
@@ -129,11 +153,7 @@ def handle(ch: pika.channel.Channel, method, body: bytes, store, bucket: str, wo
         store.download_file(bucket, key, str(local))
 
         progress(30, "detect", "Tracking faces")
-        tracker = FaceTracker()
-        try:
-            path_doc = tracker.track(str(local), sample_fps=float(env("REFRAME_SAMPLE_FPS", "5")))
-        finally:
-            tracker.close()
+        path_doc = _run_track_keepalive(ch, str(local), float(env("REFRAME_SAMPLE_FPS", "5")))
 
         progress(80, "upload", "Uploading crop_path.json")
         crop_key = f"media/{media_id}/reframe/crop_path.json"
@@ -183,23 +203,37 @@ def main() -> None:
     work_dir = Path(env("WORK_DIR", "/tmp/work"))
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    connection = pika.BlockingConnection(pika.URLParameters(rabbit))
-    ch = connection.channel()
-    declare_topology(ch)
-    ch.basic_qos(prefetch_count=1)
+    params = pika.URLParameters(rabbit)
+    # Long face-tracking jobs: keep the connection alive while detection runs on a side thread.
+    params.heartbeat = int(env("REFRAME_AMQP_HEARTBEAT", "600"))
+    params.blocked_connection_timeout = 300
 
-    store = s3_client()
-    log.info("worker-reframe started bucket=%s", bucket)
-
-    def on_message(channel, method, properties, body):
-        handle(channel, method, body, store, bucket, work_dir)
-
-    ch.basic_consume(queue="q.reframe", on_message_callback=on_message, auto_ack=False)
-    try:
-        ch.start_consuming()
-    except KeyboardInterrupt:
-        ch.stop_consuming()
-    connection.close()
+    while True:
+        connection = pika.BlockingConnection(params)
+        ch = connection.channel()
+        declare_topology(ch)
+        ch.basic_qos(prefetch_count=1)
+        store = s3_client()
+        log.info("worker-reframe started bucket=%s heartbeat=%s", bucket, params.heartbeat)
+        try:
+            for method, _properties, body in ch.consume("q.reframe", inactivity_timeout=1, auto_ack=False):
+                if body is None:
+                    continue
+                handle(ch, method, body, store, bucket, work_dir)
+        except KeyboardInterrupt:
+            log.info("worker-reframe stopping")
+            try:
+                ch.cancel()
+            except Exception:  # noqa: BLE001
+                pass
+            connection.close()
+            return
+        except Exception:
+            log.exception("worker-reframe connection lost; reconnecting")
+            try:
+                connection.close()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 if __name__ == "__main__":

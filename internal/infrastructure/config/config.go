@@ -45,6 +45,16 @@ type Config struct {
 	MinioWebhookSecret    string
 }
 
+// IsProduction reports whether env is a production deployment (GO_ENV).
+func IsProduction(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "production", "prod":
+		return true
+	default:
+		return false
+	}
+}
+
 func Load() *Config {
 	// Fill only missing/empty keys from .env. Docker env_file can inject an
 	// empty string for a key; godotenv.Load() would not override it, so a
