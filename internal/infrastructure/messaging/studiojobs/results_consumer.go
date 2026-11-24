@@ -8,6 +8,7 @@ import (
 	"time"
 
 	mediacmd "go-api/internal/application/command/media"
+	"go-api/internal/pipeline"
 	"go-api/internal/studio/envelope"
 	"go-api/internal/studio/topology"
 
@@ -17,13 +18,14 @@ import (
 
 // ResultsConsumer consumes studio.results (q.results) and runs shared post-source orchestration.
 type ResultsConsumer struct {
-	url         string
-	markReady   *mediacmd.MarkSourceReadyHandler
-	markFail    *mediacmd.MarkFetchFailedHandler
-	applyProbe  *mediacmd.ApplyProbeResultHandler
-	applyAudio  *mediacmd.ApplyAudioResultHandler
-	applyProxy  *mediacmd.ApplyProxyResultHandler
-	applyWave   *mediacmd.ApplyWaveformResultHandler
+	url          string
+	markReady    *mediacmd.MarkSourceReadyHandler
+	markFail     *mediacmd.MarkFetchFailedHandler
+	applyProbe   *mediacmd.ApplyProbeResultHandler
+	applyAudio   *mediacmd.ApplyAudioResultHandler
+	applyProxy   *mediacmd.ApplyProxyResultHandler
+	applyWave    *mediacmd.ApplyWaveformResultHandler
+	applySilence *mediacmd.ApplySilenceResultHandler
 }
 
 func NewResultsConsumer(
@@ -34,15 +36,17 @@ func NewResultsConsumer(
 	applyAudio *mediacmd.ApplyAudioResultHandler,
 	applyProxy *mediacmd.ApplyProxyResultHandler,
 	applyWave *mediacmd.ApplyWaveformResultHandler,
+	applySilence *mediacmd.ApplySilenceResultHandler,
 ) *ResultsConsumer {
 	return &ResultsConsumer{
-		url:        rabbitURL,
-		markReady:  markReady,
-		markFail:   markFail,
-		applyProbe: applyProbe,
-		applyAudio: applyAudio,
-		applyProxy: applyProxy,
-		applyWave:  applyWave,
+		url:          rabbitURL,
+		markReady:    markReady,
+		markFail:     markFail,
+		applyProbe:   applyProbe,
+		applyAudio:   applyAudio,
+		applyProxy:   applyProxy,
+		applyWave:    applyWave,
+		applySilence: applySilence,
 	}
 }
 
@@ -116,7 +120,9 @@ func (c *ResultsConsumer) handle(ctx context.Context, bus *topology.Bus, d amqp.
 		handleErr = c.onProxySucceeded(ctx, msg)
 	case "result.waveform.succeeded":
 		handleErr = c.onWaveformSucceeded(ctx, msg)
-	case "result.probe.failed", "result.audio.failed", "result.proxy.failed", "result.waveform.failed":
+	case "result.silence.succeeded":
+		handleErr = c.onSilenceSucceeded(ctx, msg)
+	case "result.probe.failed", "result.audio.failed", "result.proxy.failed", "result.waveform.failed", "result.silence.failed":
 		log.Printf("pipeline step failed type=%s correlationId=%s", msg.Type, msg.CorrelationID)
 		handleErr = nil
 	default:
@@ -158,6 +164,18 @@ type proxyOutput struct {
 
 type waveformOutput struct {
 	PeaksKey string `json:"peaksKey"`
+}
+
+type silenceInterval struct {
+	StartMs int64 `json:"startMs"`
+	EndMs   int64 `json:"endMs"`
+}
+
+type silenceOutput struct {
+	DetectionsKey         string            `json:"detectionsKey"`
+	NoiseFloorDb          float64           `json:"noiseFloorDb"`
+	CalculatedThresholdDb float64           `json:"calculatedThresholdDb"`
+	Intervals             []silenceInterval `json:"intervals"`
 }
 
 func (c *ResultsConsumer) onFetchSucceeded(ctx context.Context, msg *envelope.Message) error {
@@ -276,6 +294,30 @@ func (c *ResultsConsumer) onWaveformSucceeded(ctx context.Context, msg *envelope
 	return c.applyWave.Handle(hCtx, mediacmd.ApplyWaveformResultCommand{
 		MediaID:  mediaID,
 		PeaksKey: out.PeaksKey,
+	})
+}
+
+func (c *ResultsConsumer) onSilenceSucceeded(ctx context.Context, msg *envelope.Message) error {
+	mediaID, err := uuid.Parse(msg.CorrelationID)
+	if err != nil {
+		return fmt.Errorf("invalid correlationId: %w", err)
+	}
+	out, err := decodeResult[silenceOutput](msg)
+	if err != nil {
+		return err
+	}
+	intervals := make([]pipeline.SilenceInterval, 0, len(out.Intervals))
+	for _, iv := range out.Intervals {
+		intervals = append(intervals, pipeline.SilenceInterval{StartMs: iv.StartMs, EndMs: iv.EndMs})
+	}
+	hCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	return c.applySilence.Handle(hCtx, mediacmd.ApplySilenceResultCommand{
+		MediaID:               mediaID,
+		DetectionsKey:         out.DetectionsKey,
+		NoiseFloorDb:          out.NoiseFloorDb,
+		CalculatedThresholdDb: out.CalculatedThresholdDb,
+		Intervals:             intervals,
 	})
 }
 

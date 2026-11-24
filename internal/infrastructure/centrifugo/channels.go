@@ -5,3 +5,7 @@ import "github.com/google/uuid"
 func UserChannel(userID uuid.UUID) string {
 	return "users:" + userID.String()
 }
+
+func ProjectChannel(projectID uuid.UUID) string {
+	return "projects:" + projectID.String()
+}

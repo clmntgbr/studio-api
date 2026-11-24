@@ -10,6 +10,8 @@ const (
 	EventTypeMediaAudioReady     = "media.audio_ready.v1"
 	EventTypeMediaProxyReady     = "media.proxy_ready.v1"
 	EventTypeMediaWaveformReady  = "media.waveform_ready.v1"
+	EventTypeMediaReady          = "media.ready.v1"
+	EventTypeMediaDetectionsUpdated = "media.detections_updated.v1"
 )
 
 type MediaUploaded struct {
@@ -107,3 +109,28 @@ func (e MediaWaveformReady) EventID() string       { return e.ID }
 func (e MediaWaveformReady) EventType() string     { return EventTypeMediaWaveformReady }
 func (e MediaWaveformReady) AggregateID() string   { return e.MediaID }
 func (e MediaWaveformReady) OccurredAt() time.Time { return e.Timestamp }
+
+type MediaReady struct {
+	ID        string    `json:"eventId"`
+	MediaID   string    `json:"mediaId"`
+	ProjectID string    `json:"projectId"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e MediaReady) EventID() string       { return e.ID }
+func (e MediaReady) EventType() string     { return EventTypeMediaReady }
+func (e MediaReady) AggregateID() string   { return e.MediaID }
+func (e MediaReady) OccurredAt() time.Time { return e.Timestamp }
+
+type DetectionsUpdated struct {
+	ID        string    `json:"eventId"`
+	MediaID   string    `json:"mediaId"`
+	ProjectID string    `json:"projectId"`
+	Kind      string    `json:"kind"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func (e DetectionsUpdated) EventID() string       { return e.ID }
+func (e DetectionsUpdated) EventType() string     { return EventTypeMediaDetectionsUpdated }
+func (e DetectionsUpdated) AggregateID() string   { return e.MediaID }
+func (e DetectionsUpdated) OccurredAt() time.Time { return e.Timestamp }

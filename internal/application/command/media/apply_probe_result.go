@@ -48,14 +48,13 @@ func (h *ApplyProbeResultHandler) Handle(ctx context.Context, cmd ApplyProbeResu
 	m.ApplyProbe(cmd.DurationMs, cmd.Width, cmd.Height, cmd.FPS, cmd.VideoCodec, cmd.AudioCodec, cmd.HasAudio)
 
 	now := time.Now().UTC()
-	return h.media.WithTransaction(ctx, func(txCtx context.Context) error {
+	err = h.media.WithTransaction(ctx, func(txCtx context.Context) error {
 		if err := h.media.Update(txCtx, m); err != nil {
 			return err
 		}
 		if err := completeStep(txCtx, h.media, m.ID, domainmedia.StepProbe, now); err != nil {
 			return err
 		}
-		// Queue parallel follow-ups.
 		if cmd.HasAudio {
 			if err := queueStep(txCtx, h.media, m.ID, domainmedia.StepAudio, now); err != nil {
 				return err
@@ -66,4 +65,8 @@ func (h *ApplyProbeResultHandler) Handle(ctx context.Context, cmd ApplyProbeResu
 		}
 		return h.outbox.StoreEvents(txCtx, m.PullEvents())
 	})
+	if err != nil {
+		return err
+	}
+	return tryMarkMediaReady(ctx, h.media, h.outbox, cmd.MediaID)
 }

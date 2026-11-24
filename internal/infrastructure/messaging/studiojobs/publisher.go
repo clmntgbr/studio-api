@@ -30,7 +30,7 @@ func NewPublisher(rabbitURL string) (*Publisher, error) {
 		_ = conn.Close()
 		return nil, err
 	}
-	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform"} {
+	for _, job := range []string{"fetch", "probe", "audio", "proxy", "waveform", "silence"} {
 		if err := topology.DeclareJobQueue(ch, job, 30000); err != nil {
 			_ = ch.Close()
 			_ = conn.Close()
@@ -106,6 +106,26 @@ func (p *Publisher) PublishWaveformJob(ctx context.Context, mediaID, audioKey st
 		return err
 	}
 	return p.bus.PublishJob(ctx, "job.waveform", body, msg.MessageID, mediaID)
+}
+
+func (p *Publisher) PublishSilenceJob(ctx context.Context, mediaID, audioKey, thresholdMode string, silenceThresholdDb *float64) error {
+	if thresholdMode == "" {
+		thresholdMode = "auto"
+	}
+	payload := map[string]any{
+		"mediaId":            mediaID,
+		"audioKey":           audioKey,
+		"thresholdMode":      thresholdMode,
+		"noiseFloorOffsetDb": 8.0,
+	}
+	if silenceThresholdDb != nil {
+		payload["silenceThresholdDb"] = *silenceThresholdDb
+	}
+	msg, body, err := envelope.NewJob("silence", mediaID, "", 1, payload)
+	if err != nil {
+		return err
+	}
+	return p.bus.PublishJob(ctx, "job.silence", body, msg.MessageID, mediaID)
 }
 
 var _ port.JobPublisher = (*Publisher)(nil)

@@ -80,3 +80,24 @@ func (p *Publisher) ToUser(
 	log.Printf("centrifugo published type=%s userId=%s", eventType, userIDRaw)
 	return nil
 }
+
+// ToProject delivers the event on projects:{projectId}.
+func (p *Publisher) ToProject(
+	ctx context.Context,
+	entity string,
+	action string,
+	projectIDRaw string,
+	payload any,
+) error {
+	projectID, err := uuid.Parse(projectIDRaw)
+	if err != nil {
+		return messaging.NonRetryable(err)
+	}
+	eventType := EventType(entity, action)
+	if err := p.transport.PublishToProject(ctx, projectID, eventType, payload); err != nil {
+		log.Printf("centrifugo publish failed type=%s projectId=%s: %v", eventType, projectIDRaw, err)
+		return messaging.Retryable(err)
+	}
+	log.Printf("centrifugo published type=%s projectId=%s", eventType, projectIDRaw)
+	return nil
+}

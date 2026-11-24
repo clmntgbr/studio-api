@@ -8,6 +8,7 @@ import (
 	mediacmd "go-api/internal/application/command/media"
 	projectcmd "go-api/internal/application/command/project"
 	usercmd "go-api/internal/application/command/user"
+	querydetection "go-api/internal/application/query/detection"
 	querymedia "go-api/internal/application/query/media"
 	queryproject "go-api/internal/application/query/project"
 	queryuser "go-api/internal/application/query/user"
@@ -35,6 +36,7 @@ type Container struct {
 	RealtimeHandler        *httphandler.RealtimeHandler
 	ProjectHandler         *httphandler.ProjectHandler
 	MediaHandler           *httphandler.MediaHandler
+	DetectionHandler       *httphandler.DetectionHandler
 }
 
 func NewContainer(db *gorm.DB, env *config.Config) *Container {
@@ -50,6 +52,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	projectReadRepo := read.NewProjectReadRepository(db)
 	mediaWriteRepo := write.NewMediaWriteRepository(db)
 	mediaReadRepo := read.NewMediaReadRepository(db)
+	detectionReadRepo := read.NewDetectionReadRepository(db)
 
 	storage, err := s3store.New(s3store.Config{
 		Endpoint:  env.S3Endpoint,
@@ -90,6 +93,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	deleteMediaHandler := mediacmd.NewDeleteMediaHandler(mediaWriteRepo)
 	getMediaHandler := querymedia.NewGetMediaHandler(mediaReadRepo)
 	listMediaHandler := querymedia.NewListMediaHandler(mediaReadRepo)
+	listDetectionsHandler := querydetection.NewListDetectionsHandler(detectionReadRepo)
 
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
@@ -124,5 +128,6 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			getMediaHandler,
 			listMediaHandler,
 		),
+		DetectionHandler: httphandler.NewDetectionHandler(listDetectionsHandler),
 	}
 }

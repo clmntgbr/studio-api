@@ -52,7 +52,48 @@ func (r *mediaReadRepository) FindByID(ctx context.Context, id uuid.UUID) (*doma
 		}
 		return nil, err
 	}
-	return scanMediaView(m), nil
+	view := scanMediaView(m)
+	steps, err := r.ListSteps(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	view.Steps = steps
+	return view, nil
+}
+
+type stepScan struct {
+	Kind         string     `gorm:"column:kind"`
+	Status       string     `gorm:"column:status"`
+	Progress     float64    `gorm:"column:progress"`
+	ErrorMessage *string    `gorm:"column:error_message"`
+	QueuedAt     *time.Time `gorm:"column:queued_at"`
+	StartedAt    *time.Time `gorm:"column:started_at"`
+	CompletedAt  *time.Time `gorm:"column:completed_at"`
+}
+
+func (r *mediaReadRepository) ListSteps(ctx context.Context, mediaFileID uuid.UUID) ([]domainmedia.StepView, error) {
+	var rows []stepScan
+	err := r.db.WithContext(ctx).
+		Table("processing_step").
+		Where("media_file_id = ?", mediaFileID).
+		Order("created_at ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domainmedia.StepView, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domainmedia.StepView{
+			Kind:         domainmedia.StepKind(row.Kind),
+			Status:       domainmedia.StepStatus(row.Status),
+			Progress:     row.Progress,
+			ErrorMessage: row.ErrorMessage,
+			QueuedAt:     row.QueuedAt,
+			StartedAt:    row.StartedAt,
+			CompletedAt:  row.CompletedAt,
+		})
+	}
+	return out, nil
 }
 
 func (r *mediaReadRepository) ListByProject(ctx context.Context, projectID uuid.UUID, query paginate.PaginateQuery) ([]domainmedia.FileView, int64, error) {

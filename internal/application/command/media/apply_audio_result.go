@@ -50,7 +50,7 @@ func (h *ApplyAudioResultHandler) Handle(ctx context.Context, cmd ApplyAudioResu
 	m.RecordAudioReady(cmd.AnalysisKey, cmd.TranscriptionKey, cmd.MasterKey)
 	now := time.Now().UTC()
 
-	return h.media.WithTransaction(ctx, func(txCtx context.Context) error {
+	err = h.media.WithTransaction(ctx, func(txCtx context.Context) error {
 		if err := h.media.Update(txCtx, m); err != nil {
 			return err
 		}
@@ -73,6 +73,13 @@ func (h *ApplyAudioResultHandler) Handle(ctx context.Context, cmd ApplyAudioResu
 		if err := queueStep(txCtx, h.media, m.ID, domainmedia.StepWaveform, now); err != nil {
 			return err
 		}
+		if err := queueStep(txCtx, h.media, m.ID, domainmedia.StepSilence, now); err != nil {
+			return err
+		}
 		return h.outbox.StoreEvents(txCtx, m.PullEvents())
 	})
+	if err != nil {
+		return err
+	}
+	return tryMarkMediaReady(ctx, h.media, h.outbox, cmd.MediaID)
 }

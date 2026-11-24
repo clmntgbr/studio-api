@@ -2,11 +2,11 @@ COMPOSE_DEV := docker compose -f compose.dev.yaml
 
 # Always-on app processes (excludes profile-only denoise/gpu workers)
 APP_SERVICES := api worker \
-	worker-fetch worker-media worker-transcribe worker-scenes \
-	worker-detect worker-analyze worker-reframe worker-render worker-translate
+	worker-fetch worker-media worker-silence worker-transcribe worker-scenes \
+	worker-analyze worker-reframe worker-render worker-translate
 
-PIPELINE_WORKERS := worker-fetch worker-media worker-transcribe worker-scenes \
-	worker-detect worker-analyze worker-reframe worker-render worker-translate
+PIPELINE_WORKERS := worker-fetch worker-media worker-silence worker-transcribe worker-scenes \
+	worker-analyze worker-reframe worker-render worker-translate
 
 # ============================================
 # Development (compose.dev.yaml)
@@ -51,8 +51,11 @@ worker-transcribe-logs:
 worker-scenes-logs:
 	$(COMPOSE_DEV) logs -f worker-scenes
 
+worker-silence-logs:
+	$(COMPOSE_DEV) logs -f worker-silence
+
 worker-detect-logs:
-	$(COMPOSE_DEV) logs -f worker-detect
+	$(COMPOSE_DEV) --profile legacy logs -f worker-detect
 
 worker-analyze-logs:
 	$(COMPOSE_DEV) logs -f worker-analyze

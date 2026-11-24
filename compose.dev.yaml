@@ -141,10 +141,21 @@ services:
     command: ["go", "run", "./cmd/worker-scenes"]
     networks: [egress, backend]
 
+  worker-silence:
+    <<: *pipeline-worker
+    container_name: worker-silence
+    command: ["go", "run", "./cmd/worker-silence"]
+    environment:
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      SILENCE_PREFETCH: ${SILENCE_PREFETCH:-2}
+    networks: [backend]
+
   worker-detect:
     <<: *pipeline-worker
     container_name: worker-detect
     command: ["go", "run", "./cmd/worker-detect"]
+    profiles: [legacy]
     networks: [backend]
 
   worker-analyze:

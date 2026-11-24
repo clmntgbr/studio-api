@@ -56,7 +56,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     ./cmd/cli
 
 RUN set -eu; \
-    for name in fetch media denoise transcribe scenes detect analyze reframe render translate; do \
+    for name in fetch media silence denoise transcribe scenes detect analyze reframe render translate; do \
       CGO_ENABLED=0 GOOS=linux go build \
         -a -installsuffix cgo \
         -ldflags="-w -s" \
@@ -90,6 +90,7 @@ COPY --from=builder --chown=appuser:appuser /app/worker .
 COPY --from=builder --chown=appuser:appuser /app/cli .
 COPY --from=builder --chown=appuser:appuser /app/worker-fetch .
 COPY --from=builder --chown=appuser:appuser /app/worker-media .
+COPY --from=builder --chown=appuser:appuser /app/worker-silence .
 COPY --from=builder --chown=appuser:appuser /app/worker-denoise .
 COPY --from=builder --chown=appuser:appuser /app/worker-transcribe .
 COPY --from=builder --chown=appuser:appuser /app/worker-scenes .
@@ -118,6 +119,13 @@ USER root
 RUN apk --no-cache add ffmpeg ca-certificates
 USER appuser
 CMD ["./worker-media"]
+
+# Silence needs ffmpeg (volumedetect / silencedetect).
+FROM production AS worker-silence
+USER root
+RUN apk --no-cache add ffmpeg ca-certificates
+USER appuser
+CMD ["./worker-silence"]
 
 
 FROM production AS api

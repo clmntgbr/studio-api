@@ -48,7 +48,7 @@ func (h *ApplyProxyResultHandler) Handle(ctx context.Context, cmd ApplyProxyResu
 	m.RecordProxyReady(cmd.ProxyKey)
 	now := time.Now().UTC()
 
-	return h.media.WithTransaction(ctx, func(txCtx context.Context) error {
+	err = h.media.WithTransaction(ctx, func(txCtx context.Context) error {
 		if err := h.media.Update(txCtx, m); err != nil {
 			return err
 		}
@@ -60,4 +60,8 @@ func (h *ApplyProxyResultHandler) Handle(ctx context.Context, cmd ApplyProxyResu
 		}
 		return h.outbox.StoreEvents(txCtx, m.PullEvents())
 	})
+	if err != nil {
+		return err
+	}
+	return tryMarkMediaReady(ctx, h.media, h.outbox, cmd.MediaID)
 }

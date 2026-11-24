@@ -162,9 +162,21 @@ services:
     command: ["./worker-scenes"]
     networks: [egress, backend]
 
+  worker-silence:
+    <<: *pipeline-worker
+    command: ["./worker-silence"]
+    environment:
+      <<: *s3-env
+      WORK_DIR: ${WORK_DIR:-/tmp/work}
+      SILENCE_PREFETCH: ${SILENCE_PREFETCH:-2}
+    networks: [backend]
+    deploy:
+      replicas: 2
+
   worker-detect:
     <<: *pipeline-worker
     command: ["./worker-detect"]
+    profiles: [legacy]
     networks: [backend]
 
   worker-analyze:

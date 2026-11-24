@@ -83,9 +83,16 @@ func (h *EnqueueAfterAudioReadyHandler) Handle(ctx context.Context, payload []by
 	if evt.MediaID == "" || evt.AnalysisKey == "" {
 		return messaging.NonRetryable(fmt.Errorf("media.audio_ready payload missing mediaId or analysisKey"))
 	}
-	// Waveform uses analysis track; silence/transcribe will join this fan-out later.
+	// Parallel fan-out: waveform ∥ silence (transcribe joins later).
+	var firstErr error
 	if err := h.jobs.PublishWaveformJob(ctx, evt.MediaID, evt.AnalysisKey); err != nil {
-		return messaging.Retryable(err)
+		firstErr = err
+	}
+	if err := h.jobs.PublishSilenceJob(ctx, evt.MediaID, evt.AnalysisKey, "auto", nil); err != nil && firstErr == nil {
+		firstErr = err
+	}
+	if firstErr != nil {
+		return messaging.Retryable(firstErr)
 	}
 	return nil
 }

@@ -18,7 +18,7 @@ type ConnectionInfo struct {
 
 func NewConnectionInfo(env *config.Config, userID uuid.UUID) (ConnectionInfo, error) {
 	channel := UserChannel(userID)
-	token, err := generateConnectionToken(env.CentrifugoTokenSecret, userID, channel)
+	token, err := generateConnectionToken(env.CentrifugoTokenSecret, userID)
 	if err != nil {
 		return ConnectionInfo{}, err
 	}
@@ -30,11 +30,12 @@ func NewConnectionInfo(env *config.Config, userID uuid.UUID) (ConnectionInfo, er
 	}, nil
 }
 
-func generateConnectionToken(secret string, userID uuid.UUID, channel string) (string, error) {
+func generateConnectionToken(secret string, userID uuid.UUID) (string, error) {
+	// No channels claim: clients may subscribe to namespaces with
+	// allow_subscribe_for_client (users + projects).
 	claims := jwt.MapClaims{
-		"sub":      userID.String(),
-		"exp":      time.Now().Add(24 * time.Hour).Unix(),
-		"channels": []string{channel},
+		"sub": userID.String(),
+		"exp": time.Now().Add(24 * time.Hour).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

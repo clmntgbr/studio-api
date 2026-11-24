@@ -32,6 +32,11 @@ func main() {
 			log.Printf("results consumer stopped: %v", err)
 		}
 	}()
+	go func() {
+		if err := container.ProgressConsumer.Start(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("progress consumer stopped: %v", err)
+		}
+	}()
 
 	if err := container.Consumer.Start(ctx); err != nil {
 		log.Fatalf("worker stopped with error: %v", err)

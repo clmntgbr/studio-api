@@ -8,26 +8,49 @@ import (
 	"go-api/internal/domain/port"
 )
 
+type MediaStepResponse struct {
+	Kind         string     `json:"kind"`
+	Status       string     `json:"status"`
+	Progress     float64    `json:"progress"`
+	ErrorMessage *string    `json:"errorMessage,omitempty"`
+	QueuedAt     *time.Time `json:"queuedAt,omitempty"`
+	StartedAt    *time.Time `json:"startedAt,omitempty"`
+	CompletedAt  *time.Time `json:"completedAt,omitempty"`
+}
+
 type MediaResponse struct {
-	ID               string    `json:"id"`
-	ProjectID        string    `json:"projectId"`
-	Position         int       `json:"position"`
-	SourceKind       string    `json:"sourceKind"`
-	SourceURL        *string   `json:"sourceUrl,omitempty"`
-	Title            *string   `json:"title,omitempty"`
-	OriginalFilename *string   `json:"originalFilename,omitempty"`
-	StorageKey       *string   `json:"storageKey,omitempty"`
-	MimeType         *string   `json:"mimeType,omitempty"`
-	DurationMs       *int64    `json:"durationMs,omitempty"`
-	Width            *int      `json:"width,omitempty"`
-	Height           *int      `json:"height,omitempty"`
-	Status           string    `json:"status"`
-	SizeBytes        *int64    `json:"sizeBytes,omitempty"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	ID               string              `json:"id"`
+	ProjectID        string              `json:"projectId"`
+	Position         int                 `json:"position"`
+	SourceKind       string              `json:"sourceKind"`
+	SourceURL        *string             `json:"sourceUrl,omitempty"`
+	Title            *string             `json:"title,omitempty"`
+	OriginalFilename *string             `json:"originalFilename,omitempty"`
+	StorageKey       *string             `json:"storageKey,omitempty"`
+	MimeType         *string             `json:"mimeType,omitempty"`
+	DurationMs       *int64              `json:"durationMs,omitempty"`
+	Width            *int                `json:"width,omitempty"`
+	Height           *int                `json:"height,omitempty"`
+	Status           string              `json:"status"`
+	SizeBytes        *int64              `json:"sizeBytes,omitempty"`
+	Steps            []MediaStepResponse `json:"steps"`
+	CreatedAt        time.Time           `json:"createdAt"`
+	UpdatedAt        time.Time           `json:"updatedAt"`
 }
 
 func NewMediaResponseFromView(v domainmedia.FileView) MediaResponse {
+	steps := make([]MediaStepResponse, 0, len(v.Steps))
+	for _, s := range v.Steps {
+		steps = append(steps, MediaStepResponse{
+			Kind:         string(s.Kind),
+			Status:       string(s.Status),
+			Progress:     s.Progress,
+			ErrorMessage: s.ErrorMessage,
+			QueuedAt:     s.QueuedAt,
+			StartedAt:    s.StartedAt,
+			CompletedAt:  s.CompletedAt,
+		})
+	}
 	return MediaResponse{
 		ID:               v.ID.String(),
 		ProjectID:        v.ProjectID.String(),
@@ -43,6 +66,7 @@ func NewMediaResponseFromView(v domainmedia.FileView) MediaResponse {
 		Height:           v.Height,
 		Status:           string(v.Status),
 		SizeBytes:        v.SizeBytes,
+		Steps:            steps,
 		CreatedAt:        v.CreatedAt,
 		UpdatedAt:        v.UpdatedAt,
 	}
@@ -64,6 +88,7 @@ func NewMediaResponseFromEntity(m *domainmedia.MediaFile) MediaResponse {
 		Height:           m.Height,
 		Status:           string(m.Status),
 		SizeBytes:        m.SizeBytes,
+		Steps:            make([]MediaStepResponse, 0),
 		CreatedAt:        m.CreatedAt,
 		UpdatedAt:        m.UpdatedAt,
 	}

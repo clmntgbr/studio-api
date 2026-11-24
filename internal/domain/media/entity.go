@@ -156,8 +156,27 @@ func (m *MediaFile) recordEvent(e event.DomainEvent) {
 }
 
 func (m *MediaFile) MarkReady() {
+	now := time.Now().UTC()
 	m.Status = StatusReady
-	m.UpdatedAt = time.Now().UTC()
+	m.UpdatedAt = now
+	m.recordEvent(MediaReady{
+		ID:        uuid.New().String(),
+		MediaID:   m.ID.String(),
+		ProjectID: m.ProjectID.String(),
+		Timestamp: now,
+	})
+}
+
+func (m *MediaFile) RecordDetectionsUpdated(kind string) {
+	now := time.Now().UTC()
+	m.UpdatedAt = now
+	m.recordEvent(DetectionsUpdated{
+		ID:        uuid.New().String(),
+		MediaID:   m.ID.String(),
+		ProjectID: m.ProjectID.String(),
+		Kind:      kind,
+		Timestamp: now,
+	})
 }
 
 func (m *MediaFile) MarkFailed() {

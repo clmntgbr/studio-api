@@ -28,6 +28,7 @@ type WriteRepository interface {
 type ReadRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*FileView, error)
 	ListByProject(ctx context.Context, projectID uuid.UUID, query paginate.PaginateQuery) ([]FileView, int64, error)
+	ListSteps(ctx context.Context, mediaFileID uuid.UUID) ([]StepView, error)
 }
 
 type FileView struct {
@@ -51,4 +52,15 @@ type FileView struct {
 	Status           Status
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+	Steps            []StepView
+}
+
+type StepView struct {
+	Kind         StepKind
+	Status       StepStatus
+	Progress     float64
+	ErrorMessage *string
+	QueuedAt     *time.Time
+	StartedAt    *time.Time
+	CompletedAt  *time.Time
 }

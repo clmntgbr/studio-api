@@ -33,6 +33,7 @@ func setupAPIRoutes(app *fiber.App, container *di.Container) {
 	setupRealtimeRoutes(protected, container)
 	setupProjectRoutes(protected, container)
 	setupMediaRoutes(protected, container)
+	setupDetectionRoutes(protected, container)
 }
 
 func setupRealtimeRoutes(api fiber.Router, container *di.Container) {
@@ -60,4 +61,8 @@ func setupMediaRoutes(api fiber.Router, container *di.Container) {
 	api.Delete("/media/:id", container.MediaHandler.Delete)
 	api.Post("/media/:id/uploads/parts", container.MediaHandler.PresignParts)
 	api.Post("/media/:id/uploads/complete", container.MediaHandler.CompleteUpload)
+}
+
+func setupDetectionRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/media/:id/detections", container.DetectionHandler.ListByMedia)
 }
