@@ -252,11 +252,16 @@ func runFFmpeg(ctx context.Context, workDir string, inputs []string, inputIdx []
 		return fmt.Errorf("input index mismatch")
 	}
 
+	headlinePath, err := writeHeadlineFile(workDir, plan)
+	if err != nil {
+		return err
+	}
+
 	n := len(plan.Segments)
-	needPost := plan.Audio.LoudnessLUFS != 0 || assPath != "" || headlineDrawtext(plan, fontsDir) != ""
+	needPost := plan.Audio.LoudnessLUFS != 0 || assPath != "" || headlinePath != ""
 
 	if n <= maxFilterSegments {
-		return runFFmpegConcat(ctx, workDir, inputs, inputIdx, plan, plan.Segments, 0, outPath, assPath, fontsDir, cropDoc, true)
+		return runFFmpegConcat(ctx, workDir, inputs, inputIdx, plan, plan.Segments, 0, outPath, assPath, fontsDir, headlinePath, cropDoc, true)
 	}
 
 	// Dense cut lists: encode in batches then concat demuxer, then optional post pass.
@@ -269,7 +274,7 @@ func runFFmpeg(ctx context.Context, workDir string, inputs []string, inputIdx []
 		partPath := filepath.Join(workDir, fmt.Sprintf("part-%d.mp4", start))
 		subSegs := plan.Segments[start:end]
 		subIdx := inputIdx[start:end]
-		if err := runFFmpegConcat(ctx, workDir, inputs, subIdx, plan, subSegs, start, partPath, "", fontsDir, cropDoc, false); err != nil {
+		if err := runFFmpegConcat(ctx, workDir, inputs, subIdx, plan, subSegs, start, partPath, "", fontsDir, "", cropDoc, false); err != nil {
 			return err
 		}
 		parts = append(parts, partPath)
@@ -282,7 +287,7 @@ func runFFmpeg(ctx context.Context, workDir string, inputs []string, inputIdx []
 	if !needPost {
 		return os.Rename(concatPath, outPath)
 	}
-	return runFFmpegPost(ctx, workDir, concatPath, plan, outPath, assPath, fontsDir)
+	return runFFmpegPost(ctx, workDir, concatPath, plan, outPath, assPath, fontsDir, headlinePath)
 }
 
 // runFFmpegConcat builds one filter_complex concat for segs.
@@ -295,7 +300,7 @@ func runFFmpegConcat(
 	plan renderplan.Plan,
 	segs []renderplan.Segment,
 	segOffset int,
-	outPath, assPath, fontsDir string,
+	outPath, assPath, fontsDir, headlinePath string,
 	cropDoc *cropPathDoc,
 	applyFinish bool,
 ) error {
@@ -358,7 +363,7 @@ func runFFmpegConcat(
 			fmt.Fprintf(&filter, ";%sass=%s:fontsdir=%s[vburn]", vout, escaped, fonts)
 			vout = "[vburn]"
 		}
-		if overlay := headlineDrawtext(plan, fontsDir); overlay != "" {
+		if overlay := headlineDrawtext(plan, fontsDir, headlinePath); overlay != "" {
 			// Chain setsar after drawtext so enable=… cannot swallow the [vhead] pad.
 			fmt.Fprintf(&filter, ";%s%s,setsar=1[vhead]", vout, overlay)
 			vout = "[vhead]"
@@ -407,13 +412,13 @@ func concatDemuxer(ctx context.Context, workDir string, parts []string, outPath 
 	return nil
 }
 
-func runFFmpegPost(ctx context.Context, workDir, inPath string, plan renderplan.Plan, outPath, assPath, fontsDir string) error {
+func runFFmpegPost(ctx context.Context, workDir, inPath string, plan renderplan.Plan, outPath, assPath, fontsDir, headlinePath string) error {
 	args := []string{"-y", "-hide_banner", "-loglevel", "error", "-i", inPath}
 	var vf, af []string
 	if assPath != "" {
 		vf = append(vf, fmt.Sprintf("ass=%s:fontsdir=%s", escapeFilterPath(assPath), escapeFilterPath(fontsDir)))
 	}
-	if overlay := headlineDrawtext(plan, fontsDir); overlay != "" {
+	if overlay := headlineDrawtext(plan, fontsDir, headlinePath); overlay != "" {
 		vf = append(vf, strings.TrimPrefix(overlay, ","))
 	}
 	if plan.Audio.LoudnessLUFS != 0 {
@@ -562,19 +567,35 @@ func videoGeometry(cropMode string, w, h int) string {
 	}
 }
 
-func headlineDrawtext(plan renderplan.Plan, fontsDir string) string {
-	var text string
-	var startMs, endMs int64
+func writeHeadlineFile(workDir string, plan renderplan.Plan) (string, error) {
+	text := ""
 	for _, o := range plan.Overlays {
 		if o.Kind == "headline" && strings.TrimSpace(o.Text) != "" {
 			text = o.Text
-			startMs = o.StartMs
-			endMs = o.EndMs
 			break
 		}
 	}
 	if text == "" {
+		return "", nil
+	}
+	path := filepath.Join(workDir, "headline.txt")
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func headlineDrawtext(plan renderplan.Plan, fontsDir, textFile string) string {
+	if strings.TrimSpace(textFile) == "" {
 		return ""
+	}
+	var startMs, endMs int64
+	for _, o := range plan.Overlays {
+		if o.Kind == "headline" && strings.TrimSpace(o.Text) != "" {
+			startMs = o.StartMs
+			endMs = o.EndMs
+			break
+		}
 	}
 	if endMs <= startMs {
 		endMs = startMs + 3000
@@ -588,19 +609,16 @@ func headlineDrawtext(plan renderplan.Plan, fontsDir string) string {
 	if fs > 96 {
 		fs = 96
 	}
-	escaped := escapeDrawtext(text)
 	fontFile := resolveDrawtextFont(fontsDir)
 	if fontFile == "" {
 		// Without fontfile, ffmpeg falls back to family "Sans" and fails in Alpine.
 		return ""
 	}
-	fontOpt := fmt.Sprintf(":fontfile=%s", escapeDrawtextFontPath(fontFile))
-	// Top-centered hook banner for vertical clips.
-	// enable uses quoted between() with literal commas; the caller must chain another
-	// filter (e.g. ,setsar=1[vhead]) so the output pad is never part of enable=.
+	// textfile avoids apostrophe/comma breakage in FR hooks (text='J'ai…' → filter "0").
+	// enable commas escaped; caller chains ,setsar=1[vhead].
 	return fmt.Sprintf(
-		"drawtext=text='%s':fontsize=%d:fontcolor=white:borderw=3:bordercolor=black@0.7%s:x=(w-text_w)/2:y=h*0.08:enable='between(t,%g,%g)'",
-		escaped, fs, fontOpt, start, end,
+		"drawtext=textfile=%s:fontsize=%d:fontcolor=white:borderw=3:bordercolor=black@0.7:fontfile=%s:x=(w-text_w)/2:y=h*0.08:enable=between(t\\,%g\\,%g)",
+		escapeDrawtextFontPath(textFile), fs, escapeDrawtextFontPath(fontFile), start, end,
 	)
 }
 
