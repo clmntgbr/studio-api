@@ -66,6 +66,8 @@ func setupProjectRoutes(api fiber.Router, container *di.Container) {
 func setupMediaRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/media/:id", container.MediaHandler.GetByID)
 	api.Get("/media/:id/steps", container.MediaHandler.ListSteps)
+	api.Get("/media/:id/playback", container.PlaybackHandler.Get)
+	api.Get("/media/:id/stream", container.PlaybackHandler.Stream)
 	api.Delete("/media/:id", container.MediaHandler.Delete)
 	api.Post("/media/:id/uploads/parts", container.MediaHandler.PresignParts)
 	api.Post("/media/:id/uploads/complete", container.MediaHandler.CompleteUpload)

@@ -49,6 +49,41 @@ func (r *timelineWriteRepository) Save(ctx context.Context, t *domaintimeline.Ti
 	return nil
 }
 
+func (r *timelineWriteRepository) ReplaceContents(ctx context.Context, t *domaintimeline.Timeline, segments []domaintimeline.Segment, decisions []domaintimeline.Decision) error {
+	db := DBWithContext(ctx, r.db)
+	if err := db.Model(&TimelineModel{}).Where("id = ?", t.ID).Updates(map[string]any{
+		"fingerprint": t.Fingerprint,
+		"duration_ms": t.DurationMs,
+		"status":      string(t.Status),
+	}).Error; err != nil {
+		return err
+	}
+	if err := db.Where("timeline_id = ?", t.ID).Delete(&TimelineSegmentModel{}).Error; err != nil {
+		return err
+	}
+	if err := db.Where("timeline_id = ?", t.ID).Delete(&TimelineDecisionModel{}).Error; err != nil {
+		return err
+	}
+	for i := range segments {
+		seg := segments[i]
+		seg.TimelineID = t.ID
+		if seg.ID == uuid.Nil {
+			seg.ID = uuid.New()
+		}
+		if err := db.Create(timelineSegmentModelFromDomain(&seg)).Error; err != nil {
+			return err
+		}
+	}
+	for i := range decisions {
+		dec := decisions[i]
+		dec.TimelineID = t.ID
+		if err := db.Create(timelineDecisionModelFromDomain(&dec)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *timelineWriteRepository) Update(ctx context.Context, t *domaintimeline.Timeline) error {
 	return DBWithContext(ctx, r.db).Save(timelineModelFromDomain(t)).Error
 }

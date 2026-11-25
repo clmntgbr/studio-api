@@ -48,6 +48,7 @@ type Container struct {
 	RealtimeHandler        *httphandler.RealtimeHandler
 	ProjectHandler         *httphandler.ProjectHandler
 	MediaHandler           *httphandler.MediaHandler
+	PlaybackHandler        *httphandler.PlaybackHandler
 	DetectionHandler       *httphandler.DetectionHandler
 	OverrideHandler        *httphandler.OverrideHandler
 	SubtitleStyleHandler   *httphandler.SubtitleStyleHandler
@@ -120,8 +121,10 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	listMediaHandler := querymedia.NewListMediaHandler(mediaReadRepo)
 	updateConfigHandler := mediacmd.NewUpdateConfigurationHandler(mediaWriteRepo)
 	getConfigHandler := querymedia.NewGetConfigurationHandler(mediaReadRepo)
-	reanalyzeHandler := mediacmd.NewReanalyzeHandler(mediaWriteRepo, jobPublisher)
+	reanalyzeHandler := mediacmd.NewReanalyzeHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo, jobPublisher)
 	listStepRunsHandler := querymedia.NewListStepRunsHandler(mediaReadRepo)
+	getPlaybackHandler := querymedia.NewGetPlaybackHandler(mediaWriteRepo, storage, env.S3BucketMedia, env.S3PublicEndpoint)
+	getStreamHandler := querymedia.NewGetStreamHandler(mediaWriteRepo, storage, env.S3BucketMedia)
 	listDetectionsHandler := querydetection.NewListDetectionsHandler(detectionReadRepo)
 	createOverrideHandler := detectioncmd.NewCreateOverrideHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
 	deleteOverrideHandler := detectioncmd.NewDeleteOverrideHandler(mediaWriteRepo, detectionWriteRepo, detectionReadRepo, outboxRepo)
@@ -213,6 +216,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			reanalyzeHandler,
 			listStepRunsHandler,
 		),
+		PlaybackHandler:   httphandler.NewPlaybackHandler(getPlaybackHandler, getStreamHandler),
 		DetectionHandler:  httphandler.NewDetectionHandler(listDetectionsHandler),
 		OverrideHandler: httphandler.NewOverrideHandler(createOverrideHandler, deleteOverrideHandler),
 		SubtitleStyleHandler: httphandler.NewSubtitleStyleHandler(

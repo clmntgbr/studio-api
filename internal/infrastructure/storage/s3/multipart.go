@@ -146,6 +146,40 @@ func (c *Client) PresignGetObject(ctx context.Context, bucket, key string, expir
 	return rewritePublicURL(res.URL, publicBase), nil
 }
 
+func (c *Client) GetObjectStream(ctx context.Context, bucket, key, rangeHeader string) (*port.ObjectStream, error) {
+	in := &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+	if rangeHeader != "" {
+		in.Range = aws.String(rangeHeader)
+	}
+	out, err := c.inner.GetObject(ctx, in)
+	if err != nil {
+		return nil, fmt.Errorf("get s3://%s/%s: %w", bucket, key, err)
+	}
+
+	stream := &port.ObjectStream{
+		Body:         out.Body,
+		AcceptRanges: true,
+		StatusCode:   200,
+	}
+	if out.ContentType != nil {
+		stream.ContentType = *out.ContentType
+	}
+	if out.ContentLength != nil {
+		stream.ContentLength = *out.ContentLength
+	}
+	if out.ContentRange != nil && *out.ContentRange != "" {
+		stream.ContentRange = *out.ContentRange
+		stream.StatusCode = 206
+	}
+	if stream.ContentType == "" {
+		stream.ContentType = "application/octet-stream"
+	}
+	return stream, nil
+}
+
 func rewritePublicURL(signed, publicBase string) string {
 	publicBase = strings.TrimRight(publicBase, "/")
 	if publicBase == "" {

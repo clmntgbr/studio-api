@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"errors"
 	"strings"
 
 	cmdtimeline "go-api/internal/application/command/timeline"
@@ -43,10 +42,6 @@ func NewTimelineHandler(
 
 type timelinePreviewBody struct {
 	MediaID string `json:"mediaId" validate:"omitempty,uuid"`
-}
-
-type timelineValidateBody struct {
-	Version int `json:"version" validate:"required,min=1"`
 }
 
 func (h *TimelineHandler) Get(c fiber.Ctx) error {
@@ -118,40 +113,9 @@ func (h *TimelineHandler) Preview(c fiber.Ctx) error {
 }
 
 func (h *TimelineHandler) Validate(c fiber.Ctx) error {
-	if _, err := httpctx.GetUser(c); err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
-	}
-	projectID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
-	}
-	var body timelineValidateBody
-	if err := validation.BindBody(c, &body); err != nil {
-		return err
-	}
-	t, err := h.validateHandler.Handle(c.Context(), cmdtimeline.ValidateCommand{
-		ProjectID: projectID,
-		Version:   body.Version,
+	return c.Status(fiber.StatusGone).JSON(fiber.Map{
+		"message": "timeline validate removed; POST /projects/:id/renders to ship",
 	})
-	if err != nil {
-		if errors.Is(err, cmdtimeline.ErrStaleVersion) || strings.Contains(err.Error(), "stale") {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"message": "Timeline version is stale",
-				"code":    "STALE_TIMELINE_VERSION",
-			})
-		}
-		if strings.Contains(err.Error(), "not found") {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Timeline not found"})
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to validate timeline"})
-	}
-	view, getErr := h.getHandler.Handle(c.Context(), querytimeline.GetTimelineQuery{ProjectID: projectID})
-	if getErr != nil {
-		return c.Status(fiber.StatusOK).JSON(presenter.NewTimelineResponseFromView(&querytimeline.TimelineView{
-			Timeline: t,
-		}))
-	}
-	return c.Status(fiber.StatusOK).JSON(presenter.NewTimelineResponseFromView(view))
 }
 
 func (h *TimelineHandler) GetSubtitlesASS(c fiber.Ctx) error {

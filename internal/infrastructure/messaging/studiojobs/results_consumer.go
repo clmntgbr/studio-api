@@ -352,6 +352,7 @@ func (c *ResultsConsumer) onSilenceSucceeded(ctx context.Context, msg *envelope.
 	defer cancel()
 	return c.applySilence.Handle(hCtx, mediacmd.ApplySilenceResultCommand{
 		MediaID:               mediaID,
+		Attempt:               msg.Attempt,
 		DetectionsKey:         out.DetectionsKey,
 		NoiseFloorDb:          out.NoiseFloorDb,
 		CalculatedThresholdDb: out.CalculatedThresholdDb,
@@ -447,6 +448,7 @@ func (c *ResultsConsumer) onTextSucceeded(ctx context.Context, msg *envelope.Mes
 	defer cancel()
 	return c.applyText.Handle(hCtx, detectioncmd.ApplyTextResultCommand{
 		MediaID:       mediaID,
+		Attempt:       msg.Attempt,
 		DetectionsKey: out.DetectionsKey,
 		Detector:      out.Detector,
 		Intervals:     intervals,

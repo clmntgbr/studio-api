@@ -116,16 +116,6 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo, "publish_media_audio_ready_realtime", publishMediaRealtime.OnAudioReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
-		dedupRepo,
-		"enqueue_scenes_on_proxy_ready",
-		eventmedia.NewEnqueueScenesHandler(jobPublisher, mediaWriteRepo).Handle,
-	))
-	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
-		dedupRepo,
-		"enqueue_reframe_on_proxy_ready",
-		eventmedia.NewEnqueueReframeHandler(jobPublisher, mediaWriteRepo).Handle,
-	))
-	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
 		dedupRepo, "publish_media_proxy_ready_realtime", publishMediaRealtime.OnProxyReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaWaveformReady, dedup.With(
@@ -140,7 +130,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	reg.Register(domainmedia.EventTypeMediaDetectionsUpdated, dedup.With(
 		dedupRepo,
 		"rebuild_timeline_on_detections_updated",
-		eventmedia.NewRebuildTimelineHandler(rebuildTimeline).OnDetectionsUpdated,
+		eventmedia.NewRebuildTimelineHandler(rebuildTimeline, realtimePublisher).OnDetectionsUpdated,
 	))
 	reg.Register(domainmedia.EventTypeMediaTranscribed, dedup.With(
 		dedupRepo, "publish_media_transcribed_realtime", publishMediaRealtime.OnTranscribed,
@@ -171,8 +161,26 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	llmArtifactWriteRepo := write.NewLLMArtifactWriteRepository(db)
 	applyLLM := detectioncmd.NewApplyLLMResultHandler(mediaWriteRepo, detectionWriteRepo, llmArtifactWriteRepo, clipWriteRepo, outboxRepo)
 	applyScenes := detectioncmd.NewApplyScenesResultHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
-	applyReframe := mediacmd.NewApplyReframeResultHandler(mediaWriteRepo)
 	renderWriteRepo := write.NewRenderWriteRepository(db)
+	renderReadRepo := read.NewRenderReadRepository(db)
+	outputPresetReadRepo := read.NewOutputPresetReadRepository(db)
+	clipReadRepo := read.NewClipReadRepository(db)
+	kickoffDeferred := rendercmd.NewKickoffDeferredHandler(
+		renderWriteRepo,
+		renderReadRepo,
+		mediaWriteRepo,
+		rendercmd.QueuedPlanDeps(
+			timelineReadRepo,
+			outputPresetReadRepo,
+			mediaWriteRepo,
+			clipReadRepo,
+			nil,
+			nil,
+			"",
+		),
+		jobPublisher,
+	)
+	applyReframe := mediacmd.NewApplyReframeResultHandler(mediaWriteRepo, kickoffDeferred)
 	applyRender := rendercmd.NewApplyResultHandler(renderWriteRepo, realtimePublisher)
 	resultsConsumer := studiojobs.NewResultsConsumer(
 		env.RabbitMQURL, mediaWriteRepo, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence, applyTranscript, applyText, applyLLM, applyScenes, applyReframe, applyRender,

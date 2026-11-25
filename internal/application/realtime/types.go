@@ -9,9 +9,10 @@ const (
 	ActionCompleted = "step_completed"
 	ActionFailed    = "step_failed"
 
-	EntityUser   = "user"
-	EntityMedia  = "media"
-	EntityRender = "render"
+	EntityUser     = "user"
+	EntityMedia    = "media"
+	EntityTimeline = "timeline"
+	EntityRender   = "render"
 
 	ActionRenderProgress  = "progress"
 	ActionRenderCompleted = "completed"

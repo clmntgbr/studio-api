@@ -39,7 +39,7 @@ func (h *EnqueueReframeHandler) Handle(ctx context.Context, payload []byte) erro
 	if err := mediacmd.QueueStep(ctx, h.media, mediaID, domainmedia.StepReframe, time.Now().UTC()); err != nil {
 		return messaging.Retryable(err)
 	}
-	if err := h.jobs.PublishReframeJob(ctx, evt.MediaID, evt.ProxyKey); err != nil {
+	if err := h.jobs.PublishReframeJob(ctx, evt.MediaID, evt.ProxyKey, 0, 0); err != nil {
 		return messaging.Retryable(err)
 	}
 	return nil

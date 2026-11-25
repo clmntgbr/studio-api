@@ -84,7 +84,7 @@ class FaceTracker:
         zoom = 1.0 + max(0.0, 0.35 - max(fw / w, fh / h))
         return float(cx), float(cy), float(max(1.0, min(1.6, zoom)))
 
-    def track(self, video_path: str, sample_fps: float = 5.0) -> dict:
+    def track(self, video_path: str, sample_fps: float = 5.0, target_aspect: float | None = None) -> dict:
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise RuntimeError(f"cannot open video: {video_path}")
@@ -117,7 +117,15 @@ class FaceTracker:
             samples = [Sample(t_ms=0, cx=0.5, cy=0.42, zoom=1.05)]
 
         smoothed = _smooth(samples, window=5)
-        return {
+        if target_aspect is not None and width > 0 and height > 0:
+            frame_aspect = width / height
+            if target_aspect < frame_aspect - 1e-6:
+                boost = min(0.25, (frame_aspect / target_aspect - 1.0) * 0.1)
+                smoothed = [
+                    Sample(s.t_ms, s.cx, s.cy, min(1.6, s.zoom * (1.0 + boost))) for s in smoothed
+                ]
+
+        doc: dict = {
             "version": 1,
             "fps": sample_fps,
             "frameWidth": width,
@@ -128,3 +136,6 @@ class FaceTracker:
                 for s in smoothed
             ],
         }
+        if target_aspect is not None:
+            doc["targetAspect"] = round(target_aspect, 6)
+        return doc

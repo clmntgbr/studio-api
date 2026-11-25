@@ -9,6 +9,8 @@ import (
 type WriteRepository interface {
 	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 	Save(ctx context.Context, t *Timeline, segments []Segment, decisions []Decision) error
+	// ReplaceContents updates the timeline row and replaces all segments/decisions.
+	ReplaceContents(ctx context.Context, t *Timeline, segments []Segment, decisions []Decision) error
 	Update(ctx context.Context, t *Timeline) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Timeline, error)
 	SupersedeDrafts(ctx context.Context, projectID uuid.UUID) error
