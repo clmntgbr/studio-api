@@ -29,6 +29,9 @@ type UpdateConfigurationCommand struct {
 	AdsAction            *string
 	Language             *string
 	MasterSplit          *string // "" | parts:N | durationMs:N
+	BurnSubtitles        *bool
+	OutputPresetID       *uuid.UUID
+	ClearOutputPresetID  bool // explicit clear when client sends null preset
 }
 
 type UpdateConfigurationHandler struct {
@@ -116,6 +119,15 @@ func (h *UpdateConfigurationHandler) Handle(ctx context.Context, cmd UpdateConfi
 			return nil, err
 		}
 		cfg.MasterSplit = raw
+	}
+	if cmd.BurnSubtitles != nil {
+		cfg.BurnSubtitles = *cmd.BurnSubtitles
+	}
+	if cmd.ClearOutputPresetID {
+		cfg.OutputPresetID = nil
+	} else if cmd.OutputPresetID != nil {
+		id := *cmd.OutputPresetID
+		cfg.OutputPresetID = &id
 	}
 	cfg.UpdatedAt = time.Now().UTC()
 

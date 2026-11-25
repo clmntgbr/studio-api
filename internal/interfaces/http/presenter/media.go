@@ -199,10 +199,17 @@ type MediaConfigurationResponse struct {
 	AdsAction            string    `json:"adsAction"`
 	Language             *string   `json:"language,omitempty"`
 	MasterSplit          string    `json:"masterSplit"`
+	BurnSubtitles        bool      `json:"burnSubtitles"`
+	OutputPresetID       *string   `json:"outputPresetId,omitempty"`
 	UpdatedAt            time.Time `json:"updatedAt"`
 }
 
 func NewMediaConfigurationResponse(cfg *domainmedia.Configuration) MediaConfigurationResponse {
+	var presetID *string
+	if cfg.OutputPresetID != nil {
+		v := cfg.OutputPresetID.String()
+		presetID = &v
+	}
 	return MediaConfigurationResponse{
 		MediaFileID:          cfg.MediaFileID.String(),
 		SilenceEnabled:       cfg.SilenceEnabled,
@@ -220,6 +227,8 @@ func NewMediaConfigurationResponse(cfg *domainmedia.Configuration) MediaConfigur
 		AdsAction:            string(cfg.AdsAction),
 		Language:             cfg.Language,
 		MasterSplit:          cfg.MasterSplit,
+		BurnSubtitles:        cfg.BurnSubtitles,
+		OutputPresetID:       presetID,
 		UpdatedAt:            cfg.UpdatedAt,
 	}
 }

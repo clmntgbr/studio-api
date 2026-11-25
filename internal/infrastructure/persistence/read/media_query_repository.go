@@ -194,6 +194,8 @@ func (r *mediaReadRepository) GetConfiguration(ctx context.Context, mediaFileID 
 		AdsAction            string          `gorm:"column:ads_action"`
 		Language             *string         `gorm:"column:language"`
 		MasterSplit          string          `gorm:"column:master_split"`
+		BurnSubtitles        bool            `gorm:"column:burn_subtitles"`
+		OutputPresetID       *uuid.UUID      `gorm:"column:output_preset_id"`
 		Settings             json.RawMessage `gorm:"column:settings"`
 		UpdatedAt            time.Time       `gorm:"column:updated_at"`
 	}
@@ -226,6 +228,8 @@ func (r *mediaReadRepository) GetConfiguration(ctx context.Context, mediaFileID 
 		AdsAction:            domainmedia.DecisionAction(row.AdsAction),
 		Language:             row.Language,
 		MasterSplit:          row.MasterSplit,
+		BurnSubtitles:        row.BurnSubtitles,
+		OutputPresetID:       row.OutputPresetID,
 		Settings:             settings,
 		UpdatedAt:            row.UpdatedAt,
 	}, nil

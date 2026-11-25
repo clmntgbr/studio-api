@@ -340,6 +340,8 @@ type Configuration struct {
 	AdsAction            DecisionAction
 	Language             *string
 	MasterSplit          string // "" | parts:N | durationMs:N — one value for master TikTok splits
+	BurnSubtitles        bool
+	OutputPresetID       *uuid.UUID // last selected Ship format
 	Settings             json.RawMessage
 	UpdatedAt            time.Time
 }
@@ -360,6 +362,8 @@ func DefaultConfiguration(mediaFileID uuid.UUID) *Configuration {
 		SponsorsAction:       DecisionSuggest,
 		AdsAction:            DecisionSuggest,
 		MasterSplit:          "",
+		BurnSubtitles:        false,
+		OutputPresetID:       nil,
 		Settings:             json.RawMessage(`{}`),
 		UpdatedAt:            time.Now().UTC(),
 	}

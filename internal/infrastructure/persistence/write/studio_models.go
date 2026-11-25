@@ -72,6 +72,8 @@ type MediaConfigurationModel struct {
 	AdsAction            string       `gorm:"column:ads_action"`
 	Language             *string      `gorm:"column:language"`
 	MasterSplit          string       `gorm:"column:master_split"`
+	BurnSubtitles        bool         `gorm:"column:burn_subtitles"`
+	OutputPresetID       *uuid.UUID   `gorm:"column:output_preset_id"`
 	Settings             dbtype.JSONB `gorm:"column:settings"`
 	UpdatedAt            time.Time    `gorm:"column:updated_at"`
 }

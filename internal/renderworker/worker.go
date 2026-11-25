@@ -82,11 +82,13 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 	defer ch.Close()
-	bus, err := topology.NewBus(ch, 1)
+	// Hard serial: one in-flight render job at a time (no parallel encodes).
+	prefetch := 1
+	bus, err := topology.NewBus(ch, prefetch)
 	if err != nil {
 		return err
 	}
-	if err := ch.Qos(1, 0, false); err != nil {
+	if err := ch.Qos(prefetch, 0, false); err != nil {
 		return err
 	}
 	deliveries, err := ch.Consume("q.render", "worker-render", false, false, false, false, nil)
@@ -94,7 +96,7 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 
-	log.Printf("worker-render started")
+	log.Printf("worker-render started (serial prefetch=%d)", prefetch)
 	for {
 		select {
 		case <-ctx.Done():
@@ -103,6 +105,7 @@ func Run(ctx context.Context, cfg Config) error {
 			if !ok {
 				return fmt.Errorf("deliveries closed")
 			}
+			// Handle inline — never spawn a goroutine per delivery.
 			if err := handle(ctx, cfg, store, bus, d); err != nil {
 				log.Printf("worker-render error: %v", err)
 			}
@@ -523,7 +526,10 @@ func encodeArgs(plan renderplan.Plan) []string {
 	if preset == "" {
 		preset = "veryfast"
 	}
+	// Single-threaded encode: one render already saturates CPU/RAM; never fan out.
 	return []string{
+		"-threads", "1",
+		"-filter_threads", "1",
 		"-c:v", "libx264", "-preset", preset, "-crf", strconv.Itoa(crf),
 		"-r", fmt.Sprintf("%g", fps),
 		"-c:a", "aac", "-b:a", "192k",

@@ -1,183 +1,123 @@
-# Go API Template
+# Studio API
 
-Go/Fiber API template with **Clean Architecture**, **CQRS**, **Outbox pattern**, **RabbitMQ**, **Centrifugo**, **PostgreSQL**, and **Clerk** authentication.
+Backend Go for **Studio**: ingest a video, cut silences, propose viral clips, then **Ship** a master (+ optional vertical clips) with FFmpeg.
 
-## Features
+Product design lives in [docs/docs.md](docs/docs.md).
 
-- CQRS: command / query / event handlers under `internal/application`
-- Domain events (`user.created.v1`) + transactional outbox
-- RabbitMQ worker (outbox relay + consumer + handler registry) on `domain.events`
-- Centrifugo realtime (outbox → worker → publish to `users:{id}`)
-- Offset pagination + query validation helpers
-- Clerk JWT auth + webhook sync (Svix)
-- Docker Compose local stack (API, worker, Postgres, RabbitMQ, Centrifugo, ngrok)
+## Stack
 
-## Tech Stack
+| Layer | Tech |
+| --- | --- |
+| API | Go 1.25+, Fiber v3, GORM, Goose |
+| DB | PostgreSQL |
+| Jobs | RabbitMQ (`studio.jobs` / `q.*`) |
+| Storage | MinIO (S3) |
+| Realtime | Centrifugo |
+| Auth | Clerk |
+| Encode | FFmpeg + libass (DejaVu fonts in worker image) |
 
-| Layer | Technology |
-|---|---|
-| Language | Go 1.25 |
-| HTTP | Fiber v3 |
-| ORM | GORM + PostgreSQL |
-| Auth | Clerk (JWKS + webhooks) |
-| Messaging | RabbitMQ (topic exchange `domain.events`) |
-| Realtime | Centrifugo v5 |
-| CLI | Cobra |
-| Dev | Docker, Air, golangci-lint |
+## Workers
 
-## Architecture
+| Container | Queue | Role |
+| --- | --- | --- |
+| `worker-fetch` | `q.fetch` | yt-dlp |
+| `worker-media` | probe / audio / proxy / waveform | Media prep |
+| `worker-silence` | `q.silence` | Silence detection |
+| `worker-transcribe` | `q.transcribe` | AssemblyAI (or mock) |
+| `worker-text` | `q.text` | Fillers / false starts |
+| `worker-llm` | `q.llm` | Sponsors, chapters, viral clips |
+| `worker-scenes` | scenes | Ad-ish cuts (Python) |
+| `worker-reframe` | `q.reframe` | Face / speaker crop path |
+| **`worker-render`** | `q.render` | Master / clip encode (**serial**, prefetch 1, ffmpeg `-threads 1`) |
 
-```
-cmd/
-  api/          HTTP server
-  worker/       Outbox relay + RabbitMQ consumer
-  cli/          Migrations
-internal/
-  domain/                 Aggregates, events, ports, paginate
-  application/
-    command/              Write-side handlers
-    query/                Read-side handlers
-    event/                Async event handlers (+ realtime publish)
-    realtime/             WS type helpers (entity.action)
-    registry/             Event handler registry
-  infrastructure/
-    persistence/write|read|outbox|processed
-    messaging/rabbitmq
-    centrifugo
-    clerk|config
-  interfaces/http/        Handlers, middleware, DTO, presenter, validation
-```
+Plus `api` (HTTP) and `worker` (outbox / domain events / results).
 
-### Sync command + async event flow
-
-```
-HTTP / webhook
-  → CreateUser command (same DB transaction)
-      → save User aggregate
-      → StoreEvents(outbox)
-  → 201 response
-
-worker (outbox relay)
-  → poll unpublished outbox rows
-  → publish to RabbitMQ exchange domain.events
-  → mark published_at
-
-worker (consumer)
-  → HandlerRegistry.Dispatch(event type)
-  → log / notify handlers
-  → publish_user_*_realtime → Centrifugo users:{userId}
-```
-
-Supported domain events: `user.created.v1`, `user.updated.v1`, `user.deleted.v1` (all written to outbox on the matching command).
-
-### Idempotence + retry / DLQ
-
-- Each domain event has a stable `eventId` (set when recorded on the aggregate).
-- Handlers are wrapped with dedup on `(event_id, handler_name)` via `processed_events`.
-- RabbitMQ topology: `domain.events` → `domain.events.retry` (TTL) → back to main; non-retryable / max attempts → `domain.events.dlq`.
-- Never `Nack(requeue=true)` — retries go through the TTL retry queue.
-
-If queue declare fails after changing args, delete the old queues (or recreate the RabbitMQ volume) then restart the worker.
-
-## Getting Started
+## Getting started
 
 ```bash
 cp .env.dist .env
-# fill Clerk keys
+# Clerk, S3, RabbitMQ, optional ASSEMBLYAI_API_KEY / LLM_* 
 
 make dev
 make migrate
 ```
 
-| Service | Host port | Notes |
-|---|---|---|
-| API | `4000` | Air hot reload |
-| Worker | — | relay + consumer |
-| Postgres | `9543` | |
-| RabbitMQ | `5672` / UI `15672` | user/password from `.env` |
-| Centrifugo | `8000` | WS + HTTP API |
-| ngrok | `4040` | webhook tunnel |
+| Service | Port |
+| --- | --- |
+| API | `4000` |
+| Postgres | `9543` (compose mapping may vary) |
+| RabbitMQ UI | `15672` |
+| MinIO | `9000` / console `9003` |
+| Centrifugo | `8000` |
 
-## Makefile
+Dev mocks (default): `TRANSCRIBE_PROVIDER=mock`, `LLM_PROVIDER=mock` → `testdata/mocks/external/`.
+
+## Ship / render (current behaviour)
+
+### Global Ship (editor)
+
+1. User picks **format** + optional **burn SRT** + **master split** (persisted on `media_configuration`).
+2. `POST /api/projects/:id/renders` with `force: true` → **master** job.
+3. For each selected clip → `POST /api/clips/:id/render` (queued **one after another** from the app).
+4. `worker-render` runs **one job at a time** (QoS 1).
+
+### Media configuration (persisted prefs)
+
+| Column | Values | Effect |
+| --- | --- | --- |
+| `output_preset_id` | UUID | Last Ship format |
+| `burn_subtitles` | bool | Burn ASS captions into master + clips when Ship |
+| `master_split` | `""` / `off` / `parts:N` / `durationMs:N` | After master encode, split into parts for TikTok-style upload |
+
+- `parts:5` → 5 equal parts (N ∈ 2…50).
+- `durationMs:600000` → parts of at most 10 minutes.
+- Full master stays at `storage_key`; parts in `render.output_parts`.
+- Download: `GET /api/renders/:id/download` and `?part=1`…`N`.
+
+### Clips
+
+- LLM viral band: ~**25–90 s** (prefer ~45 s); mock expands fixture windows.
+- Clip encode uses a **continuous** source window (no silence KEEP cuts).
+- Hook overlay via `drawtext` + `textfile=` (avoids FR apostrophe breakage) and DejaVu `fontfile=`.
+
+### Fingerprint / force
+
+- Same inputs reuse a queued/running/completed render unless `force: true` (Ship always forces a new encode).
+
+## Useful Makefile targets
 
 | Command | Description |
-|---|---|
-| `make dev` | Start compose.dev stack |
-| `make build` | Start stack with `--build` |
-| `make dev-down` | Stop stack |
-| `make dev-logs` | Follow API + worker logs |
-| `make worker-logs` | Follow worker logs only |
-| `make tests` | Handler HTTP tests (in api container) |
-| `make coverage` | Handler coverage profile |
-| `make coverage-html` | HTML coverage report |
-| `make migrate` | Apply SQL migrations + schema drift check |
-| `make migrate-check` | Fail if persistence models ≠ DB columns |
-| `make migrate-status` | Goose migration status |
-| `make lint` | golangci-lint --fix |
+| --- | --- |
+| `make dev` | Compose stack |
+| `make migrate` | Goose + schema drift check |
+| `make tests` | Handler tests in API container |
+| `make lint` | golangci-lint |
 | `make shell` | Shell into API container |
 
-## Testing
+## Key HTTP surfaces
 
-Handler HTTP tests live under `internal/interfaces/http/handler/test/`. See [docs/handler-tests.md](docs/handler-tests.md).
+- Media: upload / from-URL, configuration (`PATCH …/configuration`), reanalyze, playback
+- Timeline: get / preview / validate / rebuild / exports / subtitles
+- Clips: list / create / patch (incl. `selected`) / analyze / render
+- Renders: create / list / cancel / **download** (streamed proxy, no MinIO signature for the browser)
+- Output presets: list
 
-```bash
-go test ./internal/interfaces/http/handler/test/... -race \
-  -coverpkg=./internal/interfaces/http/handler/...
+Realtime: Centrifugo project channel (`render.progress` / completed / failed, timeline updates).
+
+## Architecture sketch
+
+```
+cmd/api | worker | worker-* 
+internal/
+  domain/           aggregates + ports
+  application/      command | query | event
+  renderplan/       job payload for worker-render
+  mastersplit/      parts:N | durationMs:N
+  renderworker/     FFmpeg encode + optional master split
+  llm/              OpenAI-compatible + file/heuristic mock
+  infrastructure/   GORM, S3, RabbitMQ, Centrifugo
+  interfaces/http/  Fiber handlers
+migrations/         Goose SQL
 ```
 
-CI enforces ≥95% handler statement coverage (Codecov flag `handler`, patch 100%).
-
-## API
-
-### Health
-
-- `GET /livez`, `/readyz`, `/startupz`
-
-### Protected
-
-- `GET /api/users/me` — Bearer Clerk JWT (query side / read repository)
-- `GET /api/realtime/connection` — Centrifugo JWT + channel + `wsUrl`
-
-### Webhooks
-
-- `POST /webhooks/clerk` — Svix-verified; `user.created` / `updated` / `deleted`
-
-## CQRS notes
-
-- Commands write through aggregates (`NewUser` records `UserCreated`) and persist events in `outbox_events` in the **same** GORM transaction.
-- Queries use `UserReadRepository` (SQL projection / `UserView`), not domain mutation.
-- Event types are versioned (`user.created.v1`).
-- One worker process runs outbox relay + consumer; scale the worker horizontally as needed.
-- Start with a single queue (`domain.events`); add comma-separated routing keys as you add aggregates.
-
-## Environment
-
-See `.env.dist`. Messaging / realtime:
-
-- `RABBITMQ_URL`
-- `RABBITMQ_EXCHANGE` (default `domain.events`)
-- `RABBITMQ_QUEUE` (default `domain.events`)
-- `RABBITMQ_ROUTING_KEY` (default `user.#`, comma-separated)
-- `OUTBOX_POLL_INTERVAL` (default `2s`)
-- `WORKER_CONCURRENCY` (default `4`)
-- `CENTRIFUGO_URL`, `CENTRIFUGO_API_KEY`, `CENTRIFUGO_TOKEN_SECRET`, `CENTRIFUGO_PUBLIC_WS_URL`
-- `RATE_LIMIT_MAX` (requests per minute per IP; `0` disables)
-
-## Extending
-
-1. Add aggregate under `internal/domain/<name>/` (`entity.go`, `events.go`, `repository.go`)
-2. Add command/query handlers under `internal/application/...`
-3. Implement write/read repos under `internal/infrastructure/persistence/`
-4. Register event handlers in `cmd/worker/di` (including `publish_*_realtime` if needed)
-5. Wire HTTP in `cmd/api/di` + `routes.go`
-6. Add a SQL migration in `migrations/` and a persistence model under `internal/infrastructure/persistence/`
-7. Run `make migrate` (applies SQL + fails on model/DB drift)
-
-## Architecture rules
-
-Conventions live in [`.cursor/rules/architecture.mdc`](.cursor/rules/architecture.mdc).
-
-- User / auth: [docs/user.md](docs/user.md)
-- Webhooks: [docs/webhooks.md](docs/webhooks.md)
-- Realtime: [docs/realtime.md](docs/realtime.md)
-- Handler tests: [docs/handler-tests.md](docs/handler-tests.md)
+Conventions: [`.cursor/rules/`](.cursor/rules/) when present; deep product notes in [docs/docs.md](docs/docs.md).

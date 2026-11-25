@@ -260,6 +260,8 @@ func mediaConfigurationModelFromDomain(c *domainmedia.Configuration) *MediaConfi
 		AdsAction:            string(c.AdsAction),
 		Language:             c.Language,
 		MasterSplit:          c.MasterSplit,
+		BurnSubtitles:        c.BurnSubtitles,
+		OutputPresetID:       c.OutputPresetID,
 		Settings:             dbtype.JSONB(settings),
 		UpdatedAt:            c.UpdatedAt,
 	}
@@ -287,6 +289,8 @@ func mediaConfigurationDomainFromModel(c *MediaConfigurationModel) *domainmedia.
 		AdsAction:            domainmedia.DecisionAction(c.AdsAction),
 		Language:             c.Language,
 		MasterSplit:          c.MasterSplit,
+		BurnSubtitles:        c.BurnSubtitles,
+		OutputPresetID:       c.OutputPresetID,
 		Settings:             settings,
 		UpdatedAt:            c.UpdatedAt,
 	}

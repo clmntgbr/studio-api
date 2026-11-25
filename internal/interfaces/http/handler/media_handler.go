@@ -285,6 +285,8 @@ type updateConfigurationBody struct {
 	AdsAction            *string  `json:"adsAction" validate:"omitempty,oneof=remove suggest keep"`
 	Language             *string  `json:"language" validate:"omitempty,max=10"`
 	MasterSplit          *string  `json:"masterSplit" validate:"omitempty,max=64"`
+	BurnSubtitles        *bool    `json:"burnSubtitles"`
+	OutputPresetID       *string  `json:"outputPresetId" validate:"omitempty,uuid"`
 }
 
 type reanalyzeBody struct {
@@ -336,6 +338,16 @@ func (h *MediaHandler) UpdateConfiguration(c fiber.Ctx) error {
 	if err := validation.BindBody(c, &body); err != nil {
 		return err
 	}
+	var presetID *uuid.UUID
+	clearPreset := false
+	if body.OutputPresetID != nil {
+		if *body.OutputPresetID == "" {
+			clearPreset = true
+		} else {
+			id := uuid.MustParse(*body.OutputPresetID)
+			presetID = &id
+		}
+	}
 	cfg, err := h.updateConfigHandler.Handle(c.Context(), cmdmedia.UpdateConfigurationCommand{
 		MediaID:              id,
 		SilenceEnabled:       body.SilenceEnabled,
@@ -353,6 +365,9 @@ func (h *MediaHandler) UpdateConfiguration(c fiber.Ctx) error {
 		AdsAction:            body.AdsAction,
 		Language:             body.Language,
 		MasterSplit:          body.MasterSplit,
+		BurnSubtitles:        body.BurnSubtitles,
+		OutputPresetID:       presetID,
+		ClearOutputPresetID:  clearPreset,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
