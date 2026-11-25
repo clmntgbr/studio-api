@@ -90,14 +90,19 @@ def publish(
     )
 
 
-def _run_track_keepalive(ch: pika.channel.Channel, video_path: str, sample_fps: float) -> dict:
+def _run_track_keepalive(
+    ch: pika.channel.Channel,
+    video_path: str,
+    sample_fps: float,
+    target_aspect: float | None = None,
+) -> dict:
     """Run face tracking off the I/O thread while pumping AMQP heartbeats."""
     box: dict = {}
 
     def target() -> None:
         tracker = FaceTracker()
         try:
-            box["doc"] = tracker.track(video_path, sample_fps=sample_fps)
+            box["doc"] = tracker.track(video_path, sample_fps=sample_fps, target_aspect=target_aspect)
         except Exception as exc:  # noqa: BLE001 — surfaced to caller
             box["err"] = exc
         finally:
@@ -129,6 +134,9 @@ def handle(ch: pika.channel.Channel, method, body: bytes, store, bucket: str, wo
 
     media_id = payload.get("mediaId") or corr
     proxy_key = payload.get("proxyKey") or ""
+    target_w = int(payload.get("targetWidth") or 0)
+    target_h = int(payload.get("targetHeight") or 0)
+    target_aspect = (target_w / target_h) if target_w > 0 and target_h > 0 else None
     if not media_id or not proxy_key:
         m, out, rk = envelope.new_result(
             "reframe", corr, msg["messageId"], attempt, False, None, "invalid_payload", "mediaId/proxyKey required", False
@@ -153,7 +161,12 @@ def handle(ch: pika.channel.Channel, method, body: bytes, store, bucket: str, wo
         store.download_file(bucket, key, str(local))
 
         progress(30, "detect", "Tracking faces")
-        path_doc = _run_track_keepalive(ch, str(local), float(env("REFRAME_SAMPLE_FPS", "5")))
+        path_doc = _run_track_keepalive(
+            ch, str(local), float(env("REFRAME_SAMPLE_FPS", "5")), target_aspect=target_aspect
+        )
+        if target_w > 0 and target_h > 0:
+            path_doc["targetWidth"] = target_w
+            path_doc["targetHeight"] = target_h
 
         progress(80, "upload", "Uploading crop_path.json")
         crop_key = f"media/{media_id}/reframe/crop_path.json"

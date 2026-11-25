@@ -319,5 +319,5 @@ func (h *ReanalyzeHandler) requeueReframe(ctx context.Context, m *domainmedia.Me
 		}
 	}
 
-	return h.jobs.PublishReframeJob(ctx, m.ID.String(), asset.StorageKey)
+	return h.jobs.PublishReframeJob(ctx, m.ID.String(), asset.StorageKey, 0, 0)
 }

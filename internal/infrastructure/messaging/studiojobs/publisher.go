@@ -212,11 +212,16 @@ func (p *Publisher) PublishLLMJob(ctx context.Context, mediaID, wordsKey string,
 	return p.bus.PublishJob(ctx, "job.llm", body, msg.MessageID, mediaID)
 }
 
-func (p *Publisher) PublishReframeJob(ctx context.Context, mediaID, proxyKey string) error {
-	msg, body, err := envelope.NewJob("reframe", mediaID, "", 1, map[string]any{
+func (p *Publisher) PublishReframeJob(ctx context.Context, mediaID, proxyKey string, targetWidth, targetHeight int) error {
+	payload := map[string]any{
 		"mediaId":  mediaID,
 		"proxyKey": proxyKey,
-	})
+	}
+	if targetWidth > 0 && targetHeight > 0 {
+		payload["targetWidth"] = targetWidth
+		payload["targetHeight"] = targetHeight
+	}
+	msg, body, err := envelope.NewJob("reframe", mediaID, "", 1, payload)
 	if err != nil {
 		return err
 	}
