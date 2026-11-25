@@ -54,11 +54,33 @@ func (h *RebuildHandler) Handle(ctx context.Context, cmd RebuildCommand) (*domai
 		return head, out, nil
 	}
 
-	version, err := h.timelines.NextVersion(ctx, cmd.ProjectID)
+	segments := mapSegments(out)
+	decisions := mapDecisions(out)
+
+	if head == nil {
+		t := domaintimeline.New(cmd.ProjectID, 1, out.Fingerprint, out.DurationMs)
+		err = h.timelines.WithTransaction(ctx, func(txCtx context.Context) error {
+			return h.timelines.Save(txCtx, t, segments, decisions)
+		})
+		if err != nil {
+			return nil, eng.Output{}, err
+		}
+		return t, out, nil
+	}
+
+	head.Fingerprint = out.Fingerprint
+	head.DurationMs = out.DurationMs
+	head.Status = domaintimeline.StatusDraft
+	err = h.timelines.WithTransaction(ctx, func(txCtx context.Context) error {
+		return h.timelines.ReplaceContents(txCtx, head, segments, decisions)
+	})
 	if err != nil {
 		return nil, eng.Output{}, err
 	}
-	t := domaintimeline.New(cmd.ProjectID, version, out.Fingerprint, out.DurationMs)
+	return head, out, nil
+}
+
+func mapSegments(out eng.Output) []domaintimeline.Segment {
 	segments := make([]domaintimeline.Segment, 0, len(out.Segments))
 	for _, s := range out.Segments {
 		var reason *domaintimeline.CutReason
@@ -77,6 +99,10 @@ func (h *RebuildHandler) Handle(ctx context.Context, cmd RebuildCommand) (*domai
 			RemovedBeforeReason: reason,
 		})
 	}
+	return segments
+}
+
+func mapDecisions(out eng.Output) []domaintimeline.Decision {
 	decisions := make([]domaintimeline.Decision, 0, len(out.Decisions))
 	for _, d := range out.Decisions {
 		decisions = append(decisions, domaintimeline.Decision{
@@ -86,15 +112,5 @@ func (h *RebuildHandler) Handle(ctx context.Context, cmd RebuildCommand) (*domai
 			Reason:      d.Reason,
 		})
 	}
-
-	err = h.timelines.WithTransaction(ctx, func(txCtx context.Context) error {
-		if err := h.timelines.SupersedeDrafts(txCtx, cmd.ProjectID); err != nil {
-			return err
-		}
-		return h.timelines.Save(txCtx, t, segments, decisions)
-	})
-	if err != nil {
-		return nil, eng.Output{}, errors.New("failed to save timeline")
-	}
-	return t, out, nil
+	return decisions
 }
