@@ -40,7 +40,7 @@ func (h *PlaybackHandler) Get(c fiber.Ctx) error {
 	}
 	kind := c.Query("kind")
 	if kind == "" {
-		kind = "proxy"
+		kind = "auto"
 	}
 	out, err := h.playback.Handle(c.Context(), querymedia.PlaybackQuery{MediaID: id, Kind: kind})
 	if err != nil {
@@ -60,7 +60,7 @@ func (h *PlaybackHandler) Get(c fiber.Ctx) error {
 	})
 }
 
-// Stream proxies the proxy MP4 from MinIO through the API (Range-aware).
+// Stream proxies proxy or original source from MinIO through the API (Range-aware).
 func (h *PlaybackHandler) Stream(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
@@ -74,7 +74,7 @@ func (h *PlaybackHandler) Stream(c fiber.Ctx) error {
 	}
 	kind := c.Query("kind")
 	if kind == "" {
-		kind = "proxy"
+		kind = "auto"
 	}
 
 	out, err := h.stream.Handle(c.Context(), querymedia.StreamQuery{

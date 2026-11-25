@@ -53,12 +53,17 @@ func (h *EnqueueTextHandler) Handle(ctx context.Context, payload []byte) error {
 	if err := mediacmd.QueueStep(ctx, h.media, mediaID, domainmedia.StepText, time.Now().UTC()); err != nil {
 		return messaging.Retryable(err)
 	}
+	attempt := 1
+	if step, err := h.media.GetStep(ctx, mediaID, domainmedia.StepText); err == nil && step != nil {
+		attempt = mediacmd.EffectiveStepAttempt(step.Attempt)
+	}
 	if err := h.jobs.PublishTextJob(ctx, evt.MediaID, evt.WordsKey, port.TextJobOptions{
 		Language:           lang,
 		DetectionLevel:     cfg.DetectionLevel,
 		FillersEnabled:     cfg.FillersEnabled,
 		RepetitionsEnabled: cfg.RepetitionsEnabled,
 		FalseStartsEnabled: cfg.FalseStartsEnabled,
+		Attempt:            attempt,
 	}); err != nil {
 		return messaging.Retryable(err)
 	}

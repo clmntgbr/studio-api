@@ -57,11 +57,11 @@ func (h *ApplyTextResultHandler) Handle(ctx context.Context, cmd ApplyTextResult
 	if err != nil {
 		return err
 	}
-	if step != nil && cmd.Attempt > 0 && cmd.Attempt != step.Attempt {
+	if step != nil && cmd.Attempt > 0 && cmd.Attempt != mediacmd.EffectiveStepAttempt(step.Attempt) {
 		return nil // stale job for an older attempt
 	}
 	if step != nil && step.Status == domainmedia.StepStatusCompleted &&
-		(cmd.Attempt == 0 || cmd.Attempt == step.Attempt) {
+		(cmd.Attempt == 0 || cmd.Attempt == mediacmd.EffectiveStepAttempt(step.Attempt)) {
 		return nil
 	}
 	if step != nil && (step.Status == domainmedia.StepStatusCancelled ||

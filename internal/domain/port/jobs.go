@@ -35,6 +35,7 @@ type TextJobOptions struct {
 	FillersEnabled     bool
 	RepetitionsEnabled bool
 	FalseStartsEnabled bool
+	Attempt            int // processing_step.attempt; defaults to 1
 }
 
 // SilenceJobOptions configures the silence detection worker.
@@ -42,6 +43,7 @@ type SilenceJobOptions struct {
 	ThresholdMode      string
 	SilenceThresholdDb *float64
 	NoiseFloorOffsetDb float64
+	Attempt            int // processing_step.attempt; defaults to 1
 }
 
 // TranscribeJobOptions configures the transcription worker.

@@ -141,6 +141,7 @@ func queueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uu
 	if step == nil {
 		step = domainmedia.NewProcessingStep(mediaID, kind)
 		step.Status = domainmedia.StepStatusQueued
+		step.Attempt = 1 // align with studiojobs NewJob(..., attempt=1)
 		q := at
 		step.QueuedAt = &q
 		return repo.SaveStep(ctx, step)
@@ -151,7 +152,18 @@ func queueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uu
 		return nil
 	}
 	step.Status = domainmedia.StepStatusQueued
+	if step.Attempt < 1 {
+		step.Attempt = 1
+	}
 	q := at
 	step.QueuedAt = &q
 	return repo.UpdateStep(ctx, step)
+}
+
+// EffectiveStepAttempt normalizes unset attempts to 1 (job publishers always send attempt≥1).
+func EffectiveStepAttempt(attempt int) int {
+	if attempt < 1 {
+		return 1
+	}
+	return attempt
 }
