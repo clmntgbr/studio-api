@@ -32,11 +32,12 @@ func (p *Publisher) ToMembers(
 	eventType := EventType(entity, action)
 	for _, memberID := range memberIDs {
 		if err := p.transport.PublishToUser(ctx, memberID, eventType, payload); err != nil {
+			// Best-effort: never fail the domain event pipeline on realtime outages.
 			log.Printf(
 				"centrifugo publish failed type=%s userId=%s: %v",
 				eventType, memberID, err,
 			)
-			return messaging.Retryable(err)
+			continue
 		}
 		log.Printf("centrifugo published type=%s userId=%s", eventType, memberID)
 	}
@@ -74,8 +75,9 @@ func (p *Publisher) ToUser(
 
 	eventType := EventType(entity, action)
 	if err := p.transport.PublishToUser(ctx, userID, eventType, payload); err != nil {
+		// Best-effort: never fail the domain event pipeline on realtime outages.
 		log.Printf("centrifugo publish failed type=%s userId=%s: %v", eventType, userIDRaw, err)
-		return messaging.Retryable(err)
+		return nil
 	}
 	log.Printf("centrifugo published type=%s userId=%s", eventType, userIDRaw)
 	return nil
@@ -95,8 +97,9 @@ func (p *Publisher) ToProject(
 	}
 	eventType := EventType(entity, action)
 	if err := p.transport.PublishToProject(ctx, projectID, eventType, payload); err != nil {
+		// Best-effort: never fail the domain event pipeline on realtime outages.
 		log.Printf("centrifugo publish failed type=%s projectId=%s: %v", eventType, projectIDRaw, err)
-		return messaging.Retryable(err)
+		return nil
 	}
 	log.Printf("centrifugo published type=%s projectId=%s", eventType, projectIDRaw)
 	return nil

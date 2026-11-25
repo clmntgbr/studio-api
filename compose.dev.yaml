@@ -75,7 +75,7 @@ services:
       minio:
         condition: service_started
       centrifugo:
-        condition: service_started
+        condition: service_healthy
     networks: [edge, backend, data]
 
   worker:
@@ -92,7 +92,7 @@ services:
       rabbitmq:
         condition: service_healthy
       centrifugo:
-        condition: service_started
+        condition: service_healthy
     networks: [backend, data]
 
   worker-fetch:
@@ -289,16 +289,23 @@ services:
   centrifugo:
     container_name: centrifugo
     image: centrifugo/centrifugo:v5
-    command: ["centrifugo", "-c", "config.json"]
+    # Mount the file (not the directory): Docker Desktop/WSL often bind-mounts an empty
+    # dir on first boot → Centrifugo starts with no namespaces → unknown channel 102.
+    command: ["centrifugo", "-c", "/centrifugo/config.json"]
     ports:
       - "8000:8000"
     volumes:
-      - ./centrifugo:/centrifugo:ro
-    working_dir: /centrifugo
+      - ./centrifugo/config.json:/centrifugo/config.json:ro
     environment:
       CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-dev-centrifugo-api-key}
       CENTRIFUGO_TOKEN_HMAC_SECRET_KEY: ${CENTRIFUGO_TOKEN_SECRET:-dev-centrifugo-token-secret}
       CENTRIFUGO_ALLOWED_ORIGINS: ${CENTRIFUGO_ALLOWED_ORIGINS:-http://localhost:3000 http://localhost:3001}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
     networks: [edge, backend]
     restart: unless-stopped
 

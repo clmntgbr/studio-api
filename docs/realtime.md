@@ -10,6 +10,12 @@ outbox → RabbitMQ → worker handler → Centrifugo publisher
 
 Realtime event `type` uses `entity.action` (e.g. `user.created`), not the versioned domain type (`user.created.v1`).
 
+Publish is **best-effort**: a Centrifugo outage is logged and must not retry/DLQ domain events.
+
+### Local / Docker config
+
+Namespaces (`users`, `projects`) live in committed `centrifugo/config.json`, mounted as a **single file** (`./centrifugo/config.json:/centrifugo/config.json:ro`). Do not mount the whole directory — under Docker Desktop/WSL that often appears empty inside the container, Centrifugo starts with no namespaces, and publishes fail with `unknown channel: 102`. Secrets/origins stay in env (`CENTRIFUGO_API_KEY`, `CENTRIFUGO_TOKEN_HMAC_SECRET_KEY`, `CENTRIFUGO_ALLOWED_ORIGINS`).
+
 ## HTTP routes
 
 | Method | Path | Description |

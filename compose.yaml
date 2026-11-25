@@ -341,14 +341,20 @@ services:
 
   centrifugo:
     image: centrifugo/centrifugo:v5
-    command: ["centrifugo", "-c", "config.json"]
+    # Mount the file (not the directory): empty dir mounts drop namespaces → channel 102.
+    command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
-      - ./centrifugo:/centrifugo:ro
-    working_dir: /centrifugo
+      - ./centrifugo/config.json:/centrifugo/config.json:ro
     environment:
       CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY}
       CENTRIFUGO_TOKEN_HMAC_SECRET_KEY: ${CENTRIFUGO_TOKEN_SECRET}
       CENTRIFUGO_ALLOWED_ORIGINS: ${CENTRIFUGO_ALLOWED_ORIGINS}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
     networks: [edge, backend]
     restart: unless-stopped
 
