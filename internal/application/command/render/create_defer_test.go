@@ -66,10 +66,11 @@ func (f *fakePresetRepo) List(context.Context) ([]domainpreset.Preset, error) {
 }
 
 type fakeMediaWrite struct {
-	mediaID  uuid.UUID
-	source   string
-	proxyKey string
-	hasCrop  bool
+	mediaID   uuid.UUID
+	source    string
+	proxyKey  string
+	hasCrop   bool
+	savedStep *domainmedia.ProcessingStep
 }
 
 func (f *fakeMediaWrite) WithTransaction(context.Context, func(context.Context) error) error {
@@ -118,6 +119,7 @@ func (f *fakeMediaWrite) GetAssetByKind(_ context.Context, mediaID uuid.UUID, ki
 	}
 }
 func (f *fakeMediaWrite) SaveStep(_ context.Context, step *domainmedia.ProcessingStep) error {
+	f.savedStep = step
 	return nil
 }
 func (f *fakeMediaWrite) UpdateStep(context.Context, *domainmedia.ProcessingStep) error { panic("unused") }
@@ -203,6 +205,9 @@ func TestCreateHandler_defersWhenCropMissing_faceTrack(t *testing.T) {
 	}
 	if jobs.render != 0 {
 		t.Fatalf("PublishRenderJob calls = %d, want 0", jobs.render)
+	}
+	if media.savedStep == nil || media.savedStep.Kind != domainmedia.StepReframe {
+		t.Fatalf("QueueStep reframe missing, got %#v", media.savedStep)
 	}
 	var plan map[string]any
 	if err := json.Unmarshal(renders.saved.Plan, &plan); err != nil {

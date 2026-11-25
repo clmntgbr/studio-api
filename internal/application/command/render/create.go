@@ -221,10 +221,18 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 			return nil, errors.New("failed to create render")
 		}
 		if err := mediacmd.QueueStep(ctx, h.media, firstMediaID, domainmedia.StepReframe, time.Now().UTC()); err != nil {
+			r.Status = domainrender.StatusFailed
+			msg := "failed to queue reframe"
+			r.ErrorMessage = &msg
+			_ = h.renders.Update(ctx, r)
 			return nil, err
 		}
 		if err := h.jobs.PublishReframeJob(ctx, firstMediaID.String(), proxyAsset.StorageKey, preset.Width, preset.Height); err != nil {
-			return nil, err
+			r.Status = domainrender.StatusFailed
+			msg := "failed to enqueue reframe"
+			r.ErrorMessage = &msg
+			_ = h.renders.Update(ctx, r)
+			return nil, errors.New("failed to enqueue reframe")
 		}
 		return r, nil
 	}
