@@ -108,6 +108,90 @@ func TestMediaHandler_UpdateConfiguration_Success(t *testing.T) {
 	}
 }
 
+func TestMediaHandler_UpdateConfiguration_OutputPresetAndShipPrefs(t *testing.T) {
+	updateCfg := &mockUpdateConfig{out: sampleConfig()}
+	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, updateCfg, nil, nil, nil)
+	app := mount(h, true)
+
+	presetID := testutil.TestOverrideID.String()
+	burn := true
+	req, _ := testutil.JSONRequest(http.MethodPatch, "/api/media/"+testutil.TestMediaID.String()+"/configuration", map[string]any{
+		"outputPresetId": presetID,
+		"burnSubtitles":  burn,
+		"masterSplit":    "parts:5",
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if updateCfg.cmd.OutputPresetID == nil || updateCfg.cmd.OutputPresetID.String() != presetID {
+		t.Fatalf("preset=%v", updateCfg.cmd.OutputPresetID)
+	}
+	if updateCfg.cmd.ClearOutputPresetID {
+		t.Fatal("expected ClearOutputPresetID=false")
+	}
+	if updateCfg.cmd.BurnSubtitles == nil || !*updateCfg.cmd.BurnSubtitles {
+		t.Fatalf("burn=%v", updateCfg.cmd.BurnSubtitles)
+	}
+	if updateCfg.cmd.MasterSplit == nil || *updateCfg.cmd.MasterSplit != "parts:5" {
+		t.Fatalf("split=%v", updateCfg.cmd.MasterSplit)
+	}
+}
+
+func TestMediaHandler_UpdateConfiguration_ClearOutputPreset(t *testing.T) {
+	updateCfg := &mockUpdateConfig{out: sampleConfig()}
+	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, updateCfg, nil, nil, nil)
+	app := mount(h, true)
+
+	req, _ := testutil.JSONRequest(http.MethodPatch, "/api/media/"+testutil.TestMediaID.String()+"/configuration", map[string]any{
+		"outputPresetId": "",
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if !updateCfg.cmd.ClearOutputPresetID || updateCfg.cmd.OutputPresetID != nil {
+		t.Fatalf("cmd=%+v", updateCfg.cmd)
+	}
+}
+
+func TestMediaHandler_UpdateConfiguration_InvalidOutputPresetID(t *testing.T) {
+	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	app := mount(h, true)
+	req, _ := testutil.JSONRequest(http.MethodPatch, "/api/media/"+testutil.TestMediaID.String()+"/configuration", map[string]any{
+		"outputPresetId": "not-a-uuid",
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
+func TestMediaHandler_UpdateConfiguration_MasterSplitValidation(t *testing.T) {
+	updateCfg := &mockUpdateConfig{err: errors.New("masterSplit must be empty, off, parts:N, or durationMs:N")}
+	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, updateCfg, nil, nil, nil)
+	app := mount(h, true)
+	req, _ := testutil.JSONRequest(http.MethodPatch, "/api/media/"+testutil.TestMediaID.String()+"/configuration", map[string]any{
+		"masterSplit": "nope",
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
 func TestMediaHandler_UpdateConfiguration_Unauthorized(t *testing.T) {
 	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	app := mount(h, false)

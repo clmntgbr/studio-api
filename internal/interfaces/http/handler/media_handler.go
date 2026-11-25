@@ -286,7 +286,8 @@ type updateConfigurationBody struct {
 	Language             *string  `json:"language" validate:"omitempty,max=10"`
 	MasterSplit          *string  `json:"masterSplit" validate:"omitempty,max=64"`
 	BurnSubtitles        *bool    `json:"burnSubtitles"`
-	OutputPresetID       *string  `json:"outputPresetId" validate:"omitempty,uuid"`
+	// Empty string clears the preset; non-empty must be a UUID (validated below).
+	OutputPresetID *string `json:"outputPresetId" validate:"omitempty"`
 }
 
 type reanalyzeBody struct {
@@ -344,8 +345,11 @@ func (h *MediaHandler) UpdateConfiguration(c fiber.Ctx) error {
 		if *body.OutputPresetID == "" {
 			clearPreset = true
 		} else {
-			id := uuid.MustParse(*body.OutputPresetID)
-			presetID = &id
+			parsed, err := uuid.Parse(*body.OutputPresetID)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid outputPresetId"})
+			}
+			presetID = &parsed
 		}
 	}
 	cfg, err := h.updateConfigHandler.Handle(c.Context(), cmdmedia.UpdateConfigurationCommand{

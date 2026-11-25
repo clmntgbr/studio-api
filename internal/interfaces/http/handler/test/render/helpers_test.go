@@ -77,11 +77,13 @@ func (m *mockList) Handle(_ context.Context, _ queryrender.ListQuery) ([]domainr
 }
 
 type mockDownload struct {
-	out *queryrender.DownloadResult
-	err error
+	out  *queryrender.DownloadResult
+	err  error
+	last queryrender.DownloadQuery
 }
 
-func (m *mockDownload) Handle(_ context.Context, _ queryrender.DownloadQuery) (*queryrender.DownloadResult, error) {
+func (m *mockDownload) Handle(_ context.Context, q queryrender.DownloadQuery) (*queryrender.DownloadResult, error) {
+	m.last = q
 	if m.err != nil {
 		return nil, m.err
 	}

@@ -2,10 +2,13 @@ package rendertest
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	queryrender "go-api/internal/application/query/render"
+	"go-api/internal/domain/port"
 	"go-api/internal/interfaces/http/testutil"
 )
 
@@ -435,5 +438,65 @@ func TestRenderHandler_Download_HandlerError(t *testing.T) {
 	}
 	if resp.StatusCode != http.StatusInternalServerError {
 		t.Fatalf("status=%d", resp.StatusCode)
+	}
+}
+
+func TestRenderHandler_Download_PartSuccess(t *testing.T) {
+	download := &mockDownload{}
+	app := mount(nil, nil, nil, nil, download, true)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/renders/"+testRenderID.String()+"/download?part=2", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if download.last.Part != 2 {
+		t.Fatalf("part=%d", download.last.Part)
+	}
+}
+
+func TestRenderHandler_Download_InvalidPart(t *testing.T) {
+	app := mount(nil, nil, nil, nil, nil, true)
+	for _, raw := range []string{"0", "-1", "abc"} {
+		req, _ := testutil.JSONRequest(http.MethodGet, "/api/renders/"+testRenderID.String()+"/download?part="+raw, nil)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("part=%s status=%d", raw, resp.StatusCode)
+		}
+		_ = resp.Body.Close()
+	}
+}
+
+func TestRenderHandler_Download_RangeAndDefaultStatus(t *testing.T) {
+	download := &mockDownload{out: &queryrender.DownloadResult{
+		Filename: "part-1.mp4",
+		Stream: &port.ObjectStream{
+			Body:          io.NopCloser(strings.NewReader("ab")),
+			ContentType:   "video/mp4",
+			ContentLength: 2,
+			ContentRange:  "bytes 0-1/8",
+			StatusCode:    0,
+		},
+	}}
+	app := mount(nil, nil, nil, nil, download, true)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/renders/"+testRenderID.String()+"/download", nil)
+	req.Header.Set("Range", "bytes=0-1")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if resp.Header.Get("Content-Range") != "bytes 0-1/8" {
+		t.Fatalf("content-range=%q", resp.Header.Get("Content-Range"))
+	}
+	if download.last.RangeHeader != "bytes=0-1" {
+		t.Fatalf("range=%q", download.last.RangeHeader)
 	}
 }
