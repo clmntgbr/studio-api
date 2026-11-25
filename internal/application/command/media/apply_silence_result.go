@@ -16,6 +16,7 @@ import (
 
 type ApplySilenceResultCommand struct {
 	MediaID               uuid.UUID
+	Attempt               int
 	DetectionsKey         string
 	NoiseFloorDb          float64
 	CalculatedThresholdDb float64
@@ -49,7 +50,15 @@ func (h *ApplySilenceResultHandler) Handle(ctx context.Context, cmd ApplySilence
 	if err != nil {
 		return err
 	}
-	if step != nil && step.Status == domainmedia.StepStatusCompleted {
+	if step != nil && cmd.Attempt > 0 && cmd.Attempt != step.Attempt {
+		return nil // stale job for an older attempt
+	}
+	if step != nil && step.Status == domainmedia.StepStatusCompleted &&
+		(cmd.Attempt == 0 || cmd.Attempt == step.Attempt) {
+		return nil
+	}
+	if step != nil && (step.Status == domainmedia.StepStatusCancelled ||
+		step.Status == domainmedia.StepStatusSkipped) {
 		return nil
 	}
 
