@@ -123,6 +123,10 @@ func (p *Publisher) PublishSilenceJob(ctx context.Context, mediaID, audioKey str
 	if opts.NoiseFloorOffsetDb == 0 {
 		opts.NoiseFloorOffsetDb = 12
 	}
+	attempt := opts.Attempt
+	if attempt < 1 {
+		attempt = 1
+	}
 	payload := map[string]any{
 		"mediaId":            mediaID,
 		"audioKey":           audioKey,
@@ -132,7 +136,7 @@ func (p *Publisher) PublishSilenceJob(ctx context.Context, mediaID, audioKey str
 	if opts.SilenceThresholdDb != nil {
 		payload["silenceThresholdDb"] = *opts.SilenceThresholdDb
 	}
-	msg, body, err := envelope.NewJob("silence", mediaID, "", 1, payload)
+	msg, body, err := envelope.NewJob("silence", mediaID, "", attempt, payload)
 	if err != nil {
 		return err
 	}
@@ -172,7 +176,11 @@ func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string
 		opts.Language = "fr"
 	}
 	if opts.DetectionLevel == "" {
-		opts.DetectionLevel = "aggressive"
+		opts.DetectionLevel = "standard"
+	}
+	attempt := opts.Attempt
+	if attempt < 1 {
+		attempt = 1
 	}
 	payload := map[string]any{
 		"mediaId":              mediaID,
@@ -183,7 +191,7 @@ func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string
 		"repetitionsEnabled":   opts.RepetitionsEnabled,
 		"falseStartsEnabled":   opts.FalseStartsEnabled,
 	}
-	msg, body, err := envelope.NewJob("text", mediaID, "", 1, payload)
+	msg, body, err := envelope.NewJob("text", mediaID, "", attempt, payload)
 	if err != nil {
 		return err
 	}

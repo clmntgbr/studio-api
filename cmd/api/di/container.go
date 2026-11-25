@@ -164,7 +164,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	cancelRender := rendercmd.NewCancelHandler(renderWriteRepo)
 	getRender := queryrender.NewGetHandler(renderReadRepo)
 	listRenders := queryrender.NewListHandler(renderReadRepo)
-	downloadRender := queryrender.NewDownloadHandler(renderReadRepo, storage, env.S3BucketRenders, env.S3PublicEndpoint)
+	downloadRender := queryrender.NewDownloadHandler(renderReadRepo, storage, env.S3BucketRenders)
 
 	llmArtifactReadRepo := read.NewLLMArtifactReadRepository(db)
 	listClips := queryclip.NewListHandler(clipReadRepo)

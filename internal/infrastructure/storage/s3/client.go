@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type Config struct {
@@ -146,6 +147,33 @@ func (c *Client) DeleteObject(ctx context.Context, bucket, key string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("delete s3://%s/%s: %w", bucket, key, err)
+	}
+	return nil
+}
+
+// DeleteObjects removes many keys (chunks of 1000).
+func (c *Client) DeleteObjects(ctx context.Context, bucket string, keys []string) error {
+	const chunk = 1000
+	for i := 0; i < len(keys); i += chunk {
+		end := i + chunk
+		if end > len(keys) {
+			end = len(keys)
+		}
+		objs := make([]types.ObjectIdentifier, 0, end-i)
+		for _, key := range keys[i:end] {
+			objs = append(objs, types.ObjectIdentifier{Key: aws.String(key)})
+		}
+		out, err := c.inner.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(bucket),
+			Delete: &types.Delete{Objects: objs, Quiet: aws.Bool(true)},
+		})
+		if err != nil {
+			return fmt.Errorf("delete batch s3://%s: %w", bucket, err)
+		}
+		if out != nil && len(out.Errors) > 0 {
+			e := out.Errors[0]
+			return fmt.Errorf("delete s3://%s/%s: %s", bucket, aws.ToString(e.Key), aws.ToString(e.Message))
+		}
 	}
 	return nil
 }

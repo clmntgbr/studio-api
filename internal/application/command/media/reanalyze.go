@@ -141,6 +141,7 @@ func (h *ReanalyzeHandler) requeueSilence(ctx context.Context, m *domainmedia.Me
 		ThresholdMode:      cfg.ThresholdMode,
 		SilenceThresholdDb: cfg.SilenceThresholdDB,
 		NoiseFloorOffsetDb: cfg.NoiseFloorOffsetDb(),
+		Attempt:            step.Attempt,
 	})
 }
 
@@ -235,6 +236,7 @@ func (h *ReanalyzeHandler) requeueText(ctx context.Context, m *domainmedia.Media
 		FillersEnabled:     cfg.FillersEnabled,
 		RepetitionsEnabled: cfg.RepetitionsEnabled,
 		FalseStartsEnabled: cfg.FalseStartsEnabled,
+		Attempt:            step.Attempt,
 	})
 }
 

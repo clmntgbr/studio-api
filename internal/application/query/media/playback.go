@@ -13,7 +13,7 @@ import (
 
 type PlaybackQuery struct {
 	MediaID uuid.UUID
-	Kind    string // proxy (default)
+	Kind    string // proxy | source | auto (default)
 }
 
 type PlaybackResult struct {
@@ -48,28 +48,11 @@ func (h *GetPlaybackHandler) Handle(ctx context.Context, q PlaybackQuery) (*Play
 	if q.MediaID == uuid.Nil {
 		return nil, errors.New("mediaId is required")
 	}
-	kind := q.Kind
-	if kind == "" {
-		kind = domainmedia.AssetKindProxy
-	}
-	if kind != domainmedia.AssetKindProxy {
-		return nil, errors.New("kind must be proxy")
-	}
-	m, err := h.media.GetByID(ctx, q.MediaID)
+	key, kind, err := resolvePlaybackObject(ctx, h.media, q.MediaID, q.Kind)
 	if err != nil {
 		return nil, err
 	}
-	if m == nil {
-		return nil, errors.New("media not found")
-	}
-	asset, err := h.media.GetAssetByKind(ctx, m.ID, kind)
-	if err != nil {
-		return nil, err
-	}
-	if asset == nil || asset.StorageKey == "" {
-		return nil, errors.New("proxy not ready")
-	}
-	url, err := h.storage.PresignGetObject(ctx, h.bucket, asset.StorageKey, h.expiry, h.publicBase)
+	url, err := h.storage.PresignGetObject(ctx, h.bucket, key, h.expiry, h.publicBase)
 	if err != nil {
 		return nil, errors.New("failed to presign playback")
 	}

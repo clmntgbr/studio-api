@@ -28,14 +28,7 @@ func completeStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID
 		return nil
 	}
 
-	started := at
-	if step.StartedAt != nil {
-		started = *step.StartedAt
-	} else if step.QueuedAt != nil {
-		started = *step.QueuedAt
-	} else if !step.CreatedAt.IsZero() {
-		started = step.CreatedAt
-	}
+	started := stepStartAt(step, at)
 	step.StartedAt = &started
 	step.Status = domainmedia.StepStatusCompleted
 	step.Progress = 1
@@ -99,12 +92,7 @@ func FailStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uui
 	if !created && (step.Status == domainmedia.StepStatusCompleted || step.Status == domainmedia.StepStatusFailed) {
 		return nil
 	}
-	started := at
-	if step.StartedAt != nil {
-		started = *step.StartedAt
-	} else if step.QueuedAt != nil {
-		started = *step.QueuedAt
-	}
+	started := stepStartAt(step, at)
 	step.StartedAt = &started
 	step.Status = domainmedia.StepStatusFailed
 	msg := errMsg
@@ -128,6 +116,21 @@ func FailStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uui
 	return repo.SaveStepRun(ctx, run)
 }
 
+// stepStartAt picks a started timestamp that is never after `at` (DB check: completed_at >= started_at).
+// Do not use CreatedAt: NewProcessingStep sets it to time.Now(), which can be after a captured `at`.
+func stepStartAt(step *domainmedia.ProcessingStep, at time.Time) time.Time {
+	started := at
+	if step.StartedAt != nil {
+		started = *step.StartedAt
+	} else if step.QueuedAt != nil {
+		started = *step.QueuedAt
+	}
+	if started.After(at) {
+		return at
+	}
+	return started
+}
+
 // QueueStep marks a processing step as queued.
 func QueueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {
 	return queueStep(ctx, repo, mediaID, kind, at)
@@ -141,6 +144,7 @@ func queueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uu
 	if step == nil {
 		step = domainmedia.NewProcessingStep(mediaID, kind)
 		step.Status = domainmedia.StepStatusQueued
+		step.Attempt = 1 // align with studiojobs NewJob(..., attempt=1)
 		q := at
 		step.QueuedAt = &q
 		return repo.SaveStep(ctx, step)
@@ -151,7 +155,18 @@ func queueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uu
 		return nil
 	}
 	step.Status = domainmedia.StepStatusQueued
+	if step.Attempt < 1 {
+		step.Attempt = 1
+	}
 	q := at
 	step.QueuedAt = &q
 	return repo.UpdateStep(ctx, step)
+}
+
+// EffectiveStepAttempt normalizes unset attempts to 1 (job publishers always send attempt≥1).
+func EffectiveStepAttempt(attempt int) int {
+	if attempt < 1 {
+		return 1
+	}
+	return attempt
 }

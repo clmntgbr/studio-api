@@ -127,16 +127,10 @@ func handle(ctx context.Context, cfg Config, store *s3store.Client, bus *topolog
 	}
 	defer os.RemoveAll(workDir)
 
-	_ = publishProgress(ctx, bus, msg, 5, "download", "Downloading source segments")
-	inputs := make([]string, 0, len(plan.Segments))
-	for i, seg := range plan.Segments {
-		local := filepath.Join(workDir, fmt.Sprintf("in-%d.mp4", i))
-		if err := store.DownloadFile(ctx, cfg.MediaBucket, seg.MediaKey, local); err != nil {
-			if err2 := store.DownloadFile(ctx, cfg.MediaBucket, strings.TrimPrefix(seg.MediaKey, "/"), local); err2 != nil {
-				return finish(ctx, bus, d, msg, false, nil, "download", err.Error(), true)
-			}
-		}
-		inputs = append(inputs, local)
+	_ = publishProgress(ctx, bus, msg, 5, "download", "Downloading source media")
+	inputs, inputIdx, err := downloadUniqueInputs(ctx, store, cfg.MediaBucket, workDir, plan.Segments)
+	if err != nil {
+		return finish(ctx, bus, d, msg, false, nil, "download", err.Error(), true)
 	}
 
 	assPath := ""
@@ -172,7 +166,7 @@ func handle(ctx context.Context, cfg Config, store *s3store.Client, bus *topolog
 
 	_ = publishProgress(ctx, bus, msg, 40, "ffmpeg", "Encoding output")
 	outLocal := filepath.Join(workDir, "out.mp4")
-	if err := runFFmpeg(ctx, workDir, inputs, plan, outLocal, assPath, fontsDir, cropDoc); err != nil {
+	if err := runFFmpeg(ctx, workDir, inputs, inputIdx, plan, outLocal, assPath, fontsDir, cropDoc); err != nil {
 		return finish(ctx, bus, d, msg, false, nil, "ffmpeg", err.Error(), true)
 	}
 
@@ -193,10 +187,102 @@ func handle(ctx context.Context, cfg Config, store *s3store.Client, bus *topolog
 	}, "", "", false)
 }
 
-func runFFmpeg(ctx context.Context, workDir string, inputs []string, plan renderplan.Plan, outPath, assPath, fontsDir string, cropDoc *cropPathDoc) error {
-	if len(inputs) == 0 {
+// maxFilterSegments caps filter_complex size to avoid ffmpeg OOM on dense cut lists.
+const maxFilterSegments = 48
+
+// uniqueMediaKeys collapses repeated keys while preserving first-seen order.
+func uniqueMediaKeys(keys []string) (unique []string, idx []int) {
+	seen := make(map[string]int, len(keys))
+	idx = make([]int, len(keys))
+	for i, key := range keys {
+		key = strings.TrimPrefix(key, "/")
+		if j, ok := seen[key]; ok {
+			idx[i] = j
+			continue
+		}
+		seen[key] = len(unique)
+		idx[i] = len(unique)
+		unique = append(unique, key)
+	}
+	return unique, idx
+}
+
+// downloadUniqueInputs fetches each distinct mediaKey once and returns
+// (unique local paths, per-segment index into that slice).
+func downloadUniqueInputs(ctx context.Context, store *s3store.Client, bucket, workDir string, segs []renderplan.Segment) ([]string, []int, error) {
+	keys := make([]string, len(segs))
+	for i, seg := range segs {
+		keys[i] = seg.MediaKey
+	}
+	unique, inputIdx := uniqueMediaKeys(keys)
+	inputs := make([]string, len(unique))
+	for i, key := range unique {
+		local := filepath.Join(workDir, fmt.Sprintf("in-%d.mp4", i))
+		if err := store.DownloadFile(ctx, bucket, key, local); err != nil {
+			if err2 := store.DownloadFile(ctx, bucket, "/"+key, local); err2 != nil {
+				return nil, nil, err
+			}
+		}
+		inputs[i] = local
+	}
+	return inputs, inputIdx, nil
+}
+
+func runFFmpeg(ctx context.Context, workDir string, inputs []string, inputIdx []int, plan renderplan.Plan, outPath, assPath, fontsDir string, cropDoc *cropPathDoc) error {
+	if len(inputs) == 0 || len(plan.Segments) == 0 {
 		return fmt.Errorf("no inputs")
 	}
+	if len(inputIdx) != len(plan.Segments) {
+		return fmt.Errorf("input index mismatch")
+	}
+
+	n := len(plan.Segments)
+	needPost := plan.Audio.LoudnessLUFS != 0 || assPath != "" || headlineDrawtext(plan) != ""
+
+	if n <= maxFilterSegments {
+		return runFFmpegConcat(ctx, workDir, inputs, inputIdx, plan, plan.Segments, 0, outPath, assPath, fontsDir, cropDoc, true)
+	}
+
+	// Dense cut lists: encode in batches then concat demuxer, then optional post pass.
+	parts := make([]string, 0, (n+maxFilterSegments-1)/maxFilterSegments)
+	for start := 0; start < n; start += maxFilterSegments {
+		end := start + maxFilterSegments
+		if end > n {
+			end = n
+		}
+		partPath := filepath.Join(workDir, fmt.Sprintf("part-%d.mp4", start))
+		subSegs := plan.Segments[start:end]
+		subIdx := inputIdx[start:end]
+		if err := runFFmpegConcat(ctx, workDir, inputs, subIdx, plan, subSegs, start, partPath, "", fontsDir, cropDoc, false); err != nil {
+			return err
+		}
+		parts = append(parts, partPath)
+	}
+
+	concatPath := filepath.Join(workDir, "concat.mp4")
+	if err := concatDemuxer(ctx, workDir, parts, concatPath); err != nil {
+		return err
+	}
+	if !needPost {
+		return os.Rename(concatPath, outPath)
+	}
+	return runFFmpegPost(ctx, workDir, concatPath, plan, outPath, assPath, fontsDir)
+}
+
+// runFFmpegConcat builds one filter_complex concat for segs.
+// applyFinish enables loudnorm/ass/overlays when encoding the full plan in one shot.
+func runFFmpegConcat(
+	ctx context.Context,
+	workDir string,
+	inputs []string,
+	inputIdx []int,
+	plan renderplan.Plan,
+	segs []renderplan.Segment,
+	segOffset int,
+	outPath, assPath, fontsDir string,
+	cropDoc *cropPathDoc,
+	applyFinish bool,
+) error {
 	args := []string{"-y", "-hide_banner", "-loglevel", "error"}
 	for _, in := range inputs {
 		args = append(args, "-i", in)
@@ -208,21 +294,22 @@ func runFFmpeg(ctx context.Context, workDir string, inputs []string, plan render
 	}
 	fadeSec := float64(fade) / 1000.0
 	var filter strings.Builder
-	n := len(plan.Segments)
+	n := len(segs)
 	mode := strings.ToLower(plan.Crop.Mode)
-	for i, seg := range plan.Segments {
+	for i, seg := range segs {
 		start := float64(seg.SrcStartMs) / 1000.0
 		dur := float64(seg.SrcEndMs-seg.SrcStartMs) / 1000.0
 		if dur <= 0 {
 			dur = 0.04
 		}
+		inI := inputIdx[i]
 		geom := videoGeometry(plan.Crop.Mode, plan.Output.Width, plan.Output.Height)
 		if cropDoc != nil && (mode == "face_track" || mode == "speaker_track") {
-			srcW, srcH, err := probeVideoSize(inputs[i])
+			srcW, srcH, err := probeVideoSize(inputs[inI])
 			if err != nil {
 				return err
 			}
-			cmdPath, err := writeFaceTrackSendcmd(workDir, i, cropDoc, seg.SrcStartMs, seg.SrcEndMs, srcW, srcH, plan.Output.Width, plan.Output.Height)
+			cmdPath, err := writeFaceTrackSendcmd(workDir, segOffset+i, cropDoc, seg.SrcStartMs, seg.SrcEndMs, srcW, srcH, plan.Output.Width, plan.Output.Height)
 			if err != nil {
 				return err
 			}
@@ -230,43 +317,110 @@ func runFFmpeg(ctx context.Context, workDir string, inputs []string, plan render
 		}
 		fmt.Fprintf(&filter,
 			"[%d:v]trim=start=%f:duration=%f,setpts=PTS-STARTPTS,%s[v%d];",
-			i, start, dur, geom, i,
+			inI, start, dur, geom, i,
 		)
 		fmt.Fprintf(&filter,
 			"[%d:a]atrim=start=%f:duration=%f,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=%f,afade=t=out:st=%f:d=%f[a%d];",
-			i, start, dur, fadeSec, maxFloat(0, dur-fadeSec), fadeSec, i,
+			inI, start, dur, fadeSec, maxFloat(0, dur-fadeSec), fadeSec, i,
 		)
 	}
 	for i := 0; i < n; i++ {
 		fmt.Fprintf(&filter, "[v%d][a%d]", i, i)
 	}
 	fmt.Fprintf(&filter, "concat=n=%d:v=1:a=1[vout][aout]", n)
-	if plan.Audio.LoudnessLUFS != 0 {
-		fmt.Fprintf(&filter, ";[aout]loudnorm=I=%0.1f:TP=-1.5:LRA=11[aout2]", plan.Audio.LoudnessLUFS)
-	}
 
 	vout := "[vout]"
-	if assPath != "" {
-		escaped := escapeFilterPath(assPath)
-		fonts := escapeFilterPath(fontsDir)
-		fmt.Fprintf(&filter, ";%sass=%s:fontsdir=%s[vburn]", vout, escaped, fonts)
-		vout = "[vburn]"
-	}
-	if overlay := headlineDrawtext(plan); overlay != "" {
-		fmt.Fprintf(&filter, ";%s%s[vhead]", vout, overlay)
-		vout = "[vhead]"
+	aout := "[aout]"
+	if applyFinish {
+		if plan.Audio.LoudnessLUFS != 0 {
+			fmt.Fprintf(&filter, ";[aout]loudnorm=I=%0.1f:TP=-1.5:LRA=11[aout2]", plan.Audio.LoudnessLUFS)
+			aout = "[aout2]"
+		}
+		if assPath != "" {
+			escaped := escapeFilterPath(assPath)
+			fonts := escapeFilterPath(fontsDir)
+			fmt.Fprintf(&filter, ";%sass=%s:fontsdir=%s[vburn]", vout, escaped, fonts)
+			vout = "[vburn]"
+		}
+		if overlay := headlineDrawtext(plan); overlay != "" {
+			fmt.Fprintf(&filter, ";%s%s[vhead]", vout, overlay)
+			vout = "[vhead]"
+		}
 	}
 
-	scriptPath := filepath.Join(workDir, "filter.txt")
+	scriptPath := filepath.Join(workDir, fmt.Sprintf("filter-%d.txt", segOffset))
 	if err := os.WriteFile(scriptPath, []byte(filter.String()), 0o644); err != nil {
 		return err
 	}
 	args = append(args, "-filter_complex_script", scriptPath)
-	aout := "[aout]"
-	if plan.Audio.LoudnessLUFS != 0 {
-		aout = "[aout2]"
-	}
 	args = append(args, "-map", vout, "-map", aout)
+	args = append(args, encodeArgs(plan)...)
+	args = append(args, outPath)
+
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd.Dir = workDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ffmpeg: %w: %s", err, string(out))
+	}
+	return nil
+}
+
+func concatDemuxer(ctx context.Context, workDir string, parts []string, outPath string) error {
+	listPath := filepath.Join(workDir, "concat.txt")
+	var b strings.Builder
+	for _, p := range parts {
+		// Basename: ffmpeg runs with cmd.Dir=workDir (works for relative WORK_DIR too).
+		fmt.Fprintf(&b, "file '%s'\n", filepath.Base(p))
+	}
+	if err := os.WriteFile(listPath, []byte(b.String()), 0o644); err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, "ffmpeg",
+		"-y", "-hide_banner", "-loglevel", "error",
+		"-f", "concat", "-safe", "0", "-i", listPath,
+		"-c", "copy", "-movflags", "+faststart",
+		outPath,
+	)
+	cmd.Dir = workDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ffmpeg concat: %w: %s", err, string(out))
+	}
+	return nil
+}
+
+func runFFmpegPost(ctx context.Context, workDir, inPath string, plan renderplan.Plan, outPath, assPath, fontsDir string) error {
+	args := []string{"-y", "-hide_banner", "-loglevel", "error", "-i", inPath}
+	var vf, af []string
+	if assPath != "" {
+		vf = append(vf, fmt.Sprintf("ass=%s:fontsdir=%s", escapeFilterPath(assPath), escapeFilterPath(fontsDir)))
+	}
+	if overlay := headlineDrawtext(plan); overlay != "" {
+		// headlineDrawtext returns ",drawtext=..." when chained; here it's a standalone vf.
+		vf = append(vf, strings.TrimPrefix(overlay, ","))
+	}
+	if plan.Audio.LoudnessLUFS != 0 {
+		af = append(af, fmt.Sprintf("loudnorm=I=%0.1f:TP=-1.5:LRA=11", plan.Audio.LoudnessLUFS))
+	}
+	if len(vf) > 0 {
+		args = append(args, "-vf", strings.Join(vf, ","))
+	}
+	if len(af) > 0 {
+		args = append(args, "-af", strings.Join(af, ","))
+	}
+	args = append(args, encodeArgs(plan)...)
+	args = append(args, outPath)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
+	cmd.Dir = workDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ffmpeg post: %w: %s", err, string(out))
+	}
+	return nil
+}
+
+func encodeArgs(plan renderplan.Plan) []string {
 	fps := plan.Output.FPS
 	if fps <= 0 {
 		fps = 30
@@ -279,21 +433,12 @@ func runFFmpeg(ctx context.Context, workDir string, inputs []string, plan render
 	if preset == "" {
 		preset = "veryfast"
 	}
-	args = append(args,
+	return []string{
 		"-c:v", "libx264", "-preset", preset, "-crf", strconv.Itoa(crf),
 		"-r", fmt.Sprintf("%g", fps),
 		"-c:a", "aac", "-b:a", "192k",
 		"-movflags", "+faststart",
-		outPath,
-	)
-
-	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
-	cmd.Dir = workDir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("ffmpeg: %w: %s", err, string(out))
 	}
-	return nil
 }
 
 func escapeFilterPath(p string) string {
