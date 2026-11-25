@@ -1,0 +1,60 @@
+# golangci-lint v2 configuration.
+# Format: https://golangci-lint.run/docs/configuration/file/ (checked 2026-11-25)
+# `version: "2"` is required; a v1 file is rejected by golangci-lint v2.
+
+version: "2"
+
+linters:
+  # Enable only the linters listed below (nothing extra from the "standard" set).
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - gosec
+    - revive
+    - ineffassign
+    - unused
+    - bodyclose
+    - sqlclosecheck
+    - misspell
+    - gocritic
+    - errorlint
+  settings:
+    errcheck:
+      check-type-assertions: true
+    govet:
+      enable:
+        - shadow
+    misspell:
+      # Locale for typo suggestions in identifiers and comments (English).
+      locale: US
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      # Matches module path in go.mod.
+      local-prefixes:
+        - go-api
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

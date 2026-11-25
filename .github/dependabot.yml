@@ -1,0 +1,38 @@
+# Dependabot: weekly updates, grouped to keep PR noise low.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      go-modules:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    # Dependabot can bump SHA-pinned actions and keep the version comment.
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      docker:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    # This ecosystem only does work once a Dockerfile exists at the repo root
+    # (or change directory: if it lives elsewhere).

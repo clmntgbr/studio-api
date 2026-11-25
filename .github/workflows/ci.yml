@@ -1,0 +1,379 @@
+# CI for clmntgbr/studio-api
+#
+# Action pins (commit SHAs) were verified on 2026-11-25 via the GitHub Git API.
+# Prefer keeping SHA pins; Dependabot (package-ecosystem: github-actions) updates them.
+#
+# Nightly schedule (04:00 UTC) runs only the "security" job.
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: "0 4 * * *"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check gofmt
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go mod tidy (fail if go.mod / go.sum would change)
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          args: --timeout=10m
+
+  test-handlers:
+    name: Handler HTTP tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Run handler tests with coverage
+        run: |
+          go test ./internal/interfaces/http/handler/test/... \
+            -count=1 \
+            -race \
+            -timeout=5m \
+            -coverprofile=coverage.txt \
+            -covermode=atomic \
+            -coverpkg=./internal/interfaces/http/handler/...
+
+      - name: Add coverage to job summary
+        run: |
+          {
+            echo '## Handler coverage'
+            echo ''
+            echo 'Packages under test: `internal/interfaces/http/handler/test/...`'
+            echo 'Coverage scope: `internal/interfaces/http/handler/...`'
+            echo ''
+            echo '### Total'
+            echo '```'
+            go tool cover -func=coverage.txt | tail -1
+            echo '```'
+            echo ''
+            echo '### By file'
+            echo '```'
+            go tool cover -func=coverage.txt | grep 'handler/'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce handler coverage floor
+        run: |
+          TOTAL=$(go tool cover -func=coverage.txt | tail -1 | awk '{print $3}' | tr -d '%')
+          MIN_COVERAGE=95.0
+          echo "Handler statement coverage: ${TOTAL}% (minimum: ${MIN_COVERAGE}%)"
+          awk -v total="$TOTAL" -v min="$MIN_COVERAGE" 'BEGIN { exit (total + 0 >= min + 0) ? 0 : 1 }' || {
+            echo "::error::Handler coverage ${TOTAL}% is below minimum ${MIN_COVERAGE}%"
+            exit 1
+          }
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: handler-coverage
+          path: coverage.txt
+          if-no-files-found: error
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.txt
+          flags: handler
+          name: handler
+          slug: clmntgbr/studio-api
+          fail_ci_if_error: true
+
+  test-all:
+    name: All unit tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      # Raise once a meaningful baseline exists (0 disables the check).
+      MIN_COVERAGE: "0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      # Exclude handler/test packages — covered (with race + 95% floor) by test-handlers.
+      - name: Run unit tests with coverage
+        run: |
+          pkgs="$(go list ./... | grep -v '/internal/interfaces/http/handler/test')"
+          # shellcheck disable=SC2086
+          go test $pkgs \
+            -count=1 \
+            -race \
+            -timeout=10m \
+            -coverprofile=coverage.txt \
+            -covermode=atomic
+
+      - name: Add coverage to job summary
+        run: |
+          {
+            echo '## Global coverage (excluding handler/test)'
+            echo ''
+            echo '### Total'
+            echo '```'
+            go tool cover -func=coverage.txt | tail -1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce optional global coverage floor
+        run: |
+          TOTAL=$(go tool cover -func=coverage.txt | tail -1 | awk '{print $3}' | tr -d '%')
+          echo "Global statement coverage: ${TOTAL}% (minimum: ${MIN_COVERAGE}%; 0 = disabled)"
+          awk -v total="$TOTAL" -v min="$MIN_COVERAGE" 'BEGIN {
+            if (min + 0 <= 0) exit 0
+            exit (total + 0 >= min + 0) ? 0 : 1
+          }' || {
+            echo "::error::Global coverage ${TOTAL}% is below minimum ${MIN_COVERAGE}%"
+            exit 1
+          }
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: all-coverage
+          path: coverage.txt
+          if-no-files-found: error
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.txt
+          flags: all
+          name: all
+          slug: clmntgbr/studio-api
+          fail_ci_if_error: true
+
+  integration:
+    name: Integration (migrations)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: studio_api_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d studio_api_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/studio_api_test?sslmode=disable
+      # Stubs for config.Load() required keys (CLI migrate uses ConnectDatabase).
+      GO_ENV: test
+      PORT: "4000"
+      CLERK_SECRET_KEY: sk_test_ci
+      CLERK_FRONTEND_API: https://clerk.example
+      CLERK_WEBHOOK_SECRET: whsec_test_ci
+      CORS_ALLOWED_ORIGINS: http://localhost:3001
+      CORS_ALLOW_CREDENTIALS: "true"
+      CORS_ALLOW_METHODS: GET,POST,PUT,PATCH,DELETE,OPTIONS
+      CORS_ALLOW_HEADERS: "*"
+      CORS_MAX_AGE: "600"
+      RATE_LIMIT_MAX: "0"
+      RABBITMQ_URL: amqp://guest:guest@localhost:5672/
+      CENTRIFUGO_URL: http://localhost:8000/api
+      CENTRIFUGO_API_KEY: ci
+      CENTRIFUGO_TOKEN_SECRET: ci-token-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build CLI
+        run: go build -o bin/cli ./cmd/cli
+
+      - name: Migrations up / down / up + schema check
+        run: |
+          ./bin/cli migrate up
+          # Roll back one step then re-apply (goose Down is single-step).
+          ./bin/cli migrate down
+          ./bin/cli migrate up
+          ./bin/cli migrate status
+          ./bin/cli migrate check
+
+      - name: Run integration-tagged tests
+        run: |
+          # Only tests named TestIntegration* (files may use //go:build integration).
+          # Exits 0 when none match yet.
+          go test ./... \
+            -tags=integration \
+            -run '^TestIntegration' \
+            -count=1 \
+            -race \
+            -timeout=10m
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: govulncheck
+        run: |
+          # Pin deliberately; bump with Dependabot / intentional updates.
+          go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+          govulncheck ./...
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
+
+  build:
+    name: Build
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [stable, oldstable]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+
+      - name: go build
+        run: go build ./...
+
+      - name: Set up Docker Buildx
+        if: matrix.go == 'stable' && hashFiles('Dockerfile') != ''
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Lint Dockerfile
+        if: matrix.go == 'stable' && hashFiles('Dockerfile') != ''
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Build image (no push)
+        if: matrix.go == 'stable' && hashFiles('Dockerfile') != ''
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: studio-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan image with Trivy
+        if: matrix.go == 'stable' && hashFiles('Dockerfile') != ''
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: studio-api:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
