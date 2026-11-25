@@ -34,7 +34,7 @@ func LoadConfigFromEnv() (Config, error) {
 		MediaBucket:  envOr("S3_BUCKET_MEDIA", "media"),
 		RenderBucket: envOr("S3_BUCKET_RENDERS", "renders"),
 		WorkDir:      envOr("WORK_DIR", "/tmp/work"),
-		FontsDir:     envOr("FONTS_DIR", "/fonts"),
+		FontsDir:     envOr("FONTS_DIR", "/usr/share/fonts/dejavu"),
 		S3: s3store.Config{
 			Endpoint:  os.Getenv("S3_ENDPOINT"),
 			Region:    envOr("S3_REGION", "us-east-1"),
@@ -237,7 +237,7 @@ func runFFmpeg(ctx context.Context, workDir string, inputs []string, inputIdx []
 	}
 
 	n := len(plan.Segments)
-	needPost := plan.Audio.LoudnessLUFS != 0 || assPath != "" || headlineDrawtext(plan) != ""
+	needPost := plan.Audio.LoudnessLUFS != 0 || assPath != "" || headlineDrawtext(plan, fontsDir) != ""
 
 	if n <= maxFilterSegments {
 		return runFFmpegConcat(ctx, workDir, inputs, inputIdx, plan, plan.Segments, 0, outPath, assPath, fontsDir, cropDoc, true)
@@ -342,7 +342,7 @@ func runFFmpegConcat(
 			fmt.Fprintf(&filter, ";%sass=%s:fontsdir=%s[vburn]", vout, escaped, fonts)
 			vout = "[vburn]"
 		}
-		if overlay := headlineDrawtext(plan); overlay != "" {
+		if overlay := headlineDrawtext(plan, fontsDir); overlay != "" {
 			fmt.Fprintf(&filter, ";%s%s[vhead]", vout, overlay)
 			vout = "[vhead]"
 		}
@@ -396,8 +396,7 @@ func runFFmpegPost(ctx context.Context, workDir, inPath string, plan renderplan.
 	if assPath != "" {
 		vf = append(vf, fmt.Sprintf("ass=%s:fontsdir=%s", escapeFilterPath(assPath), escapeFilterPath(fontsDir)))
 	}
-	if overlay := headlineDrawtext(plan); overlay != "" {
-		// headlineDrawtext returns ",drawtext=..." when chained; here it's a standalone vf.
+	if overlay := headlineDrawtext(plan, fontsDir); overlay != "" {
 		vf = append(vf, strings.TrimPrefix(overlay, ","))
 	}
 	if plan.Audio.LoudnessLUFS != 0 {
@@ -477,7 +476,7 @@ func videoGeometry(cropMode string, w, h int) string {
 	}
 }
 
-func headlineDrawtext(plan renderplan.Plan) string {
+func headlineDrawtext(plan renderplan.Plan, fontsDir string) string {
 	var text string
 	var startMs, endMs int64
 	for _, o := range plan.Overlays {
@@ -504,11 +503,35 @@ func headlineDrawtext(plan renderplan.Plan) string {
 		fs = 96
 	}
 	escaped := escapeDrawtext(text)
+	fontFile := resolveDrawtextFont(fontsDir)
+	if fontFile == "" {
+		// Without fontfile, ffmpeg falls back to family "Sans" and fails in Alpine.
+		return ""
+	}
+	fontOpt := fmt.Sprintf(":fontfile=%s", escapeFilterPath(fontFile))
 	// Top-centered hook banner for vertical clips.
 	return fmt.Sprintf(
-		"drawtext=text='%s':fontsize=%d:fontcolor=white:borderw=3:bordercolor=black@0.7:x=(w-text_w)/2:y=h*0.08:enable='between(t\\,%g\\,%g)'",
-		escaped, fs, start, end,
+		"drawtext=text='%s':fontsize=%d:fontcolor=white:borderw=3:bordercolor=black@0.7%s:x=(w-text_w)/2:y=h*0.08:enable='between(t\\,%g\\,%g)'",
+		escaped, fs, fontOpt, start, end,
 	)
+}
+
+func resolveDrawtextFont(fontsDir string) string {
+	// Alpine 3.22+ ships font-dejavu under /usr/share/fonts/dejavu;
+	// older images and Debian use ttf-dejavu / truetype/dejavu.
+	candidates := []string{
+		filepath.Join(fontsDir, "DejaVuSans.ttf"),
+		filepath.Join(fontsDir, "dejavu", "DejaVuSans.ttf"),
+		"/usr/share/fonts/dejavu/DejaVuSans.ttf",
+		"/usr/share/fonts/ttf-dejavu/DejaVuSans.ttf",
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+	}
+	for _, p := range candidates {
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return p
+		}
+	}
+	return ""
 }
 
 func escapeDrawtext(s string) string {

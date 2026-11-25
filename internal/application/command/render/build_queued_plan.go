@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 
 	querytimeline "go-api/internal/application/query/timeline"
 	domainclip "go-api/internal/domain/clip"
@@ -57,6 +58,7 @@ type queuedPlanRequest struct {
 	PresetID        uuid.UUID
 	Kind            domainrender.Kind
 	SubtitleStyleID *uuid.UUID
+	BurnSubtitles   bool
 	ClipID          *uuid.UUID
 }
 
@@ -205,13 +207,14 @@ func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanReques
 		})
 	}
 
-	if req.SubtitleStyleID != nil && req.Kind != domainrender.KindAudio {
+	burnSubs := req.BurnSubtitles || req.SubtitleStyleID != nil
+	if burnSubs && req.Kind != domainrender.KindAudio {
 		if d.ass == nil || d.storage == nil {
 			return nil, errors.New("subtitle burn-in is not configured")
 		}
 		q := querytimeline.GetSubtitlesQuery{
 			ProjectID: req.ProjectID,
-			StyleID:   req.SubtitleStyleID,
+			StyleID:   req.SubtitleStyleID, // nil → DefaultStyle
 			Format:    "ass",
 			PlayResX:  preset.Width,
 			PlayResY:  preset.Height,
@@ -231,8 +234,18 @@ func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanReques
 		if err := d.storage.PutObject(ctx, d.renderBucket, assKey, []byte(body), contentType); err != nil {
 			return nil, errors.New("failed to upload subtitle track")
 		}
-		plan.Subtitles = &renderplan.Subtitles{ASSKey: assKey, FontsDir: "/fonts"}
+		plan.Subtitles = &renderplan.Subtitles{
+			ASSKey:   assKey,
+			FontsDir: envOrFontsDir(),
+		}
 	}
 
 	return plan.Marshal()
+}
+
+func envOrFontsDir() string {
+	if v := os.Getenv("FONTS_DIR"); v != "" {
+		return v
+	}
+	return "/usr/share/fonts/dejavu"
 }

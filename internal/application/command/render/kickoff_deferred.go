@@ -69,6 +69,10 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 			continue
 		}
 
+		burnSubs := r.SubtitleStyleID != nil
+		if marker, ok := deferredMarker(r.Plan); ok {
+			burnSubs = burnSubs || marker.BurnSubtitles
+		}
 		rawPlan, err := buildQueuedPlan(ctx, h.planDeps, queuedPlanRequest{
 			ProjectID:       r.ProjectID,
 			RenderID:        r.ID,
@@ -76,6 +80,7 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 			PresetID:        r.OutputPresetID,
 			Kind:            r.Kind,
 			SubtitleStyleID: r.SubtitleStyleID,
+			BurnSubtitles:   burnSubs,
 			ClipID:          r.ClipID,
 		})
 		if err != nil {
@@ -105,15 +110,31 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 	return nil
 }
 
-func deferredMarkerMediaID(plan json.RawMessage) (mediaID string, awaiting bool, err error) {
-	var marker struct {
-		AwaitingReframe bool   `json:"awaitingReframe"`
-		MediaID         string `json:"mediaId"`
-	}
+type deferredMarkerDoc struct {
+	AwaitingReframe bool   `json:"awaitingReframe"`
+	MediaID         string `json:"mediaId"`
+	BurnSubtitles   bool   `json:"burnSubtitles"`
+}
+
+func deferredMarker(plan json.RawMessage) (deferredMarkerDoc, bool) {
+	var marker deferredMarkerDoc
 	if err := json.Unmarshal(plan, &marker); err != nil {
-		return "", false, err
+		return deferredMarkerDoc{}, false
 	}
 	if !marker.AwaitingReframe || marker.MediaID == "" {
+		return deferredMarkerDoc{}, false
+	}
+	return marker, true
+}
+
+func deferredMarkerMediaID(plan json.RawMessage) (mediaID string, awaiting bool, err error) {
+	marker, ok := deferredMarker(plan)
+	if !ok {
+		// Distinguish corrupt JSON from non-marker plans.
+		var probe map[string]any
+		if err := json.Unmarshal(plan, &probe); err != nil {
+			return "", false, err
+		}
 		return "", false, nil
 	}
 	return marker.MediaID, true, nil

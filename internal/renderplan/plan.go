@@ -65,11 +65,13 @@ func (p Plan) Marshal() (json.RawMessage, error) {
 }
 
 // Fingerprint hashes the durable render inputs (timeline, preset, style, crop, kind, clip).
-func Fingerprint(timelineID, presetID uuid.UUID, styleID, clipID *uuid.UUID, kind, cropMode string) string {
+func Fingerprint(timelineID, presetID uuid.UUID, styleID, clipID *uuid.UUID, kind, cropMode string, burnSubtitles bool) string {
 	h := sha256.New()
 	fmt.Fprintf(h, "%s|%s|%s|%s", timelineID, presetID, kind, cropMode)
 	if styleID != nil {
 		fmt.Fprintf(h, "|style:%s", styleID.String())
+	} else if burnSubtitles {
+		fmt.Fprintf(h, "|burn:default")
 	}
 	if clipID != nil {
 		fmt.Fprintf(h, "|clip:%s", clipID.String())

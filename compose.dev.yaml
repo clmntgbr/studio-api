@@ -238,7 +238,8 @@ services:
     environment:
       <<: *s3-env
       WORK_DIR: ${WORK_DIR:-/tmp/work}
-      FONTS_DIR: ${FONTS_DIR:-/fonts}
+      # Alpine font-dejavu path (drawtext/ass burn-in).
+      FONTS_DIR: ${FONTS_DIR:-/usr/share/fonts/dejavu}
     networks: [backend]
 
   worker-translate:

@@ -19,7 +19,7 @@ COPY . .
 # ============================================
 FROM base AS development
 
-RUN apk add --no-cache ffmpeg curl ca-certificates python3 \
+RUN apk add --no-cache ffmpeg curl ca-certificates python3 fontconfig ttf-dejavu \
     && curl -fsSL -o /usr/local/bin/yt-dlp \
       https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
     && chmod a+rx /usr/local/bin/yt-dlp

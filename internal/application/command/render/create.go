@@ -25,6 +25,7 @@ type CreateCommand struct {
 	PresetID        uuid.UUID
 	Kind            string
 	SubtitleStyleID *uuid.UUID
+	BurnSubtitles   bool // burn transcript captions (default style if SubtitleStyleID nil)
 	ClipID          *uuid.UUID
 }
 
@@ -125,7 +126,8 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		}
 	}
 
-	fp := renderplan.Fingerprint(t.ID, preset.ID, cmd.SubtitleStyleID, cmd.ClipID, string(kind), preset.CropMode)
+	burnSubs := cmd.BurnSubtitles || cmd.SubtitleStyleID != nil
+	fp := renderplan.Fingerprint(t.ID, preset.ID, cmd.SubtitleStyleID, cmd.ClipID, string(kind), preset.CropMode, burnSubs)
 	if existing, err := h.renders.FindByFingerprint(ctx, cmd.ProjectID, fp); err != nil {
 		return nil, err
 	} else if existing != nil {
@@ -206,6 +208,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		markerPlan, err := json.Marshal(map[string]any{
 			"awaitingReframe": true,
 			"mediaId":         firstMediaID.String(),
+			"burnSubtitles":   burnSubs,
 		})
 		if err != nil {
 			return nil, err
@@ -253,6 +256,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		PresetID:        cmd.PresetID,
 		Kind:            kind,
 		SubtitleStyleID: cmd.SubtitleStyleID,
+		BurnSubtitles:   burnSubs,
 		ClipID:          cmd.ClipID,
 	})
 	if err != nil {

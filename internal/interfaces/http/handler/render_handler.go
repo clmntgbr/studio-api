@@ -44,6 +44,7 @@ type createRenderBody struct {
 	PresetID        string  `json:"presetId" validate:"required,uuid"`
 	Kind            string  `json:"kind" validate:"omitempty,oneof=master clip audio custom"`
 	SubtitleStyleID *string `json:"subtitleStyleId" validate:"omitempty,uuid"`
+	BurnSubtitles   *bool   `json:"burnSubtitles"`
 	ClipID          *string `json:"clipId" validate:"omitempty,uuid"`
 }
 
@@ -70,11 +71,13 @@ func (h *RenderHandler) Create(c fiber.Ctx) error {
 		id := uuid.MustParse(*body.ClipID)
 		clipID = &id
 	}
+	burnSubs := body.BurnSubtitles != nil && *body.BurnSubtitles
 	r, err := h.createHandler.Handle(c.Context(), cmdrender.CreateCommand{
 		ProjectID:       projectID,
 		PresetID:        presetID,
 		Kind:            body.Kind,
 		SubtitleStyleID: styleID,
+		BurnSubtitles:   burnSubs,
 		ClipID:          clipID,
 	})
 	if err != nil {

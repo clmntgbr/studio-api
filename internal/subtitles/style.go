@@ -22,9 +22,10 @@ type Style struct {
 }
 
 // DefaultStyle returns a karaoke-friendly white/yellow bottom style.
+// Font family must exist under FONTS_DIR (DejaVu on Alpine worker images).
 func DefaultStyle() Style {
 	return Style{
-		FontFamily:     "Montserrat",
+		FontFamily:     "DejaVu Sans",
 		FontSize:       64,
 		BaseColor:      "#FFFFFF",
 		HighlightColor: "#FFE600",
@@ -45,7 +46,7 @@ func DefaultStyle() Style {
 func (s Style) normalized() Style {
 	out := s
 	if out.FontFamily == "" {
-		out.FontFamily = "Montserrat"
+		out.FontFamily = "DejaVu Sans"
 	}
 	if out.FontSize <= 0 {
 		out.FontSize = 64
