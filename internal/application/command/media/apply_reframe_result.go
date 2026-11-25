@@ -18,12 +18,17 @@ type ApplyReframeResultCommand struct {
 	Detector    string
 }
 
-type ApplyReframeResultHandler struct {
-	media domainmedia.WriteRepository
+type deferredRenderKickoff interface {
+	Handle(ctx context.Context, mediaID uuid.UUID) error
 }
 
-func NewApplyReframeResultHandler(media domainmedia.WriteRepository) *ApplyReframeResultHandler {
-	return &ApplyReframeResultHandler{media: media}
+type ApplyReframeResultHandler struct {
+	media   domainmedia.WriteRepository
+	kickoff deferredRenderKickoff
+}
+
+func NewApplyReframeResultHandler(media domainmedia.WriteRepository, kickoff deferredRenderKickoff) *ApplyReframeResultHandler {
+	return &ApplyReframeResultHandler{media: media, kickoff: kickoff}
 }
 
 func (h *ApplyReframeResultHandler) Handle(ctx context.Context, cmd ApplyReframeResultCommand) error {
@@ -52,10 +57,16 @@ func (h *ApplyReframeResultHandler) Handle(ctx context.Context, cmd ApplyReframe
 		"detector":    cmd.Detector,
 	})
 
-	return h.media.WithTransaction(ctx, func(txCtx context.Context) error {
+	if err := h.media.WithTransaction(ctx, func(txCtx context.Context) error {
 		if err := h.media.SaveAsset(txCtx, domainmedia.NewAsset(m.ID, domainmedia.AssetKindCropPath, cmd.CropPathKey, nil, meta)); err != nil {
 			return err
 		}
 		return CompleteStep(txCtx, h.media, m.ID, domainmedia.StepReframe, now)
-	})
+	}); err != nil {
+		return err
+	}
+	if h.kickoff != nil {
+		return h.kickoff.Handle(ctx, cmd.MediaID)
+	}
+	return nil
 }

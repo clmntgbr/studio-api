@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	mediacmd "go-api/internal/application/command/media"
@@ -237,100 +236,24 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		return r, nil
 	}
 
-	crf, ffmpegPreset, fadeMs := 20, "veryfast", 15
-	hookMs := int64(3000)
-	if len(preset.Settings) > 0 {
-		var settings map[string]any
-		_ = json.Unmarshal(preset.Settings, &settings)
-		if v, ok := settings["crf"].(float64); ok {
-			crf = int(v)
-		}
-		if v, ok := settings["preset"].(string); ok && v != "" {
-			ffmpegPreset = v
-		}
-		if v, ok := settings["fadeMs"].(float64); ok {
-			fadeMs = int(v)
-		}
-		if v, ok := settings["hookMs"].(float64); ok && v > 0 {
-			hookMs = int64(v)
-		}
-	}
-	fps := 30.0
-	if preset.FPS != nil && *preset.FPS > 0 {
-		fps = *preset.FPS
-	}
-	loudness := -14.0
-	if preset.LoudnessLUFS != nil {
-		loudness = *preset.LoudnessLUFS
-	}
-
 	renderID := uuid.New()
-	outputKey := fmt.Sprintf("projects/%s/renders/%s/out.mp4", cmd.ProjectID.String(), renderID.String())
-
-	plan := renderplan.Plan{
-		RenderID: renderID.String(),
-		Kind:     string(kind),
-		Segments: planSegs,
-		Crop:     renderplan.Crop{Mode: preset.CropMode, PathKey: cropPathKey},
-		Output: renderplan.Output{
-			Width:  preset.Width,
-			Height: preset.Height,
-			FPS:    fps,
-			Codec:  preset.VideoCodec,
-			CRF:    crf,
-			Preset: ffmpegPreset,
-		},
-		Audio: renderplan.Audio{
-			Codec:        preset.AudioCodec,
-			LoudnessLUFS: loudness,
-			FadeMs:       fadeMs,
-		},
-		OutputKey: outputKey,
-	}
-
-	if clip != nil && clip.Hook != nil && *clip.Hook != "" {
-		end := hookMs
-		if end <= 0 {
-			end = 3000
-		}
-		plan.Overlays = append(plan.Overlays, renderplan.Overlay{
-			Kind:    "headline",
-			Text:    *clip.Hook,
-			StartMs: 0,
-			EndMs:   end,
-		})
-	}
-
-	if cmd.SubtitleStyleID != nil && kind != domainrender.KindAudio {
-		if h.ass == nil || h.storage == nil {
-			return nil, errors.New("subtitle burn-in is not configured")
-		}
-		q := querytimeline.GetSubtitlesQuery{
-			ProjectID: cmd.ProjectID,
-			StyleID:   cmd.SubtitleStyleID,
-			Format:    "ass",
-			PlayResX:  preset.Width,
-			PlayResY:  preset.Height,
-		}
-		if clip != nil {
-			mid := clip.MediaFileID
-			start, end := clip.SourceStartMs, clip.SourceEndMs
-			q.ClipMediaID = &mid
-			q.ClipStartMs = &start
-			q.ClipEndMs = &end
-		}
-		body, contentType, err := h.ass.Handle(ctx, q)
-		if err != nil {
-			return nil, err
-		}
-		assKey := fmt.Sprintf("projects/%s/renders/%s/subs.ass", cmd.ProjectID.String(), renderID.String())
-		if err := h.storage.PutObject(ctx, h.renderBucket, assKey, []byte(body), contentType); err != nil {
-			return nil, errors.New("failed to upload subtitle track")
-		}
-		plan.Subtitles = &renderplan.Subtitles{ASSKey: assKey, FontsDir: "/fonts"}
-	}
-
-	rawPlan, err := plan.Marshal()
+	rawPlan, err := buildQueuedPlan(ctx, queuedPlanDeps{
+		timelines:    h.timelines,
+		presets:      h.presets,
+		media:        h.media,
+		clips:        h.clips,
+		ass:          h.ass,
+		storage:      h.storage,
+		renderBucket: h.renderBucket,
+	}, queuedPlanRequest{
+		ProjectID:       cmd.ProjectID,
+		RenderID:        renderID,
+		TimelineID:      t.ID,
+		PresetID:        cmd.PresetID,
+		Kind:            kind,
+		SubtitleStyleID: cmd.SubtitleStyleID,
+		ClipID:          cmd.ClipID,
+	})
 	if err != nil {
 		return nil, err
 	}

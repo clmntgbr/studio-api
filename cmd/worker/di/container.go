@@ -161,8 +161,26 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	llmArtifactWriteRepo := write.NewLLMArtifactWriteRepository(db)
 	applyLLM := detectioncmd.NewApplyLLMResultHandler(mediaWriteRepo, detectionWriteRepo, llmArtifactWriteRepo, clipWriteRepo, outboxRepo)
 	applyScenes := detectioncmd.NewApplyScenesResultHandler(mediaWriteRepo, detectionWriteRepo, outboxRepo)
-	applyReframe := mediacmd.NewApplyReframeResultHandler(mediaWriteRepo)
 	renderWriteRepo := write.NewRenderWriteRepository(db)
+	renderReadRepo := read.NewRenderReadRepository(db)
+	outputPresetReadRepo := read.NewOutputPresetReadRepository(db)
+	clipReadRepo := read.NewClipReadRepository(db)
+	kickoffDeferred := rendercmd.NewKickoffDeferredHandler(
+		renderWriteRepo,
+		renderReadRepo,
+		mediaWriteRepo,
+		rendercmd.QueuedPlanDeps(
+			timelineReadRepo,
+			outputPresetReadRepo,
+			mediaWriteRepo,
+			clipReadRepo,
+			nil,
+			nil,
+			"",
+		),
+		jobPublisher,
+	)
+	applyReframe := mediacmd.NewApplyReframeResultHandler(mediaWriteRepo, kickoffDeferred)
 	applyRender := rendercmd.NewApplyResultHandler(renderWriteRepo, realtimePublisher)
 	resultsConsumer := studiojobs.NewResultsConsumer(
 		env.RabbitMQURL, mediaWriteRepo, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence, applyTranscript, applyText, applyLLM, applyScenes, applyReframe, applyRender,
