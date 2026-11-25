@@ -116,16 +116,6 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo, "publish_media_audio_ready_realtime", publishMediaRealtime.OnAudioReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
-		dedupRepo,
-		"enqueue_scenes_on_proxy_ready",
-		eventmedia.NewEnqueueScenesHandler(jobPublisher, mediaWriteRepo).Handle,
-	))
-	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
-		dedupRepo,
-		"enqueue_reframe_on_proxy_ready",
-		eventmedia.NewEnqueueReframeHandler(jobPublisher, mediaWriteRepo).Handle,
-	))
-	reg.Register(domainmedia.EventTypeMediaProxyReady, dedup.With(
 		dedupRepo, "publish_media_proxy_ready_realtime", publishMediaRealtime.OnProxyReady,
 	))
 	reg.Register(domainmedia.EventTypeMediaWaveformReady, dedup.With(
@@ -140,7 +130,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	reg.Register(domainmedia.EventTypeMediaDetectionsUpdated, dedup.With(
 		dedupRepo,
 		"rebuild_timeline_on_detections_updated",
-		eventmedia.NewRebuildTimelineHandler(rebuildTimeline).OnDetectionsUpdated,
+		eventmedia.NewRebuildTimelineHandler(rebuildTimeline, realtimePublisher).OnDetectionsUpdated,
 	))
 	reg.Register(domainmedia.EventTypeMediaTranscribed, dedup.With(
 		dedupRepo, "publish_media_transcribed_realtime", publishMediaRealtime.OnTranscribed,
