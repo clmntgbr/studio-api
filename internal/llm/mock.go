@@ -114,9 +114,24 @@ func (a *MockAnalyzer) buildClips(words []Word) []ClipHit {
 		return nil
 	}
 	mid := len(words) / 3
-	end := min(mid+40, len(words)-1)
-	first, last, ok := ResolveBounds(words, words[mid].SourceStartMs, words[end].SourceEndMs)
+	startMs := words[mid].SourceStartMs
+	endMs := startMs + ViralClipTargetMs
+	lastWordEnd := words[len(words)-1].SourceEndMs
+	if endMs > lastWordEnd {
+		endMs = lastWordEnd
+		if endMs-startMs < ViralClipMinMs && startMs > 0 {
+			startMs = lastWordEnd - ViralClipTargetMs
+			if startMs < words[0].SourceStartMs {
+				startMs = words[0].SourceStartMs
+			}
+		}
+	}
+	first, last, ok := ResolveBounds(words, startMs, endMs)
 	if !ok {
+		return nil
+	}
+	first, last = ExpandClipBounds(words, first, last)
+	if words[last].SourceEndMs-words[first].SourceStartMs < ViralClipMinMs {
 		return nil
 	}
 	score := 0.61
@@ -127,7 +142,7 @@ func (a *MockAnalyzer) buildClips(words []Word) []ClipHit {
 		SourceEndMs:   words[last].SourceEndMs,
 		Score:         score,
 		Hook:          hook,
-		Reason:        "heuristic mid-video highlight",
+		Reason:        "heuristic mid-video highlight (~45s)",
 		Title:         title,
 		Description:   "Auto-generated clip from the mid section of the transcript.",
 		Hashtags:      []string{"#shorts", "#clip", "#highlight"},

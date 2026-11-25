@@ -635,9 +635,10 @@ func (c *ResultsConsumer) onRenderSucceeded(ctx context.Context, msg *envelope.M
 		return err
 	}
 	type renderOut struct {
-		OutputKey  string `json:"outputKey"`
-		DurationMs int64  `json:"durationMs"`
-		SizeBytes  int64  `json:"sizeBytes"`
+		OutputKey   string   `json:"outputKey"`
+		OutputParts []string `json:"outputParts"`
+		DurationMs  int64    `json:"durationMs"`
+		SizeBytes   int64    `json:"sizeBytes"`
 	}
 	out, err := decodeResult[renderOut](msg)
 	if err != nil {
@@ -646,10 +647,11 @@ func (c *ResultsConsumer) onRenderSucceeded(ctx context.Context, msg *envelope.M
 	hCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	return c.applyRender.Handle(hCtx, rendercmd.ApplyResultCommand{
-		RenderID:   renderID,
-		OutputKey:  out.OutputKey,
-		DurationMs: out.DurationMs,
-		SizeBytes:  out.SizeBytes,
+		RenderID:    renderID,
+		OutputKey:   out.OutputKey,
+		OutputParts: out.OutputParts,
+		DurationMs:  out.DurationMs,
+		SizeBytes:   out.SizeBytes,
 	})
 }
 

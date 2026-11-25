@@ -93,7 +93,8 @@ func (h *GetSubtitlesHandler) Handle(ctx context.Context, q GetSubtitlesQuery) (
 		})
 	}
 	if q.ClipMediaID != nil && q.ClipStartMs != nil && q.ClipEndMs != nil {
-		engSegs = eng.ClipWindow(engSegs, *q.ClipMediaID, *q.ClipStartMs, *q.ClipEndMs)
+		// Match clip encode: continuous source window (not silence KEEP cuts).
+		engSegs = eng.ContinuousClip(*q.ClipMediaID, *q.ClipStartMs, *q.ClipEndMs)
 		if len(engSegs) == 0 {
 			return "", "", errors.New("clip has no overlapping timeline segments")
 		}

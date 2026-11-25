@@ -71,6 +71,7 @@ type MediaConfigurationModel struct {
 	SponsorsAction       string       `gorm:"column:sponsors_action"`
 	AdsAction            string       `gorm:"column:ads_action"`
 	Language             *string      `gorm:"column:language"`
+	MasterSplit          string       `gorm:"column:master_split"`
 	Settings             dbtype.JSONB `gorm:"column:settings"`
 	UpdatedAt            time.Time    `gorm:"column:updated_at"`
 }
@@ -296,6 +297,7 @@ type RenderModel struct {
 	Status          string       `gorm:"column:status"`
 	Progress        float64      `gorm:"column:progress"`
 	StorageKey      *string      `gorm:"column:storage_key"`
+	OutputParts     dbtype.JSONB `gorm:"column:output_parts"`
 	DurationMs      *int64       `gorm:"column:duration_ms"`
 	SizeBytes       *int64       `gorm:"column:size_bytes"`
 	ErrorMessage    *string      `gorm:"column:error_message"`

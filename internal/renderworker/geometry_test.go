@@ -39,6 +39,12 @@ func TestHeadlineDrawtext(t *testing.T) {
 	if !strings.Contains(out, "drawtext=") || !strings.Contains(out, `Hello\:world`) || !strings.Contains(out, "fontfile=") {
 		t.Fatalf("out=%s", out)
 	}
+	if !strings.Contains(out, `enable='between(t,0,3)'`) {
+		t.Fatalf("out=%s", out)
+	}
+	if strings.Contains(out, "fontfile='") {
+		t.Fatalf("fontfile must not wrap quotes, got %s", out)
+	}
 }
 
 func TestHeadlineDrawtext_NoFontSkips(t *testing.T) {

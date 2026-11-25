@@ -195,9 +195,10 @@ type MediaConfigurationResponse struct {
 	FillersEnabled       bool     `json:"fillersEnabled"`
 	RepetitionsEnabled   bool     `json:"repetitionsEnabled"`
 	FalseStartsEnabled   bool     `json:"falseStartsEnabled"`
-	SponsorsAction       string   `json:"sponsorsAction"`
-	AdsAction            string   `json:"adsAction"`
-	Language             *string  `json:"language,omitempty"`
+	SponsorsAction       string    `json:"sponsorsAction"`
+	AdsAction            string    `json:"adsAction"`
+	Language             *string   `json:"language,omitempty"`
+	MasterSplit          string    `json:"masterSplit"`
 	UpdatedAt            time.Time `json:"updatedAt"`
 }
 
@@ -218,6 +219,7 @@ func NewMediaConfigurationResponse(cfg *domainmedia.Configuration) MediaConfigur
 		SponsorsAction:       string(cfg.SponsorsAction),
 		AdsAction:            string(cfg.AdsAction),
 		Language:             cfg.Language,
+		MasterSplit:          cfg.MasterSplit,
 		UpdatedAt:            cfg.UpdatedAt,
 	}
 }

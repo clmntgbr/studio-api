@@ -5,6 +5,13 @@ import (
 	"unicode"
 )
 
+// Viral short duration band (source time).
+const (
+	ViralClipMinMs    int64 = 25_000
+	ViralClipTargetMs int64 = 45_000
+	ViralClipMaxMs    int64 = 90_000
+)
+
 // ResolveBounds snaps a [start,end] range onto word indices, preferring sentence ends.
 func ResolveBounds(words []Word, startMs, endMs int64) (first, last int, ok bool) {
 	if len(words) == 0 || endMs <= startMs {
@@ -38,6 +45,37 @@ func ResolveBounds(words []Word, startMs, endMs int64) (first, last int, ok bool
 		return 0, 0, false
 	}
 	return first, last, true
+}
+
+// ExpandClipBounds grows/shrinks word indices toward the viral duration band.
+func ExpandClipBounds(words []Word, first, last int) (int, int) {
+	if len(words) == 0 || first < 0 || last < first || last >= len(words) {
+		return first, last
+	}
+	dur := func() int64 { return words[last].SourceEndMs - words[first].SourceStartMs }
+	for dur() < ViralClipMinMs && (first > 0 || last < len(words)-1) {
+		grew := false
+		if last < len(words)-1 && dur() < ViralClipTargetMs {
+			last++
+			grew = true
+		} else if first > 0 {
+			first--
+			grew = true
+		} else if last < len(words)-1 {
+			last++
+			grew = true
+		}
+		if !grew {
+			break
+		}
+		if dur() >= ViralClipMaxMs {
+			break
+		}
+	}
+	for dur() > ViralClipMaxMs && last > first {
+		last--
+	}
+	return first, last
 }
 
 func isSentenceEnd(text string) bool {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	mediacmd "go-api/internal/application/command/media"
@@ -14,6 +15,7 @@ import (
 	"go-api/internal/domain/port"
 	domainrender "go-api/internal/domain/render"
 	domaintimeline "go-api/internal/domain/timeline"
+	"go-api/internal/mastersplit"
 	"go-api/internal/renderplan"
 	eng "go-api/internal/timeline"
 
@@ -27,6 +29,7 @@ type CreateCommand struct {
 	SubtitleStyleID *uuid.UUID
 	BurnSubtitles   bool // burn transcript captions (default style if SubtitleStyleID nil)
 	ClipID          *uuid.UUID
+	Force           bool // supersede any prior fingerprint (Ship again = full re-encode)
 }
 
 type assBuilder interface {
@@ -127,12 +130,26 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 	}
 
 	burnSubs := cmd.BurnSubtitles || cmd.SubtitleStyleID != nil
-	fp := renderplan.Fingerprint(t.ID, preset.ID, cmd.SubtitleStyleID, cmd.ClipID, string(kind), preset.CropMode, burnSubs)
+	masterSplit := ""
+	if kind == domainrender.KindMaster && len(segments) > 0 {
+		if cfg, err := h.media.GetConfiguration(ctx, segments[0].MediaFileID); err != nil {
+			return nil, err
+		} else if cfg != nil {
+			masterSplit = strings.TrimSpace(cfg.MasterSplit)
+			if _, err := mastersplit.Parse(masterSplit); err != nil {
+				return nil, err
+			}
+		}
+	}
+	fp := renderplan.Fingerprint(t.ID, preset.ID, cmd.SubtitleStyleID, cmd.ClipID, string(kind), preset.CropMode, burnSubs, masterSplit)
 	if existing, err := h.renders.FindByFingerprint(ctx, cmd.ProjectID, fp); err != nil {
 		return nil, err
 	} else if existing != nil {
-		switch existing.Status {
-		case domainrender.StatusQueued, domainrender.StatusRunning, domainrender.StatusCompleted, domainrender.StatusPending:
+		reuse := !cmd.Force && (existing.Status == domainrender.StatusQueued ||
+			existing.Status == domainrender.StatusRunning ||
+			existing.Status == domainrender.StatusCompleted ||
+			existing.Status == domainrender.StatusPending)
+		if reuse {
 			return existing, nil
 		}
 		// fingerprint is varchar(64); keep superseded marker short and unique.
@@ -144,17 +161,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 
 	workSegs := segments
 	if clip != nil {
-		engSegs := make([]eng.Segment, 0, len(segments))
-		for _, s := range segments {
-			engSegs = append(engSegs, eng.Segment{
-				MediaFileID:   s.MediaFileID,
-				SourceStartMs: s.SourceStartMs,
-				SourceEndMs:   s.SourceEndMs,
-				OutputStartMs: s.OutputStartMs,
-				OutputEndMs:   s.OutputEndMs,
-			})
-		}
-		window := eng.ClipWindow(engSegs, clip.MediaFileID, clip.SourceStartMs, clip.SourceEndMs)
+		window := eng.ContinuousClip(clip.MediaFileID, clip.SourceStartMs, clip.SourceEndMs)
 		if len(window) == 0 {
 			return nil, errors.New("clip has no overlapping timeline segments")
 		}
@@ -209,6 +216,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 			"awaitingReframe": true,
 			"mediaId":         firstMediaID.String(),
 			"burnSubtitles":   burnSubs,
+			"masterSplit":     masterSplit,
 		})
 		if err != nil {
 			return nil, err
@@ -258,6 +266,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		SubtitleStyleID: cmd.SubtitleStyleID,
 		BurnSubtitles:   burnSubs,
 		ClipID:          cmd.ClipID,
+		MasterSplit:     masterSplit,
 	})
 	if err != nil {
 		return nil, err

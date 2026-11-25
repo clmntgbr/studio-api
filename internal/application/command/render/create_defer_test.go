@@ -93,8 +93,8 @@ func (f *fakeMediaWrite) SaveAsset(context.Context, *domainmedia.Asset) error { 
 func (f *fakeMediaWrite) SaveConfiguration(context.Context, *domainmedia.Configuration) error {
 	panic("unused")
 }
-func (f *fakeMediaWrite) GetConfiguration(context.Context, uuid.UUID) (*domainmedia.Configuration, error) {
-	panic("unused")
+func (f *fakeMediaWrite) GetConfiguration(_ context.Context, id uuid.UUID) (*domainmedia.Configuration, error) {
+	return &domainmedia.Configuration{MediaFileID: id}, nil
 }
 func (f *fakeMediaWrite) UpdateConfiguration(context.Context, *domainmedia.Configuration) error {
 	panic("unused")

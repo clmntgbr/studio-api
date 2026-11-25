@@ -46,6 +46,7 @@ type createRenderBody struct {
 	SubtitleStyleID *string `json:"subtitleStyleId" validate:"omitempty,uuid"`
 	BurnSubtitles   *bool   `json:"burnSubtitles"`
 	ClipID          *string `json:"clipId" validate:"omitempty,uuid"`
+	Force           *bool   `json:"force"`
 }
 
 func (h *RenderHandler) Create(c fiber.Ctx) error {
@@ -72,6 +73,7 @@ func (h *RenderHandler) Create(c fiber.Ctx) error {
 		clipID = &id
 	}
 	burnSubs := body.BurnSubtitles != nil && *body.BurnSubtitles
+	force := body.Force != nil && *body.Force
 	r, err := h.createHandler.Handle(c.Context(), cmdrender.CreateCommand{
 		ProjectID:       projectID,
 		PresetID:        presetID,
@@ -79,6 +81,7 @@ func (h *RenderHandler) Create(c fiber.Ctx) error {
 		SubtitleStyleID: styleID,
 		BurnSubtitles:   burnSubs,
 		ClipID:          clipID,
+		Force:           force,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "must be validated") {
@@ -155,13 +158,22 @@ func (h *RenderHandler) Download(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid render id"})
 	}
+	part := 0
+	if raw := strings.TrimSpace(c.Query("part")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid part"})
+		}
+		part = n
+	}
 	out, err := h.downloadHandler.Handle(c.Context(), queryrender.DownloadQuery{
 		ID:          id,
+		Part:        part,
 		RangeHeader: c.Get("Range"),
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Render not found"})
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": err.Error()})
 		}
 		if strings.Contains(err.Error(), "not ready") || strings.Contains(err.Error(), "missing") {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})

@@ -36,8 +36,8 @@ type Audio struct {
 }
 
 type Subtitles struct {
-	ASSKey   string `json:"assKey,omitempty"`
-	FontsDir string `json:"fontsDir"`
+	ASSKey   string `json:"assKey,omitempty"` // burn-in when user opts in
+	FontsDir string `json:"fontsDir,omitempty"`
 }
 
 type Overlay struct {
@@ -49,15 +49,16 @@ type Overlay struct {
 
 // Plan is the complete render job payload for worker-render.
 type Plan struct {
-	RenderID  string     `json:"renderId"`
-	Kind      string     `json:"kind"`
-	Segments  []Segment  `json:"segments"`
-	Crop      Crop       `json:"crop"`
-	Output    Output     `json:"output"`
-	Audio     Audio      `json:"audio"`
-	Subtitles *Subtitles `json:"subtitles,omitempty"`
-	Overlays  []Overlay  `json:"overlays,omitempty"`
-	OutputKey string     `json:"outputKey"`
+	RenderID    string     `json:"renderId"`
+	Kind        string     `json:"kind"`
+	Segments    []Segment  `json:"segments"`
+	Crop        Crop       `json:"crop"`
+	Output      Output     `json:"output"`
+	Audio       Audio      `json:"audio"`
+	Subtitles   *Subtitles `json:"subtitles,omitempty"`
+	Overlays    []Overlay  `json:"overlays,omitempty"`
+	OutputKey   string     `json:"outputKey"`
+	MasterSplit string     `json:"masterSplit,omitempty"` // parts:N | durationMs:N
 }
 
 func (p Plan) Marshal() (json.RawMessage, error) {
@@ -65,7 +66,7 @@ func (p Plan) Marshal() (json.RawMessage, error) {
 }
 
 // Fingerprint hashes the durable render inputs (timeline, preset, style, crop, kind, clip).
-func Fingerprint(timelineID, presetID uuid.UUID, styleID, clipID *uuid.UUID, kind, cropMode string, burnSubtitles bool) string {
+func Fingerprint(timelineID, presetID uuid.UUID, styleID, clipID *uuid.UUID, kind, cropMode string, burnSubtitles bool, masterSplit string) string {
 	h := sha256.New()
 	fmt.Fprintf(h, "%s|%s|%s|%s", timelineID, presetID, kind, cropMode)
 	if styleID != nil {
@@ -75,6 +76,9 @@ func Fingerprint(timelineID, presetID uuid.UUID, styleID, clipID *uuid.UUID, kin
 	}
 	if clipID != nil {
 		fmt.Fprintf(h, "|clip:%s", clipID.String())
+	}
+	if masterSplit != "" {
+		fmt.Fprintf(h, "|split:%s", masterSplit)
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

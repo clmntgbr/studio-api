@@ -49,6 +49,7 @@ type Render struct {
 	Status          Status
 	Progress        float64
 	StorageKey      *string
+	OutputParts     []string // extra keys after masterSplit (part-01…)
 	DurationMs      *int64
 	SizeBytes       *int64
 	ErrorMessage    *string

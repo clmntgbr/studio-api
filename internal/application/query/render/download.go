@@ -13,6 +13,7 @@ import (
 
 type DownloadQuery struct {
 	ID          uuid.UUID
+	Part        int // 0 = full master; 1..N = outputParts[part-1]
 	RangeHeader string
 }
 
@@ -50,10 +51,21 @@ func (h *DownloadHandler) Handle(ctx context.Context, q DownloadQuery) (*Downloa
 	if r.Status != domainrender.StatusCompleted {
 		return nil, errors.New("render is not ready")
 	}
-	if r.StorageKey == nil || *r.StorageKey == "" {
+	key := ""
+	filename := fmt.Sprintf("render-%s.mp4", r.ID.String())
+	if q.Part > 0 {
+		if q.Part > len(r.OutputParts) {
+			return nil, errors.New("render part not found")
+		}
+		key = r.OutputParts[q.Part-1]
+		filename = fmt.Sprintf("render-%s-part-%02d.mp4", r.ID.String(), q.Part)
+	} else if r.StorageKey != nil {
+		key = *r.StorageKey
+	}
+	if key == "" {
 		return nil, errors.New("render output missing")
 	}
-	stream, err := h.storage.GetObjectStream(ctx, h.renderBucket, *r.StorageKey, q.RangeHeader)
+	stream, err := h.storage.GetObjectStream(ctx, h.renderBucket, key, q.RangeHeader)
 	if err != nil {
 		return nil, errors.New("failed to open render object")
 	}
@@ -62,6 +74,6 @@ func (h *DownloadHandler) Handle(ctx context.Context, q DownloadQuery) (*Downloa
 	}
 	return &DownloadResult{
 		Stream:   stream,
-		Filename: fmt.Sprintf("render-%s.mp4", r.ID.String()),
+		Filename: filename,
 	}, nil
 }

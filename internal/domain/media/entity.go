@@ -339,6 +339,7 @@ type Configuration struct {
 	SponsorsAction       DecisionAction
 	AdsAction            DecisionAction
 	Language             *string
+	MasterSplit          string // "" | parts:N | durationMs:N — one value for master TikTok splits
 	Settings             json.RawMessage
 	UpdatedAt            time.Time
 }
@@ -358,6 +359,7 @@ func DefaultConfiguration(mediaFileID uuid.UUID) *Configuration {
 		FalseStartsEnabled:   false,
 		SponsorsAction:       DecisionSuggest,
 		AdsAction:            DecisionSuggest,
+		MasterSplit:          "",
 		Settings:             json.RawMessage(`{}`),
 		UpdatedAt:            time.Now().UTC(),
 	}

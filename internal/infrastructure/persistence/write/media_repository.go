@@ -259,6 +259,7 @@ func mediaConfigurationModelFromDomain(c *domainmedia.Configuration) *MediaConfi
 		SponsorsAction:       string(c.SponsorsAction),
 		AdsAction:            string(c.AdsAction),
 		Language:             c.Language,
+		MasterSplit:          c.MasterSplit,
 		Settings:             dbtype.JSONB(settings),
 		UpdatedAt:            c.UpdatedAt,
 	}
@@ -285,6 +286,7 @@ func mediaConfigurationDomainFromModel(c *MediaConfigurationModel) *domainmedia.
 		SponsorsAction:       domainmedia.DecisionAction(c.SponsorsAction),
 		AdsAction:            domainmedia.DecisionAction(c.AdsAction),
 		Language:             c.Language,
+		MasterSplit:          c.MasterSplit,
 		Settings:             settings,
 		UpdatedAt:            c.UpdatedAt,
 	}

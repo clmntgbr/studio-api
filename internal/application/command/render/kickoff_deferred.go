@@ -70,8 +70,10 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 		}
 
 		burnSubs := r.SubtitleStyleID != nil
+		masterSplit := ""
 		if marker, ok := deferredMarker(r.Plan); ok {
 			burnSubs = burnSubs || marker.BurnSubtitles
+			masterSplit = marker.MasterSplit
 		}
 		rawPlan, err := buildQueuedPlan(ctx, h.planDeps, queuedPlanRequest{
 			ProjectID:       r.ProjectID,
@@ -82,6 +84,7 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 			SubtitleStyleID: r.SubtitleStyleID,
 			BurnSubtitles:   burnSubs,
 			ClipID:          r.ClipID,
+			MasterSplit:     masterSplit,
 		})
 		if err != nil {
 			msg := err.Error()
@@ -114,6 +117,7 @@ type deferredMarkerDoc struct {
 	AwaitingReframe bool   `json:"awaitingReframe"`
 	MediaID         string `json:"mediaId"`
 	BurnSubtitles   bool   `json:"burnSubtitles"`
+	MasterSplit     string `json:"masterSplit"`
 }
 
 func deferredMarker(plan json.RawMessage) (deferredMarkerDoc, bool) {

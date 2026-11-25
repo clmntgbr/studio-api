@@ -60,6 +60,7 @@ type queuedPlanRequest struct {
 	SubtitleStyleID *uuid.UUID
 	BurnSubtitles   bool
 	ClipID          *uuid.UUID
+	MasterSplit     string // parts:N | durationMs:N (master only)
 }
 
 func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanRequest) (json.RawMessage, error) {
@@ -95,17 +96,7 @@ func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanReques
 
 	workSegs := segments
 	if clip != nil {
-		engSegs := make([]eng.Segment, 0, len(segments))
-		for _, s := range segments {
-			engSegs = append(engSegs, eng.Segment{
-				MediaFileID:   s.MediaFileID,
-				SourceStartMs: s.SourceStartMs,
-				SourceEndMs:   s.SourceEndMs,
-				OutputStartMs: s.OutputStartMs,
-				OutputEndMs:   s.OutputEndMs,
-			})
-		}
-		window := eng.ClipWindow(engSegs, clip.MediaFileID, clip.SourceStartMs, clip.SourceEndMs)
+		window := eng.ContinuousClip(clip.MediaFileID, clip.SourceStartMs, clip.SourceEndMs)
 		if len(window) == 0 {
 			return nil, errors.New("clip has no overlapping timeline segments")
 		}
@@ -191,7 +182,8 @@ func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanReques
 			LoudnessLUFS: loudness,
 			FadeMs:       fadeMs,
 		},
-		OutputKey: outputKey,
+		OutputKey:   outputKey,
+		MasterSplit: req.MasterSplit,
 	}
 
 	if clip != nil && clip.Hook != nil && *clip.Hook != "" {

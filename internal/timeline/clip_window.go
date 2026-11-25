@@ -2,6 +2,22 @@ package timeline
 
 import "github.com/google/uuid"
 
+// ContinuousClip is a single unbroken source window for viral clip encodes.
+// Unlike ClipWindow it does not apply silence KEEP cuts (shorts keep natural pacing).
+func ContinuousClip(mediaID uuid.UUID, clipStartMs, clipEndMs int64) []Segment {
+	if clipEndMs <= clipStartMs {
+		return nil
+	}
+	dur := clipEndMs - clipStartMs
+	return []Segment{{
+		MediaFileID:   mediaID,
+		SourceStartMs: clipStartMs,
+		SourceEndMs:   clipEndMs,
+		OutputStartMs: 0,
+		OutputEndMs:   dur,
+	}}
+}
+
 // ClipWindow intersects KEEP timeline segments with a SourceTime clip range on one media.
 // Returned segments are re-based so OutputStartMs starts at 0 for the clip render.
 func ClipWindow(segs []Segment, mediaID uuid.UUID, clipStartMs, clipEndMs int64) []Segment {

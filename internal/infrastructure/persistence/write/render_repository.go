@@ -65,6 +65,10 @@ func renderModelFromDomain(r *domainrender.Render) *RenderModel {
 	if len(plan) == 0 {
 		plan = json.RawMessage(`{}`)
 	}
+	parts, _ := json.Marshal(r.OutputParts)
+	if len(parts) == 0 || string(parts) == "null" {
+		parts = []byte("[]")
+	}
 	return &RenderModel{
 		ID:              r.ID,
 		ProjectID:       r.ProjectID,
@@ -79,6 +83,7 @@ func renderModelFromDomain(r *domainrender.Render) *RenderModel {
 		Status:          string(r.Status),
 		Progress:        r.Progress,
 		StorageKey:      r.StorageKey,
+		OutputParts:     dbtype.JSONB(parts),
 		DurationMs:      r.DurationMs,
 		SizeBytes:       r.SizeBytes,
 		ErrorMessage:    r.ErrorMessage,
@@ -92,6 +97,10 @@ func renderDomainFromModel(m *RenderModel) *domainrender.Render {
 	plan := json.RawMessage(m.Plan)
 	if len(plan) == 0 {
 		plan = json.RawMessage(`{}`)
+	}
+	var parts []string
+	if len(m.OutputParts) > 0 && string(m.OutputParts) != "null" {
+		_ = json.Unmarshal(m.OutputParts, &parts)
 	}
 	return &domainrender.Render{
 		ID:              m.ID,
@@ -107,6 +116,7 @@ func renderDomainFromModel(m *RenderModel) *domainrender.Render {
 		Status:          domainrender.Status(m.Status),
 		Progress:        m.Progress,
 		StorageKey:      m.StorageKey,
+		OutputParts:     parts,
 		DurationMs:      m.DurationMs,
 		SizeBytes:       m.SizeBytes,
 		ErrorMessage:    m.ErrorMessage,

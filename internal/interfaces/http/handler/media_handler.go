@@ -284,6 +284,7 @@ type updateConfigurationBody struct {
 	SponsorsAction       *string  `json:"sponsorsAction" validate:"omitempty,oneof=remove suggest keep"`
 	AdsAction            *string  `json:"adsAction" validate:"omitempty,oneof=remove suggest keep"`
 	Language             *string  `json:"language" validate:"omitempty,max=10"`
+	MasterSplit          *string  `json:"masterSplit" validate:"omitempty,max=64"`
 }
 
 type reanalyzeBody struct {
@@ -351,12 +352,13 @@ func (h *MediaHandler) UpdateConfiguration(c fiber.Ctx) error {
 		SponsorsAction:       body.SponsorsAction,
 		AdsAction:            body.AdsAction,
 		Language:             body.Language,
+		MasterSplit:          body.MasterSplit,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Media not found"})
 		}
-		if strings.Contains(err.Error(), "must be") {
+		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "masterSplit") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to update configuration"})

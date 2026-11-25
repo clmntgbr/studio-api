@@ -17,6 +17,27 @@ func TestResolveBounds_SnapsToWords(t *testing.T) {
 	}
 }
 
+func TestExpandClipBounds_ReachesMinDuration(t *testing.T) {
+	words := make([]Word, 0, 100)
+	for i := 0; i < 100; i++ {
+		start := int64(i * 1000)
+		words = append(words, Word{Text: "w", SourceStartMs: start, SourceEndMs: start + 900})
+	}
+	// 5s window → expand toward ~25s+
+	first, last, ok := ResolveBounds(words, 10_000, 15_000)
+	if !ok {
+		t.Fatal("resolve")
+	}
+	first, last = ExpandClipBounds(words, first, last)
+	dur := words[last].SourceEndMs - words[first].SourceStartMs
+	if dur < ViralClipMinMs {
+		t.Fatalf("dur=%d want >= %d (first=%d last=%d)", dur, ViralClipMinMs, first, last)
+	}
+	if dur > ViralClipMaxMs {
+		t.Fatalf("dur=%d want <= %d", dur, ViralClipMaxMs)
+	}
+}
+
 func TestMockAnalyzer_SponsorKeyword(t *testing.T) {
 	words := []Word{
 		{Text: "Merci", SourceStartMs: 0, SourceEndMs: 100},

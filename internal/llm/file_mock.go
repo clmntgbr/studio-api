@@ -73,7 +73,30 @@ func (a *FileMockAnalyzer) Analyze(ctx context.Context, words []Word, tasks []st
 		out.Chapters = append(out.Chapters, a.result.Chapters...)
 	}
 	if want["viral"] {
-		out.Clips = append(out.Clips, a.result.Clips...)
+		if len(words) == 0 {
+			out.Clips = append(out.Clips, a.result.Clips...)
+		} else {
+			// Snap + expand fixture windows onto the live transcript (25–90s band).
+			for _, cl := range a.result.Clips {
+				first, last, ok := ResolveBounds(words, cl.SourceStartMs, cl.SourceEndMs)
+				if !ok {
+					continue
+				}
+				first, last = ExpandClipBounds(words, first, last)
+				if words[last].SourceEndMs-words[first].SourceStartMs < ViralClipMinMs {
+					continue
+				}
+				cl.SourceStartMs = words[first].SourceStartMs
+				cl.SourceEndMs = words[last].SourceEndMs
+				out.Clips = append(out.Clips, cl)
+			}
+			if len(out.Clips) == 0 && a.Fallback != nil {
+				fb, err := a.Fallback.Analyze(ctx, words, []string{"viral"}, language)
+				if err == nil && fb != nil {
+					out.Clips = fb.Clips
+				}
+			}
+		}
 	}
 	return out, nil
 }

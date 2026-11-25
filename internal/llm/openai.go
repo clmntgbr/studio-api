@@ -110,7 +110,7 @@ func (a *OpenAICompatibleAnalyzer) Analyze(ctx context.Context, words []Word, ta
 	body, _ := json.Marshal(chatRequest{
 		Model: a.Model,
 		Messages: []chatMessage{
-			{Role: "system", Content: "You analyze timed transcripts. Reply with JSON only matching the schema."},
+			{Role: "system", Content: "You analyze timed transcripts. Reply with JSON only matching the schema. Viral clips must be self-contained Shorts/Reels (about 30–75 seconds)."},
 			{Role: "user", Content: prompt},
 		},
 		Temperature:    0.2,
@@ -185,6 +185,11 @@ func (a *OpenAICompatibleAnalyzer) Analyze(ctx context.Context, words []Word, ta
 		for _, c := range payload.Clips {
 			first, last, ok := ResolveBounds(words, c.StartMs, c.EndMs)
 			if !ok {
+				continue
+			}
+			first, last = ExpandClipBounds(words, first, last)
+			dur := words[last].SourceEndMs - words[first].SourceStartMs
+			if dur < ViralClipMinMs {
 				continue
 			}
 			score := c.Score
@@ -281,7 +286,15 @@ func buildPrompt(words []Word, want map[string]bool, language string) string {
 		tasks = append(tasks, "viral clips")
 	}
 	b.WriteString(strings.Join(tasks, ", "))
-	b.WriteString("\nReturn JSON: {\"sponsors\":[{\"startMs\":0,\"endMs\":0,\"confidence\":0.8,\"reason\":\"\"}],\"chapters\":[{\"title\":\"\",\"startMs\":0,\"endMs\":0}],\"clips\":[{\"startMs\":0,\"endMs\":0,\"score\":0.7,\"hook\":\"\",\"reason\":\"\",\"title\":\"\",\"description\":\"\",\"hashtags\":[\"#tag\"]}]}\nFor viral clips also fill title, description and 3-8 hashtags.\nOmit unused arrays as [].\n\n")
+	b.WriteString("\nReturn JSON: {\"sponsors\":[{\"startMs\":0,\"endMs\":0,\"confidence\":0.8,\"reason\":\"\"}],\"chapters\":[{\"title\":\"\",\"startMs\":0,\"endMs\":0}],\"clips\":[{\"startMs\":0,\"endMs\":0,\"score\":0.7,\"hook\":\"\",\"reason\":\"\",\"title\":\"\",\"description\":\"\",\"hashtags\":[\"#tag\"]}]}\n")
+	if want["viral"] {
+		b.WriteString("Viral clips rules:\n")
+		b.WriteString("- Each clip MUST last 30000–75000 ms (prefer ~45000 ms). Hard min 25000, hard max 90000.\n")
+		b.WriteString("- Self-contained arc: strong hook in the first 3s, context, clear payoff/punchline.\n")
+		b.WriteString("- Propose 3–8 clips spanning the whole video; skip micro-reactions under 25s.\n")
+		b.WriteString("- Also fill title, description and 3-8 hashtags.\n")
+	}
+	b.WriteString("Omit unused arrays as [].\n\n")
 	writePackedTranscript(&b, words, 18, 12_000)
 	return b.String()
 }

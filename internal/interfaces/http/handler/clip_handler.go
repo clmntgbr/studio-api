@@ -69,6 +69,7 @@ type renderClipBody struct {
 	PresetID        string  `json:"presetId" validate:"omitempty,uuid"`
 	SubtitleStyleID *string `json:"subtitleStyleId" validate:"omitempty,uuid"`
 	BurnSubtitles   *bool   `json:"burnSubtitles"`
+	Force           *bool   `json:"force"`
 }
 
 // Default vertical preset seed id (migrations/00005_output_presets_seed.sql).
@@ -227,6 +228,7 @@ func (h *ClipHandler) Render(c fiber.Ctx) error {
 		styleID = &id
 	}
 	burnSubs := body.BurnSubtitles != nil && *body.BurnSubtitles
+	force := body.Force != nil && *body.Force
 	clip, err := h.getHandler.Handle(c.Context(), queryclip.GetQuery{ID: clipID})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
@@ -241,6 +243,7 @@ func (h *ClipHandler) Render(c fiber.Ctx) error {
 		SubtitleStyleID: styleID,
 		BurnSubtitles:   burnSubs,
 		ClipID:          &clipID,
+		Force:           force,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "must be validated") {

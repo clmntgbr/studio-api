@@ -13,10 +13,11 @@ import (
 )
 
 type ApplyResultCommand struct {
-	RenderID   uuid.UUID
-	OutputKey  string
-	DurationMs int64
-	SizeBytes  int64
+	RenderID    uuid.UUID
+	OutputKey   string
+	OutputParts []string
+	DurationMs  int64
+	SizeBytes   int64
 }
 
 type ApplyResultHandler struct {
@@ -82,6 +83,7 @@ func (h *ApplyResultHandler) Handle(ctx context.Context, cmd ApplyResultCommand)
 	r.Progress = 100
 	key := cmd.OutputKey
 	r.StorageKey = &key
+	r.OutputParts = append([]string(nil), cmd.OutputParts...)
 	if cmd.DurationMs > 0 {
 		d := cmd.DurationMs
 		r.DurationMs = &d

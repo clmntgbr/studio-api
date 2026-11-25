@@ -35,6 +35,7 @@ type renderScan struct {
 	Status          string       `gorm:"column:status"`
 	Progress        float64      `gorm:"column:progress"`
 	StorageKey      *string      `gorm:"column:storage_key"`
+	OutputParts     dbtype.JSONB `gorm:"column:output_parts"`
 	DurationMs      *int64       `gorm:"column:duration_ms"`
 	SizeBytes       *int64       `gorm:"column:size_bytes"`
 	ErrorMessage    *string      `gorm:"column:error_message"`
@@ -92,6 +93,10 @@ func renderFromScan(row renderScan) domainrender.Render {
 	if len(plan) == 0 {
 		plan = json.RawMessage(`{}`)
 	}
+	var parts []string
+	if len(row.OutputParts) > 0 && string(row.OutputParts) != "null" {
+		_ = json.Unmarshal(row.OutputParts, &parts)
+	}
 	return domainrender.Render{
 		ID:              row.ID,
 		ProjectID:       row.ProjectID,
@@ -106,6 +111,7 @@ func renderFromScan(row renderScan) domainrender.Render {
 		Status:          domainrender.Status(row.Status),
 		Progress:        row.Progress,
 		StorageKey:      row.StorageKey,
+		OutputParts:     parts,
 		DurationMs:      row.DurationMs,
 		SizeBytes:       row.SizeBytes,
 		ErrorMessage:    row.ErrorMessage,

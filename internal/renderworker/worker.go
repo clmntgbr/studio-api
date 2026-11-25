@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	s3store "go-api/internal/infrastructure/storage/s3"
+	"go-api/internal/mastersplit"
 	"go-api/internal/renderplan"
 	"go-api/internal/studio/envelope"
 	"go-api/internal/studio/topology"
@@ -136,7 +137,7 @@ func handle(ctx context.Context, cfg Config, store *s3store.Client, bus *topolog
 	assPath := ""
 	fontsDir := cfg.FontsDir
 	if plan.Subtitles != nil && plan.Subtitles.ASSKey != "" {
-		_ = publishProgress(ctx, bus, msg, 25, "subtitles", "Downloading subtitle track")
+		_ = publishProgress(ctx, bus, msg, 25, "subtitles", "Downloading burn-in track")
 		assPath = filepath.Join(workDir, "subs.ass")
 		if err := store.DownloadFile(ctx, cfg.RenderBucket, plan.Subtitles.ASSKey, assPath); err != nil {
 			if err2 := store.DownloadFile(ctx, cfg.MediaBucket, plan.Subtitles.ASSKey, assPath); err2 != nil {
@@ -179,12 +180,27 @@ func handle(ctx context.Context, cfg Config, store *s3store.Client, bus *topolog
 	if err := store.UploadFile(ctx, cfg.RenderBucket, key, outLocal, "video/mp4"); err != nil {
 		return finish(ctx, bus, d, msg, false, nil, "upload", err.Error(), true)
 	}
+
+	var partKeys []string
+	if plan.Kind == "master" && strings.TrimSpace(plan.MasterSplit) != "" {
+		_ = publishProgress(ctx, bus, msg, 93, "split", "Splitting master for multi-upload")
+		keys, err := splitAndUploadMaster(ctx, store, cfg.RenderBucket, workDir, outLocal, plan)
+		if err != nil {
+			return finish(ctx, bus, d, msg, false, nil, "master_split", err.Error(), true)
+		}
+		partKeys = keys
+	}
+
 	_ = publishProgress(ctx, bus, msg, 100, "done", "Render completed")
-	return finish(ctx, bus, d, msg, true, map[string]any{
+	payload := map[string]any{
 		"outputKey":  key,
 		"durationMs": estimateDurationMs(plan),
 		"sizeBytes":  info.Size(),
-	}, "", "", false)
+	}
+	if len(partKeys) > 0 {
+		payload["outputParts"] = partKeys
+	}
+	return finish(ctx, bus, d, msg, true, payload, "", "", false)
 }
 
 // maxFilterSegments caps filter_complex size to avoid ffmpeg OOM on dense cut lists.
@@ -343,7 +359,8 @@ func runFFmpegConcat(
 			vout = "[vburn]"
 		}
 		if overlay := headlineDrawtext(plan, fontsDir); overlay != "" {
-			fmt.Fprintf(&filter, ";%s%s[vhead]", vout, overlay)
+			// Chain setsar after drawtext so enable=… cannot swallow the [vhead] pad.
+			fmt.Fprintf(&filter, ";%s%s,setsar=1[vhead]", vout, overlay)
 			vout = "[vhead]"
 		}
 	}
@@ -417,6 +434,75 @@ func runFFmpegPost(ctx context.Context, workDir, inPath string, plan renderplan.
 		return fmt.Errorf("ffmpeg post: %w: %s", err, string(out))
 	}
 	return nil
+}
+
+func splitAndUploadMaster(
+	ctx context.Context,
+	store *s3store.Client,
+	bucket, workDir, videoPath string,
+	plan renderplan.Plan,
+) ([]string, error) {
+	spec, err := mastersplit.Parse(plan.MasterSplit)
+	if err != nil {
+		return nil, err
+	}
+	if spec.IsZero() {
+		return nil, nil
+	}
+	totalMs := probeDurationMs(ctx, workDir, videoPath)
+	if totalMs <= 0 {
+		totalMs = estimateDurationMs(plan)
+	}
+	windows := spec.PartWindows(totalMs)
+	if len(windows) == 0 {
+		return nil, nil
+	}
+	base := strings.TrimSuffix(plan.OutputKey, filepath.Ext(plan.OutputKey))
+	if base == "" {
+		base = plan.OutputKey
+	}
+	keys := make([]string, 0, len(windows))
+	for i, w := range windows {
+		startSec := float64(w[0]) / 1000.0
+		durSec := float64(w[1]-w[0]) / 1000.0
+		local := filepath.Join(workDir, fmt.Sprintf("part-%02d.mp4", i+1))
+		cmd := exec.CommandContext(ctx, "ffmpeg",
+			"-y", "-hide_banner", "-loglevel", "error",
+			"-ss", fmt.Sprintf("%g", startSec),
+			"-i", videoPath,
+			"-t", fmt.Sprintf("%g", durSec),
+			"-c", "copy", "-avoid_negative_ts", "make_zero",
+			"-movflags", "+faststart",
+			local,
+		)
+		cmd.Dir = workDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return nil, fmt.Errorf("ffmpeg split part %d: %w: %s", i+1, err, string(out))
+		}
+		key := fmt.Sprintf("%s-part-%02d.mp4", base, i+1)
+		if err := store.UploadFile(ctx, bucket, key, local, "video/mp4"); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
+}
+
+func probeDurationMs(ctx context.Context, workDir, path string) int64 {
+	cmd := exec.CommandContext(ctx, "ffprobe",
+		"-v", "error", "-show_entries", "format=duration",
+		"-of", "default=noprint_wrappers=1:nokey=1", path,
+	)
+	cmd.Dir = workDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0
+	}
+	sec, err := strconv.ParseFloat(strings.TrimSpace(string(out)), 64)
+	if err != nil || sec <= 0 {
+		return 0
+	}
+	return int64(sec * 1000)
 }
 
 func encodeArgs(plan renderplan.Plan) []string {
@@ -508,12 +594,26 @@ func headlineDrawtext(plan renderplan.Plan, fontsDir string) string {
 		// Without fontfile, ffmpeg falls back to family "Sans" and fails in Alpine.
 		return ""
 	}
-	fontOpt := fmt.Sprintf(":fontfile=%s", escapeFilterPath(fontFile))
+	fontOpt := fmt.Sprintf(":fontfile=%s", escapeDrawtextFontPath(fontFile))
 	// Top-centered hook banner for vertical clips.
+	// enable uses quoted between() with literal commas; the caller must chain another
+	// filter (e.g. ,setsar=1[vhead]) so the output pad is never part of enable=.
 	return fmt.Sprintf(
-		"drawtext=text='%s':fontsize=%d:fontcolor=white:borderw=3:bordercolor=black@0.7%s:x=(w-text_w)/2:y=h*0.08:enable='between(t\\,%g\\,%g)'",
+		"drawtext=text='%s':fontsize=%d:fontcolor=white:borderw=3:bordercolor=black@0.7%s:x=(w-text_w)/2:y=h*0.08:enable='between(t,%g,%g)'",
 		escaped, fs, fontOpt, start, end,
 	)
+}
+
+// escapeDrawtextFontPath escapes a TTF path for drawtext fontfile= (no wrapping quotes).
+func escapeDrawtextFontPath(p string) string {
+	p = filepath.ToSlash(p)
+	p = strings.ReplaceAll(p, `\`, `\\`)
+	p = strings.ReplaceAll(p, `:`, `\:`)
+	p = strings.ReplaceAll(p, `'`, `\'`)
+	p = strings.ReplaceAll(p, `[`, `\[`)
+	p = strings.ReplaceAll(p, `]`, `\]`)
+	p = strings.ReplaceAll(p, `,`, `\,`)
+	return p
 }
 
 func resolveDrawtextFont(fontsDir string) string {

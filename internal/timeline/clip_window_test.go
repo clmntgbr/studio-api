@@ -6,6 +6,20 @@ import (
 	"github.com/google/uuid"
 )
 
+func TestContinuousClip(t *testing.T) {
+	media := uuid.New()
+	got := ContinuousClip(media, 3000, 48000)
+	if len(got) != 1 {
+		t.Fatalf("len=%d", len(got))
+	}
+	if got[0].SourceStartMs != 3000 || got[0].SourceEndMs != 48000 || got[0].OutputStartMs != 0 || got[0].OutputEndMs != 45000 {
+		t.Fatalf("%+v", got[0])
+	}
+	if ContinuousClip(media, 5, 5) != nil {
+		t.Fatal("expected nil for empty range")
+	}
+}
+
 func TestClipWindow_IntersectsAndRebases(t *testing.T) {
 	media := uuid.New()
 	other := uuid.New()

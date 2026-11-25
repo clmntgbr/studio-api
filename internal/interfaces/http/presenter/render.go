@@ -59,6 +59,7 @@ type RenderResponse struct {
 	Status          string          `json:"status"`
 	Progress        float64         `json:"progress"`
 	StorageKey      *string         `json:"storageKey,omitempty"`
+	OutputParts     []string        `json:"outputParts,omitempty"`
 	DurationMs      *int64          `json:"durationMs,omitempty"`
 	SizeBytes       *int64          `json:"sizeBytes,omitempty"`
 	ErrorMessage    *string         `json:"errorMessage,omitempty"`
@@ -96,6 +97,7 @@ func NewRenderResponse(r *domainrender.Render) RenderResponse {
 		Status:          string(r.Status),
 		Progress:        r.Progress,
 		StorageKey:      r.StorageKey,
+		OutputParts:     r.OutputParts,
 		DurationMs:      r.DurationMs,
 		SizeBytes:       r.SizeBytes,
 		ErrorMessage:    r.ErrorMessage,

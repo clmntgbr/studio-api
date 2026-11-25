@@ -41,7 +41,7 @@
   "clips": [
     {
       "sourceStartMs": 173040,
-      "sourceEndMs": 184051,
+      "sourceEndMs": 218040,
       "score": 0.9,
       "hook": "J'ai appelé le majordome... et il a répondu.",
       "reason": "Moment de surprise et d'humour où le vloggeur découvre le service de majordome personnel, avec une réaction authentique et une interaction en direct.",
@@ -58,7 +58,7 @@
     },
     {
       "sourceStartMs": 184051,
-      "sourceEndMs": 197159,
+      "sourceEndMs": 229051,
       "score": 0.85,
       "hook": "Une baignoire dans un train ?!",
       "reason": "Visuel surprenant et fort pour les réseaux sociaux. La découverte de la salle de bain luxueuse est un point de curiosité majeur.",
@@ -75,7 +75,7 @@
     },
     {
       "sourceStartMs": 424027,
-      "sourceEndMs": 439528,
+      "sourceEndMs": 469027,
       "score": 0.8,
       "hook": "Je me fais peindre... tout nu ? (Non, presque)",
       "reason": "Situation absurde et drôle où le vloggeur se fait photographier/peindre dans le wagon panoramique, créant un moment viral par l'humour.",

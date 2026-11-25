@@ -3,9 +3,11 @@ package media
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	domainmedia "go-api/internal/domain/media"
+	"go-api/internal/mastersplit"
 
 	"github.com/google/uuid"
 )
@@ -26,6 +28,7 @@ type UpdateConfigurationCommand struct {
 	SponsorsAction       *string
 	AdsAction            *string
 	Language             *string
+	MasterSplit          *string // "" | parts:N | durationMs:N
 }
 
 type UpdateConfigurationHandler struct {
@@ -106,6 +109,13 @@ func (h *UpdateConfigurationHandler) Handle(ctx context.Context, cmd UpdateConfi
 	}
 	if cmd.Language != nil {
 		cfg.Language = cmd.Language
+	}
+	if cmd.MasterSplit != nil {
+		raw := strings.TrimSpace(*cmd.MasterSplit)
+		if _, err := mastersplit.Parse(raw); err != nil {
+			return nil, err
+		}
+		cfg.MasterSplit = raw
 	}
 	cfg.UpdatedAt = time.Now().UTC()
 
