@@ -47,24 +47,25 @@ func (h *ApplyReframeResultHandler) Handle(ctx context.Context, cmd ApplyReframe
 	if err != nil {
 		return err
 	}
-	if step != nil && step.Status == domainmedia.StepStatusCompleted {
-		return nil
-	}
+	alreadyDone := step != nil && step.Status == domainmedia.StepStatusCompleted
+	if !alreadyDone {
+		now := time.Now().UTC()
+		meta, _ := json.Marshal(map[string]any{
+			"sampleCount": cmd.SampleCount,
+			"detector":    cmd.Detector,
+		})
 
-	now := time.Now().UTC()
-	meta, _ := json.Marshal(map[string]any{
-		"sampleCount": cmd.SampleCount,
-		"detector":    cmd.Detector,
-	})
-
-	if err := h.media.WithTransaction(ctx, func(txCtx context.Context) error {
-		if err := h.media.SaveAsset(txCtx, domainmedia.NewAsset(m.ID, domainmedia.AssetKindCropPath, cmd.CropPathKey, nil, meta)); err != nil {
+		if err := h.media.WithTransaction(ctx, func(txCtx context.Context) error {
+			if err := h.media.SaveAsset(txCtx, domainmedia.NewAsset(m.ID, domainmedia.AssetKindCropPath, cmd.CropPathKey, nil, meta)); err != nil {
+				return err
+			}
+			return CompleteStep(txCtx, h.media, m.ID, domainmedia.StepReframe, now)
+		}); err != nil {
 			return err
 		}
-		return CompleteStep(txCtx, h.media, m.ID, domainmedia.StepReframe, now)
-	}); err != nil {
-		return err
 	}
+	// Always kick off after crop is available — including RabbitMQ retries when the
+	// reframe step is already completed (kickoff is idempotent for non-pending rows).
 	if h.kickoff != nil {
 		return h.kickoff.Handle(ctx, cmd.MediaID)
 	}

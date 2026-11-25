@@ -62,7 +62,8 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 		}
 		waitMediaID, ok, err := deferredMarkerMediaID(r.Plan)
 		if err != nil {
-			return err
+			// Corrupt / non-marker pending row — skip so other deferrals still resume.
+			continue
 		}
 		if !ok || waitMediaID != mediaIDStr {
 			continue
@@ -84,7 +85,7 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 			if upErr := h.rendersWrite.Update(ctx, r); upErr != nil {
 				return upErr
 			}
-			return err
+			continue
 		}
 
 		r.Plan = rawPlan
@@ -98,7 +99,7 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 			r.Status = domainrender.StatusFailed
 			r.ErrorMessage = &msg
 			_ = h.rendersWrite.Update(ctx, r)
-			return errors.New("failed to enqueue render")
+			continue
 		}
 	}
 	return nil

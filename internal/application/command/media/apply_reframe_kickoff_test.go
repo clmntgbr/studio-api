@@ -82,3 +82,31 @@ func TestApplyReframeResultHandler_callsKickoffAfterSuccess(t *testing.T) {
 		t.Fatalf("kickoff calls = %v, want [%s]", kickoff.calls, mediaID)
 	}
 }
+
+func TestApplyReframeResultHandler_kickoffWhenStepAlreadyCompleted(t *testing.T) {
+	ctx := context.Background()
+	mediaID := uuid.New()
+	kickoff := &recordingKickoff{}
+	media := &fakeMediaReframe{
+		m: &domainmedia.MediaFile{ID: mediaID},
+		step: &domainmedia.ProcessingStep{
+			MediaFileID: mediaID,
+			Kind:        domainmedia.StepReframe,
+			Status:      domainmedia.StepStatusCompleted,
+		},
+	}
+	h := NewApplyReframeResultHandler(media, kickoff)
+
+	if err := h.Handle(ctx, ApplyReframeResultCommand{
+		MediaID:     mediaID,
+		CropPathKey: "crops/out.json",
+	}); err != nil {
+		t.Fatalf("Handle: %v", err)
+	}
+	if media.savedCrop {
+		t.Fatal("expected no crop re-save when step already completed")
+	}
+	if len(kickoff.calls) != 1 || kickoff.calls[0] != mediaID {
+		t.Fatalf("kickoff calls = %v, want [%s]", kickoff.calls, mediaID)
+	}
+}
