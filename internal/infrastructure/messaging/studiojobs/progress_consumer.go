@@ -23,12 +23,12 @@ import (
 // ProgressConsumer fans studio.progress to Centrifugo projects:{id}.
 // Progress messages are ephemeral: failures are logged and acked (never block the pipeline).
 type ProgressConsumer struct {
-	url       string
-	media     mediaProjectResolver
-	renders   renderProjectResolver
+	url        string
+	media      mediaProjectResolver
+	renders    renderProjectResolver
 	renderRepo domainrender.WriteRepository
-	steps     domainmedia.WriteRepository
-	publisher *realtime.Publisher
+	steps      domainmedia.WriteRepository
+	publisher  *realtime.Publisher
 }
 
 type mediaProjectResolver interface {

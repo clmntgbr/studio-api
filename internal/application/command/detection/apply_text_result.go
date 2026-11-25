@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	domaindetection "go-api/internal/domain/detection"
 	mediacmd "go-api/internal/application/command/media"
+	domaindetection "go-api/internal/domain/detection"
 	domainmedia "go-api/internal/domain/media"
 	"go-api/internal/domain/port"
 

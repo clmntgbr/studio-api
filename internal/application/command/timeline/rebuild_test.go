@@ -19,7 +19,7 @@ type fakeMediaWrite struct {
 func (f *fakeMediaWrite) WithTransaction(context.Context, func(context.Context) error) error {
 	panic("unused")
 }
-func (f *fakeMediaWrite) Save(context.Context, *domainmedia.MediaFile) error { panic("unused") }
+func (f *fakeMediaWrite) Save(context.Context, *domainmedia.MediaFile) error   { panic("unused") }
 func (f *fakeMediaWrite) Update(context.Context, *domainmedia.MediaFile) error { panic("unused") }
 func (f *fakeMediaWrite) UpdateFromStatuses(context.Context, *domainmedia.MediaFile, []domainmedia.Status) (bool, error) {
 	panic("unused")
@@ -30,7 +30,7 @@ func (f *fakeMediaWrite) GetByID(_ context.Context, id uuid.UUID) (*domainmedia.
 	}
 	return f.file, nil
 }
-func (f *fakeMediaWrite) Delete(context.Context, uuid.UUID) error { panic("unused") }
+func (f *fakeMediaWrite) Delete(context.Context, uuid.UUID) error             { panic("unused") }
 func (f *fakeMediaWrite) SaveAsset(context.Context, *domainmedia.Asset) error { panic("unused") }
 func (f *fakeMediaWrite) SaveConfiguration(context.Context, *domainmedia.Configuration) error {
 	panic("unused")
@@ -44,7 +44,9 @@ func (f *fakeMediaWrite) UpdateConfiguration(context.Context, *domainmedia.Confi
 func (f *fakeMediaWrite) GetAssetByKind(context.Context, uuid.UUID, string) (*domainmedia.Asset, error) {
 	panic("unused")
 }
-func (f *fakeMediaWrite) SaveStep(context.Context, *domainmedia.ProcessingStep) error { panic("unused") }
+func (f *fakeMediaWrite) SaveStep(context.Context, *domainmedia.ProcessingStep) error {
+	panic("unused")
+}
 func (f *fakeMediaWrite) UpdateStep(context.Context, *domainmedia.ProcessingStep) error {
 	panic("unused")
 }

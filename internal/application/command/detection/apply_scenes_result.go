@@ -106,9 +106,9 @@ func (h *ApplyScenesResultHandler) Handle(ctx context.Context, cmd ApplyScenesRe
 		"adCandidatesKey": cmd.AdCandidatesKey,
 	})
 	adMeta, _ := json.Marshal(map[string]any{
-		"count":      len(items),
-		"detector":   detector,
-		"scenesKey":  cmd.ScenesKey,
+		"count":     len(items),
+		"detector":  detector,
+		"scenesKey": cmd.ScenesKey,
 	})
 
 	m.RecordDetectionsUpdated(string(domaindetection.KindAd))

@@ -183,13 +183,13 @@ func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string
 		attempt = 1
 	}
 	payload := map[string]any{
-		"mediaId":              mediaID,
-		"wordsKey":             wordsKey,
-		"language":             opts.Language,
-		"detectionLevel":       opts.DetectionLevel,
-		"fillersEnabled":       opts.FillersEnabled,
-		"repetitionsEnabled":   opts.RepetitionsEnabled,
-		"falseStartsEnabled":   opts.FalseStartsEnabled,
+		"mediaId":            mediaID,
+		"wordsKey":           wordsKey,
+		"language":           opts.Language,
+		"detectionLevel":     opts.DetectionLevel,
+		"fillersEnabled":     opts.FillersEnabled,
+		"repetitionsEnabled": opts.RepetitionsEnabled,
+		"falseStartsEnabled": opts.FalseStartsEnabled,
 	}
 	msg, body, err := envelope.NewJob("text", mediaID, "", attempt, payload)
 	if err != nil {

@@ -33,9 +33,9 @@ type otioClip struct {
 }
 
 type otioTrack struct {
-	OTIOSchema string    `json:"OTIO_SCHEMA"`
-	Name       string    `json:"name"`
-	Kind       string    `json:"kind"`
+	OTIOSchema string     `json:"OTIO_SCHEMA"`
+	Name       string     `json:"name"`
+	Kind       string     `json:"kind"`
 	Children   []otioClip `json:"children"`
 }
 
@@ -46,9 +46,9 @@ type otioStack struct {
 }
 
 type otioTimeline struct {
-	OTIOSchema string    `json:"OTIO_SCHEMA"`
-	Name       string    `json:"name"`
-	Tracks     otioStack `json:"tracks"`
+	OTIOSchema string         `json:"OTIO_SCHEMA"`
+	Name       string         `json:"name"`
+	Tracks     otioStack      `json:"tracks"`
 	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 

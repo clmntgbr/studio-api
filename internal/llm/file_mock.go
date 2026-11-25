@@ -13,7 +13,7 @@ import (
 // FileMockAnalyzer returns the recorded llm.json under MOCK_EXTERNAL_DIR.
 // Falls back to heuristic MockAnalyzer if the file is missing.
 type FileMockAnalyzer struct {
-	Path string
+	Path     string
 	Fallback Analyzer
 
 	once   sync.Once

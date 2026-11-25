@@ -69,7 +69,7 @@ func (r *mediaWriteRepository) GetByID(ctx context.Context, id uuid.UUID) (*doma
 func (r *mediaWriteRepository) SaveAsset(ctx context.Context, asset *domainmedia.Asset) error {
 	return DBWithContext(ctx, r.db).
 		Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "media_file_id"}, {Name: "kind"}},
+			Columns:   []clause.Column{{Name: "media_file_id"}, {Name: "kind"}},
 			DoUpdates: clause.AssignmentColumns([]string{"storage_key", "size_bytes", "meta"}),
 		}).
 		Create(mediaAssetModelFromDomain(asset)).Error

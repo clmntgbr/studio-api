@@ -87,7 +87,7 @@ func detectRepetitions(words []Word) []Interval {
 		if j-i >= 2 {
 			// keep last occurrence; mark earlier ones as repetition
 			out = append(out, Interval{
-				Kind: "repetition",
+				Kind:          "repetition",
 				SourceStartMs: words[i].SourceStartMs,
 				SourceEndMs:   words[j-2].SourceEndMs,
 				FirstWord:     words[i].Index,
@@ -120,7 +120,7 @@ func detectFalseStarts(words []Word) []Interval {
 				restart := phrase(words[gapStart : gapStart+m])
 				if strings.HasPrefix(restart, prefix) || strings.HasPrefix(prefix, restart) {
 					out = append(out, Interval{
-						Kind: "false_start",
+						Kind:          "false_start",
 						SourceStartMs: words[i].SourceStartMs,
 						SourceEndMs:   words[end].SourceEndMs,
 						FirstWord:     words[i].Index,

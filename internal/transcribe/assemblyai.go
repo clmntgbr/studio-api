@@ -76,12 +76,12 @@ func (c *assemblyClient) uploadFile(ctx context.Context, path string) (string, e
 
 func (c *assemblyClient) submit(ctx context.Context, audioURL, language string) (string, error) {
 	payload := map[string]any{
-		"audio_url":           audioURL,
-		"punctuate":           true,
-		"format_text":         true,
-		"disfluencies":        true, // keep fillers like « euh »
-		"speaker_labels":      false,
-		"language_detection":  language == "",
+		"audio_url":          audioURL,
+		"punctuate":          true,
+		"format_text":        true,
+		"disfluencies":       true, // keep fillers like « euh »
+		"speaker_labels":     false,
+		"language_detection": language == "",
 	}
 	if language != "" {
 		payload["language_code"] = language

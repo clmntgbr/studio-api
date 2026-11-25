@@ -12,19 +12,19 @@ import (
 )
 
 type ClipResponse struct {
-	ID            string   `json:"id"`
-	ProjectID     string   `json:"projectId"`
-	MediaFileID   string   `json:"mediaFileId"`
-	SourceStartMs int64    `json:"sourceStartMs"`
-	SourceEndMs   int64    `json:"sourceEndMs"`
-	Origin        string   `json:"origin"`
-	Score         *float64 `json:"score,omitempty"`
-	Hook          *string  `json:"hook,omitempty"`
-	Reason        *string  `json:"reason,omitempty"`
-	Title         *string  `json:"title,omitempty"`
-	Description   *string  `json:"description,omitempty"`
-	Hashtags      []string `json:"hashtags"`
-	Selected      bool     `json:"selected"`
+	ID            string    `json:"id"`
+	ProjectID     string    `json:"projectId"`
+	MediaFileID   string    `json:"mediaFileId"`
+	SourceStartMs int64     `json:"sourceStartMs"`
+	SourceEndMs   int64     `json:"sourceEndMs"`
+	Origin        string    `json:"origin"`
+	Score         *float64  `json:"score,omitempty"`
+	Hook          *string   `json:"hook,omitempty"`
+	Reason        *string   `json:"reason,omitempty"`
+	Title         *string   `json:"title,omitempty"`
+	Description   *string   `json:"description,omitempty"`
+	Hashtags      []string  `json:"hashtags"`
+	Selected      bool      `json:"selected"`
 	CreatedAt     time.Time `json:"createdAt"`
 }
 

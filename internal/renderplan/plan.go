@@ -10,7 +10,7 @@ import (
 )
 
 type Segment struct {
-	MediaKey  string `json:"mediaKey"`
+	MediaKey   string `json:"mediaKey"`
 	SrcStartMs int64  `json:"srcStartMs"`
 	SrcEndMs   int64  `json:"srcEndMs"`
 }
@@ -30,9 +30,9 @@ type Output struct {
 }
 
 type Audio struct {
-	Codec         string  `json:"codec"`
-	LoudnessLUFS  float64 `json:"loudnessLufs"`
-	FadeMs        int     `json:"fadeMs"`
+	Codec        string  `json:"codec"`
+	LoudnessLUFS float64 `json:"loudnessLufs"`
+	FadeMs       int     `json:"fadeMs"`
 }
 
 type Subtitles struct {

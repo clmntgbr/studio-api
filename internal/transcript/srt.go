@@ -14,8 +14,8 @@ type Word struct {
 }
 
 const (
-	defaultGapMs      int64 = 800
-	defaultMaxChars         = 42
+	defaultGapMs       int64 = 800
+	defaultMaxChars          = 42
 	defaultMaxDuration int64 = 6000
 )
 

@@ -57,8 +57,8 @@ type fakeMediaKickoff struct {
 func (f *fakeMediaKickoff) WithTransaction(context.Context, func(context.Context) error) error {
 	panic("unused")
 }
-func (f *fakeMediaKickoff) Save(context.Context, *domainmedia.MediaFile) error     { panic("unused") }
-func (f *fakeMediaKickoff) Update(context.Context, *domainmedia.MediaFile) error   { panic("unused") }
+func (f *fakeMediaKickoff) Save(context.Context, *domainmedia.MediaFile) error   { panic("unused") }
+func (f *fakeMediaKickoff) Update(context.Context, *domainmedia.MediaFile) error { panic("unused") }
 func (f *fakeMediaKickoff) UpdateFromStatuses(context.Context, *domainmedia.MediaFile, []domainmedia.Status) (bool, error) {
 	panic("unused")
 }
@@ -69,7 +69,7 @@ func (f *fakeMediaKickoff) GetByID(_ context.Context, id uuid.UUID) (*domainmedi
 	key := f.source
 	return &domainmedia.MediaFile{ID: id, ProjectID: f.projectID, StorageKey: &key}, nil
 }
-func (f *fakeMediaKickoff) Delete(context.Context, uuid.UUID) error { panic("unused") }
+func (f *fakeMediaKickoff) Delete(context.Context, uuid.UUID) error             { panic("unused") }
 func (f *fakeMediaKickoff) SaveAsset(context.Context, *domainmedia.Asset) error { panic("unused") }
 func (f *fakeMediaKickoff) SaveConfiguration(context.Context, *domainmedia.Configuration) error {
 	panic("unused")
@@ -89,12 +89,18 @@ func (f *fakeMediaKickoff) GetAssetByKind(_ context.Context, mediaID uuid.UUID, 
 	}
 	return nil, nil
 }
-func (f *fakeMediaKickoff) SaveStep(context.Context, *domainmedia.ProcessingStep) error { panic("unused") }
-func (f *fakeMediaKickoff) UpdateStep(context.Context, *domainmedia.ProcessingStep) error { panic("unused") }
+func (f *fakeMediaKickoff) SaveStep(context.Context, *domainmedia.ProcessingStep) error {
+	panic("unused")
+}
+func (f *fakeMediaKickoff) UpdateStep(context.Context, *domainmedia.ProcessingStep) error {
+	panic("unused")
+}
 func (f *fakeMediaKickoff) GetStep(context.Context, uuid.UUID, domainmedia.StepKind) (*domainmedia.ProcessingStep, error) {
 	panic("unused")
 }
-func (f *fakeMediaKickoff) SaveStepRun(context.Context, *domainmedia.ProcessingStepRun) error { panic("unused") }
+func (f *fakeMediaKickoff) SaveStepRun(context.Context, *domainmedia.ProcessingStepRun) error {
+	panic("unused")
+}
 
 func markerPlan(mediaID uuid.UUID) json.RawMessage {
 	b, _ := json.Marshal(map[string]any{

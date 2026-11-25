@@ -216,9 +216,9 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			reanalyzeHandler,
 			listStepRunsHandler,
 		),
-		PlaybackHandler:   httphandler.NewPlaybackHandler(getPlaybackHandler, getStreamHandler),
-		DetectionHandler:  httphandler.NewDetectionHandler(listDetectionsHandler),
-		OverrideHandler: httphandler.NewOverrideHandler(createOverrideHandler, deleteOverrideHandler),
+		PlaybackHandler:  httphandler.NewPlaybackHandler(getPlaybackHandler, getStreamHandler),
+		DetectionHandler: httphandler.NewDetectionHandler(listDetectionsHandler),
+		OverrideHandler:  httphandler.NewOverrideHandler(createOverrideHandler, deleteOverrideHandler),
 		SubtitleStyleHandler: httphandler.NewSubtitleStyleHandler(
 			createSubtitleStyle,
 			updateSubtitleStyle,

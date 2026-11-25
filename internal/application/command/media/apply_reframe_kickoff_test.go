@@ -27,7 +27,7 @@ type fakeMediaReframe struct {
 func (f *fakeMediaReframe) WithTransaction(_ context.Context, fn func(context.Context) error) error {
 	return fn(context.Background())
 }
-func (f *fakeMediaReframe) Save(context.Context, *domainmedia.MediaFile) error     { panic("unused") }
+func (f *fakeMediaReframe) Save(context.Context, *domainmedia.MediaFile) error   { panic("unused") }
 func (f *fakeMediaReframe) Update(context.Context, *domainmedia.MediaFile) error { panic("unused") }
 func (f *fakeMediaReframe) UpdateFromStatuses(context.Context, *domainmedia.MediaFile, []domainmedia.Status) (bool, error) {
 	panic("unused")
@@ -63,7 +63,9 @@ func (f *fakeMediaReframe) UpdateStep(_ context.Context, step *domainmedia.Proce
 func (f *fakeMediaReframe) GetStep(context.Context, uuid.UUID, domainmedia.StepKind) (*domainmedia.ProcessingStep, error) {
 	return f.step, nil
 }
-func (f *fakeMediaReframe) SaveStepRun(context.Context, *domainmedia.ProcessingStepRun) error { return nil }
+func (f *fakeMediaReframe) SaveStepRun(context.Context, *domainmedia.ProcessingStepRun) error {
+	return nil
+}
 
 func TestApplyReframeResultHandler_callsKickoffAfterSuccess(t *testing.T) {
 	ctx := context.Background()

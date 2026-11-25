@@ -76,7 +76,7 @@ type fakeMediaWrite struct {
 func (f *fakeMediaWrite) WithTransaction(context.Context, func(context.Context) error) error {
 	panic("unused")
 }
-func (f *fakeMediaWrite) Save(context.Context, *domainmedia.MediaFile) error { panic("unused") }
+func (f *fakeMediaWrite) Save(context.Context, *domainmedia.MediaFile) error   { panic("unused") }
 func (f *fakeMediaWrite) Update(context.Context, *domainmedia.MediaFile) error { panic("unused") }
 func (f *fakeMediaWrite) UpdateFromStatuses(context.Context, *domainmedia.MediaFile, []domainmedia.Status) (bool, error) {
 	panic("unused")
@@ -88,7 +88,7 @@ func (f *fakeMediaWrite) GetByID(_ context.Context, id uuid.UUID) (*domainmedia.
 	key := f.source
 	return &domainmedia.MediaFile{ID: id, StorageKey: &key}, nil
 }
-func (f *fakeMediaWrite) Delete(context.Context, uuid.UUID) error { panic("unused") }
+func (f *fakeMediaWrite) Delete(context.Context, uuid.UUID) error             { panic("unused") }
 func (f *fakeMediaWrite) SaveAsset(context.Context, *domainmedia.Asset) error { panic("unused") }
 func (f *fakeMediaWrite) SaveConfiguration(context.Context, *domainmedia.Configuration) error {
 	panic("unused")
@@ -122,7 +122,9 @@ func (f *fakeMediaWrite) SaveStep(_ context.Context, step *domainmedia.Processin
 	f.savedStep = step
 	return nil
 }
-func (f *fakeMediaWrite) UpdateStep(context.Context, *domainmedia.ProcessingStep) error { panic("unused") }
+func (f *fakeMediaWrite) UpdateStep(context.Context, *domainmedia.ProcessingStep) error {
+	panic("unused")
+}
 func (f *fakeMediaWrite) GetStep(context.Context, uuid.UUID, domainmedia.StepKind) (*domainmedia.ProcessingStep, error) {
 	return nil, nil
 }
@@ -141,11 +143,11 @@ type fakeJobs struct {
 	render  int
 }
 
-func (f *fakeJobs) PublishFetchJob(context.Context, string, string) error          { panic("unused") }
-func (f *fakeJobs) PublishProbeJob(context.Context, string, string) error          { panic("unused") }
-func (f *fakeJobs) PublishAudioJob(context.Context, string, string) error          { panic("unused") }
-func (f *fakeJobs) PublishProxyJob(context.Context, string, string) error            { panic("unused") }
-func (f *fakeJobs) PublishWaveformJob(context.Context, string, string) error         { panic("unused") }
+func (f *fakeJobs) PublishFetchJob(context.Context, string, string) error    { panic("unused") }
+func (f *fakeJobs) PublishProbeJob(context.Context, string, string) error    { panic("unused") }
+func (f *fakeJobs) PublishAudioJob(context.Context, string, string) error    { panic("unused") }
+func (f *fakeJobs) PublishProxyJob(context.Context, string, string) error    { panic("unused") }
+func (f *fakeJobs) PublishWaveformJob(context.Context, string, string) error { panic("unused") }
 func (f *fakeJobs) PublishSilenceJob(context.Context, string, string, port.SilenceJobOptions) error {
 	panic("unused")
 }
@@ -158,7 +160,7 @@ func (f *fakeJobs) PublishTextJob(context.Context, string, string, port.TextJobO
 func (f *fakeJobs) PublishLLMJob(context.Context, string, string, port.LLMJobOptions) error {
 	panic("unused")
 }
-func (f *fakeJobs) PublishScenesJob(context.Context, string, string, int) error      { panic("unused") }
+func (f *fakeJobs) PublishScenesJob(context.Context, string, string, int) error { panic("unused") }
 func (f *fakeJobs) PublishRenderJob(context.Context, string, json.RawMessage) error {
 	f.render++
 	return nil

@@ -1,7 +1,7 @@
 # ============================================
 # Base stage - Common dependencies
 # ============================================
-FROM golang:1.25-alpine AS base
+FROM golang:1.26-alpine AS base
 
 WORKDIR /app
 

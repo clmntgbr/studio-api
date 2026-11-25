@@ -28,11 +28,11 @@ type Config struct {
 }
 
 type jobPayload struct {
-	MediaID              string   `json:"mediaId"`
-	AudioKey             string   `json:"audioKey"`
-	ThresholdMode        string   `json:"thresholdMode"`
-	SilenceThresholdDB   *float64 `json:"silenceThresholdDb"`
-	NoiseFloorOffsetDb   float64  `json:"noiseFloorOffsetDb"`
+	MediaID            string   `json:"mediaId"`
+	AudioKey           string   `json:"audioKey"`
+	ThresholdMode      string   `json:"thresholdMode"`
+	SilenceThresholdDB *float64 `json:"silenceThresholdDb"`
+	NoiseFloorOffsetDb float64  `json:"noiseFloorOffsetDb"`
 }
 
 func LoadConfigFromEnv() (Config, error) {

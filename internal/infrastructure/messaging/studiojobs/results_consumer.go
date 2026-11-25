@@ -68,7 +68,7 @@ func NewResultsConsumer(
 		applySilence:    applySilence,
 		applyTranscript: applyTranscript,
 		applyText:       applyText,
-		applyLLM:       applyLLM,
+		applyLLM:        applyLLM,
 		applyScenes:     applyScenes,
 		applyReframe:    applyReframe,
 		applyRender:     applyRender,
@@ -180,14 +180,14 @@ type fetchOutput struct {
 }
 
 type probeOutput struct {
-	DurationMs    int64   `json:"durationMs"`
-	Width         int     `json:"width"`
-	Height        int     `json:"height"`
-	FPSNum        int     `json:"fpsNum"`
-	FPSDen        int     `json:"fpsDen"`
-	VideoCodec    string  `json:"videoCodec"`
-	AudioCodec    string  `json:"audioCodec"`
-	AudioChannels int     `json:"audioChannels"`
+	DurationMs    int64  `json:"durationMs"`
+	Width         int    `json:"width"`
+	Height        int    `json:"height"`
+	FPSNum        int    `json:"fpsNum"`
+	FPSDen        int    `json:"fpsDen"`
+	VideoCodec    string `json:"videoCodec"`
+	AudioCodec    string `json:"audioCodec"`
+	AudioChannels int    `json:"audioChannels"`
 }
 
 type audioOutput struct {
@@ -556,11 +556,11 @@ type scenesAdCandidate struct {
 }
 
 type scenesOutput struct {
-	ScenesKey       string               `json:"scenesKey"`
-	AdCandidatesKey string               `json:"adCandidatesKey"`
-	Detector        string               `json:"detector"`
-	SceneCount      int                  `json:"sceneCount"`
-	AdCandidates    []scenesAdCandidate  `json:"adCandidates"`
+	ScenesKey       string              `json:"scenesKey"`
+	AdCandidatesKey string              `json:"adCandidatesKey"`
+	Detector        string              `json:"detector"`
+	SceneCount      int                 `json:"sceneCount"`
+	AdCandidates    []scenesAdCandidate `json:"adCandidates"`
 }
 
 func (c *ResultsConsumer) onScenesSucceeded(ctx context.Context, msg *envelope.Message) error {
