@@ -14,7 +14,7 @@ type YTDLPConfig struct {
 	Bin           string
 	MaxFilesizeMB int
 	MaxDurationS  int
-	// MaxHeight caps progressive download resolution (0 → 1080). Avoids 4K+ when proxy/ship do not need it.
+	// MaxHeight caps progressive download resolution (0 → 720). Matches proxy target so fetch can skip re-encode.
 	MaxHeight   int
 	CookiesFile string
 }
@@ -46,9 +46,9 @@ func DownloadURL(ctx context.Context, cfg YTDLPConfig, rawURL, workDir string) (
 	}
 	maxH := cfg.MaxHeight
 	if maxH <= 0 {
-		maxH = 1080
+		maxH = 720
 	}
-	// Cap the short side at MaxHeight so landscape (≤1080h) and portrait/Shorts (≤1080w) both stay ~1080p-class.
+	// Cap short side at MaxHeight (landscape ≤720h, portrait/Shorts ≤720w) — same class as the edit proxy.
 	format := fmt.Sprintf(
 		"bv*[height<=%[1]d]+ba/bv*[width<=%[1]d]+ba/b[height<=%[1]d]/b[width<=%[1]d]",
 		maxH,

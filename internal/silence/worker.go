@@ -143,7 +143,7 @@ func handle(ctx context.Context, bus *topology.Bus, store *s3store.Client, cfg C
 		req.ThresholdMode = "auto"
 	}
 	if req.NoiseFloorOffsetDb == 0 {
-		req.NoiseFloorOffsetDb = 8 // aggressive default offset above noise floor
+		req.NoiseFloorOffsetDb = 9 // standard auto offset above noise floor
 	}
 
 	workDir := filepath.Join(cfg.WorkDir, "silence-"+req.MediaID+"-"+fmt.Sprintf("%d", time.Now().UnixNano()))

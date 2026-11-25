@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"fmt"
+	"io"
+	"strconv"
 	"strings"
 
 	cmdrender "go-api/internal/application/command/render"
@@ -84,7 +87,7 @@ func (h *RenderHandler) Create(c fiber.Ctx) error {
 		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "required") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to create render"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
 	}
 	return c.Status(fiber.StatusAccepted).JSON(presenter.NewRenderResponse(r))
 }
@@ -140,6 +143,7 @@ func (h *RenderHandler) Cancel(c fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(presenter.NewRenderResponse(r))
 }
 
+// Download streams the completed master through the API (no MinIO presign).
 func (h *RenderHandler) Download(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
@@ -148,7 +152,10 @@ func (h *RenderHandler) Download(c fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid render id"})
 	}
-	out, err := h.downloadHandler.Handle(c.Context(), queryrender.DownloadQuery{ID: id})
+	out, err := h.downloadHandler.Handle(c.Context(), queryrender.DownloadQuery{
+		ID:          id,
+		RangeHeader: c.Get("Range"),
+	})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Render not found"})
@@ -156,10 +163,29 @@ func (h *RenderHandler) Download(c fiber.Ctx) error {
 		if strings.Contains(err.Error(), "not ready") || strings.Contains(err.Error(), "missing") {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to create download URL"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to download render"})
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"url":       out.URL,
-		"expiresIn": out.ExpiresIn,
-	})
+
+	stream := out.Stream
+	defer stream.Body.Close()
+
+	c.Set("Accept-Ranges", "bytes")
+	c.Set("Content-Type", stream.ContentType)
+	c.Set("Cache-Control", "private, max-age=60")
+	c.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, out.Filename))
+	if stream.ContentRange != "" {
+		c.Set("Content-Range", stream.ContentRange)
+	}
+	if stream.ContentLength > 0 {
+		c.Set("Content-Length", strconv.FormatInt(stream.ContentLength, 10))
+	}
+
+	status := stream.StatusCode
+	if status == 0 {
+		status = fiber.StatusOK
+	}
+	c.Status(status)
+
+	_, err = io.Copy(c.Response().BodyWriter(), stream.Body)
+	return err
 }

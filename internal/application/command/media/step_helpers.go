@@ -28,14 +28,7 @@ func completeStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID
 		return nil
 	}
 
-	started := at
-	if step.StartedAt != nil {
-		started = *step.StartedAt
-	} else if step.QueuedAt != nil {
-		started = *step.QueuedAt
-	} else if !step.CreatedAt.IsZero() {
-		started = step.CreatedAt
-	}
+	started := stepStartAt(step, at)
 	step.StartedAt = &started
 	step.Status = domainmedia.StepStatusCompleted
 	step.Progress = 1
@@ -99,12 +92,7 @@ func FailStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uui
 	if !created && (step.Status == domainmedia.StepStatusCompleted || step.Status == domainmedia.StepStatusFailed) {
 		return nil
 	}
-	started := at
-	if step.StartedAt != nil {
-		started = *step.StartedAt
-	} else if step.QueuedAt != nil {
-		started = *step.QueuedAt
-	}
+	started := stepStartAt(step, at)
 	step.StartedAt = &started
 	step.Status = domainmedia.StepStatusFailed
 	msg := errMsg
@@ -126,6 +114,21 @@ func FailStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uui
 		return err
 	}
 	return repo.SaveStepRun(ctx, run)
+}
+
+// stepStartAt picks a started timestamp that is never after `at` (DB check: completed_at >= started_at).
+// Do not use CreatedAt: NewProcessingStep sets it to time.Now(), which can be after a captured `at`.
+func stepStartAt(step *domainmedia.ProcessingStep, at time.Time) time.Time {
+	started := at
+	if step.StartedAt != nil {
+		started = *step.StartedAt
+	} else if step.QueuedAt != nil {
+		started = *step.QueuedAt
+	}
+	if started.After(at) {
+		return at
+	}
+	return started
 }
 
 // QueueStep marks a processing step as queued.

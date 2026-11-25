@@ -176,7 +176,7 @@ func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string
 		opts.Language = "fr"
 	}
 	if opts.DetectionLevel == "" {
-		opts.DetectionLevel = "aggressive"
+		opts.DetectionLevel = "standard"
 	}
 	attempt := opts.Attempt
 	if attempt < 1 {

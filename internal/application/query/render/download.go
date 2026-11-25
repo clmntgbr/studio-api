@@ -3,7 +3,7 @@ package render
 import (
 	"context"
 	"errors"
-	"time"
+	"fmt"
 
 	"go-api/internal/domain/port"
 	domainrender "go-api/internal/domain/render"
@@ -12,33 +12,30 @@ import (
 )
 
 type DownloadQuery struct {
-	ID uuid.UUID
+	ID          uuid.UUID
+	RangeHeader string
 }
 
 type DownloadResult struct {
-	URL       string
-	ExpiresIn int
+	Stream   *port.ObjectStream
+	Filename string
 }
 
 type DownloadHandler struct {
 	repo         domainrender.ReadRepository
 	storage      port.ObjectStorage
 	renderBucket string
-	publicBase   string
-	expiry       time.Duration
 }
 
 func NewDownloadHandler(
 	repo domainrender.ReadRepository,
 	storage port.ObjectStorage,
-	renderBucket, publicBase string,
+	renderBucket string,
 ) *DownloadHandler {
 	return &DownloadHandler{
 		repo:         repo,
 		storage:      storage,
 		renderBucket: renderBucket,
-		publicBase:   publicBase,
-		expiry:       15 * time.Minute,
 	}
 }
 
@@ -56,12 +53,15 @@ func (h *DownloadHandler) Handle(ctx context.Context, q DownloadQuery) (*Downloa
 	if r.StorageKey == nil || *r.StorageKey == "" {
 		return nil, errors.New("render output missing")
 	}
-	url, err := h.storage.PresignGetObject(ctx, h.renderBucket, *r.StorageKey, h.expiry, h.publicBase)
+	stream, err := h.storage.GetObjectStream(ctx, h.renderBucket, *r.StorageKey, q.RangeHeader)
 	if err != nil {
-		return nil, errors.New("failed to presign download")
+		return nil, errors.New("failed to open render object")
+	}
+	if stream.ContentType == "" {
+		stream.ContentType = "video/mp4"
 	}
 	return &DownloadResult{
-		URL:       url,
-		ExpiresIn: int(h.expiry.Seconds()),
+		Stream:   stream,
+		Filename: fmt.Sprintf("render-%s.mp4", r.ID.String()),
 	}, nil
 }

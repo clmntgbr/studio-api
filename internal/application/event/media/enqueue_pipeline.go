@@ -59,8 +59,10 @@ func (h *EnqueueAfterProbedHandler) Handle(ctx context.Context, payload []byte) 
 			firstErr = err
 		}
 	}
-	if err := h.jobs.PublishProxyJob(ctx, evt.MediaID, evt.SourceKey); err != nil && firstErr == nil {
-		firstErr = err
+	if !evt.SkipProxy {
+		if err := h.jobs.PublishProxyJob(ctx, evt.MediaID, evt.SourceKey); err != nil && firstErr == nil {
+			firstErr = err
+		}
 	}
 	if firstErr != nil {
 		return messaging.Retryable(firstErr)

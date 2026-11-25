@@ -63,7 +63,7 @@ func LoadConfigFromEnv() (Config, error) {
 			Bin:           envOr("YTDLP_BIN", "yt-dlp"),
 			MaxFilesizeMB: envInt("YTDLP_MAX_FILESIZE_MB", 8000),
 			MaxDurationS:  envInt("YTDLP_MAX_DURATION_S", 14400),
-			MaxHeight:     envInt("YTDLP_MAX_HEIGHT", 1080),
+			MaxHeight:     envInt("YTDLP_MAX_HEIGHT", 720),
 			CookiesFile:   os.Getenv("YTDLP_COOKIES_FILE"),
 		},
 	}
