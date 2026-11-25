@@ -122,8 +122,8 @@ func TestRenderHandler_Create_BadRequest_Kind(t *testing.T) {
 	}
 }
 
-func TestRenderHandler_Create_NotValidated(t *testing.T) {
-	create := &mockCreate{err: errors.New("timeline must be validated")}
+func TestRenderHandler_Create_DraftTimeline_OK(t *testing.T) {
+	create := &mockCreate{}
 	app := mount(create, nil, nil, nil, nil, true)
 	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/renders", map[string]any{
 		"presetId": testPresetID.String(),
@@ -132,8 +132,11 @@ func TestRenderHandler_Create_NotValidated(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusUnprocessableEntity {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status=%d", resp.StatusCode)
+	}
+	if create.calls != 1 {
+		t.Fatalf("calls=%d", create.calls)
 	}
 }
 

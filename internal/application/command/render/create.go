@@ -95,9 +95,6 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 	if t == nil {
 		return nil, errors.New("timeline not found")
 	}
-	if t.Status != domaintimeline.StatusValidated {
-		return nil, errors.New("timeline must be validated")
-	}
 	segments, err := h.timelines.ListSegments(ctx, t.ID)
 	if err != nil {
 		return nil, err

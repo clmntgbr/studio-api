@@ -515,15 +515,15 @@ func TestClipHandler_Render_NotFound(t *testing.T) {
 	}
 }
 
-func TestClipHandler_Render_NotValidated(t *testing.T) {
-	render := &mockRender{err: errors.New("timeline must be validated")}
+func TestClipHandler_Render_DraftTimeline_OK(t *testing.T) {
+	render := &mockRender{}
 	app := mount(nil, nil, nil, nil, nil, nil, render, true)
 	req, _ := testutil.JSONRequest(http.MethodPost, "/api/clips/"+testClipID.String()+"/render", map[string]any{})
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusUnprocessableEntity {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
 }
