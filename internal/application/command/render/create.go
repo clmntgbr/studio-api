@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	mediacmd "go-api/internal/application/command/media"
 	querytimeline "go-api/internal/application/query/timeline"
 	domainclip "go-api/internal/domain/clip"
 	domainmedia "go-api/internal/domain/media"
@@ -188,6 +189,44 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 				cropPathKey = &key
 			}
 		}
+	}
+
+	needsTrack := preset.CropMode == "face_track" || preset.CropMode == "speaker_track"
+	if needsTrack && cropPathKey == nil {
+		firstMediaID := workSegs[0].MediaFileID
+		proxyAsset, err := h.media.GetAssetByKind(ctx, firstMediaID, domainmedia.AssetKindProxy)
+		if err != nil {
+			return nil, err
+		}
+		if proxyAsset == nil || proxyAsset.StorageKey == "" {
+			return nil, errors.New("proxy not ready for reframe")
+		}
+
+		renderID := uuid.New()
+		markerPlan, err := json.Marshal(map[string]any{
+			"awaitingReframe": true,
+			"mediaId":         firstMediaID.String(),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		r := domainrender.New(cmd.ProjectID, t.ID, preset.ID, kind, fp, markerPlan)
+		r.ID = renderID
+		r.SubtitleStyleID = cmd.SubtitleStyleID
+		r.ClipID = cmd.ClipID
+		r.Status = domainrender.StatusPending
+
+		if err := h.renders.Save(ctx, r); err != nil {
+			return nil, errors.New("failed to create render")
+		}
+		if err := mediacmd.QueueStep(ctx, h.media, firstMediaID, domainmedia.StepReframe, time.Now().UTC()); err != nil {
+			return nil, err
+		}
+		if err := h.jobs.PublishReframeJob(ctx, firstMediaID.String(), proxyAsset.StorageKey, preset.Width, preset.Height); err != nil {
+			return nil, err
+		}
+		return r, nil
 	}
 
 	crf, ffmpegPreset, fadeMs := 20, "veryfast", 15
