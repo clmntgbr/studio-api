@@ -9,8 +9,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// tryMarkMediaReady sets status=ready when the core media pipeline is done:
-// probe + proxy always; audio + waveform when the file has audio.
+// tryMarkMediaReady sets status=ready when the media is editable:
+// probe always; audio + waveform when the file has audio.
+// Proxy is intentionally NOT required — it can finish later for better playback / reframe.
 func tryMarkMediaReady(ctx context.Context, repo domainmedia.WriteRepository, outbox port.OutboxRepository, mediaID uuid.UUID) error {
 	m, err := repo.GetByID(ctx, mediaID)
 	if err != nil || m == nil {
@@ -20,7 +21,7 @@ func tryMarkMediaReady(ctx context.Context, repo domainmedia.WriteRepository, ou
 		return nil
 	}
 
-	required := []domainmedia.StepKind{domainmedia.StepProbe, domainmedia.StepProxy}
+	required := []domainmedia.StepKind{domainmedia.StepProbe}
 	hasAudio := m.HasAudio != nil && *m.HasAudio
 	if hasAudio {
 		required = append(required, domainmedia.StepAudio, domainmedia.StepWaveform)

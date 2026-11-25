@@ -3,10 +3,13 @@ package rendertest
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"strings"
 	"time"
 
 	cmdrender "go-api/internal/application/command/render"
 	queryrender "go-api/internal/application/query/render"
+	"go-api/internal/domain/port"
 	domainrender "go-api/internal/domain/render"
 	"go-api/internal/interfaces/http/handler"
 	"go-api/internal/interfaces/http/testutil"
@@ -79,10 +82,21 @@ type mockDownload struct {
 }
 
 func (m *mockDownload) Handle(_ context.Context, _ queryrender.DownloadQuery) (*queryrender.DownloadResult, error) {
-	if m.out != nil || m.err != nil {
-		return m.out, m.err
+	if m.err != nil {
+		return nil, m.err
 	}
-	return &queryrender.DownloadResult{URL: "https://minio/renders/out.mp4", ExpiresIn: 900}, nil
+	if m.out != nil {
+		return m.out, nil
+	}
+	return &queryrender.DownloadResult{
+		Stream: &port.ObjectStream{
+			Body:          io.NopCloser(strings.NewReader("fake-mp4")),
+			ContentType:   "video/mp4",
+			ContentLength: 8,
+			StatusCode:    200,
+		},
+		Filename: "render-" + testRenderID.String() + ".mp4",
+	}, nil
 }
 
 func sampleRender() *domainrender.Render {

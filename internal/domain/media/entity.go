@@ -40,6 +40,22 @@ const (
 	AssetKindCropPath      = "crop_path"
 )
 
+// ProxyMaxShortSide is the preview encode target (720p-class). Sources already at or below
+// this short side skip the proxy job and reuse the original as the proxy asset.
+const ProxyMaxShortSide = 720
+
+// NeedsProxyEncode reports whether a source should be re-encoded for preview.
+func NeedsProxyEncode(width, height int) bool {
+	if width <= 0 || height <= 0 {
+		return true
+	}
+	short := width
+	if height < short {
+		short = height
+	}
+	return short > ProxyMaxShortSide
+}
+
 type StepKind string
 
 const (
@@ -224,6 +240,9 @@ func (m *MediaFile) ApplyProbe(durationMs int64, width, height int, fps float64,
 		SourceKey:  sourceKey,
 		HasAudio:   hasAudio,
 		DurationMs: durationMs,
+		Width:      width,
+		Height:     height,
+		SkipProxy:  !NeedsProxyEncode(width, height),
 		Timestamp:  now,
 	})
 }
@@ -329,13 +348,13 @@ func DefaultConfiguration(mediaFileID uuid.UUID) *Configuration {
 		MediaFileID:          mediaFileID,
 		SilenceEnabled:       true,
 		ThresholdMode:        "auto",
-		DetectionLevel:       "aggressive",
-		SilenceMinDurationMs: 500,
-		PaddingBeforeMs:      50,
-		PaddingAfterMs:       150,
-		SpeechMinDurationMs:  300,
-		FillersEnabled:       true,
-		RepetitionsEnabled:   true,
+		DetectionLevel:       "standard",
+		SilenceMinDurationMs: 700,
+		PaddingBeforeMs:      120,
+		PaddingAfterMs:       200,
+		SpeechMinDurationMs:  800,
+		FillersEnabled:       false,
+		RepetitionsEnabled:   false,
 		FalseStartsEnabled:   false,
 		SponsorsAction:       DecisionSuggest,
 		AdsAction:            DecisionSuggest,

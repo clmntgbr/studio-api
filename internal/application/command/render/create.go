@@ -133,7 +133,8 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		case domainrender.StatusQueued, domainrender.StatusRunning, domainrender.StatusCompleted, domainrender.StatusPending:
 			return existing, nil
 		}
-		existing.Fingerprint = existing.Fingerprint + ":superseded:" + existing.ID.String()
+		// fingerprint is varchar(64); keep superseded marker short and unique.
+		existing.Fingerprint = "s-" + existing.ID.String()
 		if err := h.renders.Update(ctx, existing); err != nil {
 			return nil, errors.New("failed to supersede previous render")
 		}

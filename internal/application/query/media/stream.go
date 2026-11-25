@@ -18,6 +18,7 @@ type StreamQuery struct {
 
 type StreamResult struct {
 	Stream *port.ObjectStream
+	Kind   string
 }
 
 type GetStreamHandler struct {
@@ -38,33 +39,14 @@ func (h *GetStreamHandler) Handle(ctx context.Context, q StreamQuery) (*StreamRe
 	if q.MediaID == uuid.Nil {
 		return nil, errors.New("mediaId is required")
 	}
-	kind := q.Kind
-	if kind == "" {
-		kind = domainmedia.AssetKindProxy
-	}
-	if kind != domainmedia.AssetKindProxy {
-		return nil, errors.New("kind must be proxy")
-	}
-
-	m, err := h.media.GetByID(ctx, q.MediaID)
+	key, kind, err := resolvePlaybackObject(ctx, h.media, q.MediaID, q.Kind)
 	if err != nil {
 		return nil, err
 	}
-	if m == nil {
-		return nil, errors.New("media not found")
-	}
 
-	asset, err := h.media.GetAssetByKind(ctx, m.ID, kind)
+	stream, err := h.storage.GetObjectStream(ctx, h.bucket, key, q.RangeHeader)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("failed to open media object")
 	}
-	if asset == nil || asset.StorageKey == "" {
-		return nil, errors.New("proxy not ready")
-	}
-
-	stream, err := h.storage.GetObjectStream(ctx, h.bucket, asset.StorageKey, q.RangeHeader)
-	if err != nil {
-		return nil, errors.New("failed to open proxy object")
-	}
-	return &StreamResult{Stream: stream}, nil
+	return &StreamResult{Stream: stream, Kind: kind}, nil
 }

@@ -130,6 +130,13 @@ USER appuser
 CMD ["./worker-silence"]
 
 
+# Render master encode needs ffmpeg.
+FROM production AS worker-render
+USER root
+RUN apk --no-cache add ffmpeg ca-certificates fontconfig ttf-dejavu
+USER appuser
+CMD ["./worker-render"]
+
 FROM production AS api
 CMD ["./api"]
 

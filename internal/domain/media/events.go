@@ -62,6 +62,9 @@ type MediaProbed struct {
 	SourceKey  string    `json:"sourceKey"`
 	HasAudio   bool      `json:"hasAudio"`
 	DurationMs int64     `json:"durationMs"`
+	Width      int       `json:"width,omitempty"`
+	Height     int       `json:"height,omitempty"`
+	SkipProxy  bool      `json:"skipProxy,omitempty"`
 	Timestamp  time.Time `json:"timestamp"`
 }
 

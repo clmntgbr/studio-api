@@ -104,10 +104,10 @@ type interval struct {
 func Build(in Input) Output {
 	cfg := in.Config
 	if cfg.SilenceMinDurationMs <= 0 {
-		cfg.SilenceMinDurationMs = 500
+		cfg.SilenceMinDurationMs = 700
 	}
 	if cfg.SpeechMinDurationMs <= 0 {
-		cfg.SpeechMinDurationMs = 300
+		cfg.SpeechMinDurationMs = 800
 	}
 
 	decisions := make([]Decision, 0, len(in.Detections))
@@ -384,7 +384,8 @@ func dropMicroAndMerge(keeps []interval, speechMinMs int) []interval {
 	out := []interval{filtered[0]}
 	for _, cur := range filtered[1:] {
 		last := &out[len(out)-1]
-		if cur.start-last.end < 100 {
+		// Merge keep islands separated by short residual gaps (micro-silence leftovers).
+		if cur.start-last.end < 400 {
 			last.end = cur.end
 			continue
 		}

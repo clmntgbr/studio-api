@@ -3,9 +3,9 @@ package rendertest
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
-	queryrender "go-api/internal/application/query/render"
 	"go-api/internal/interfaces/http/testutil"
 )
 
@@ -345,8 +345,7 @@ func TestRenderHandler_Cancel_HandlerError(t *testing.T) {
 }
 
 func TestRenderHandler_Download_Success(t *testing.T) {
-	download := &mockDownload{out: &queryrender.DownloadResult{URL: "https://minio/out.mp4", ExpiresIn: 900}}
-	app := mount(nil, nil, nil, nil, download, true)
+	app := mount(nil, nil, nil, nil, &mockDownload{}, true)
 	req, _ := testutil.JSONRequest(http.MethodGet, "/api/renders/"+testRenderID.String()+"/download", nil)
 	resp, err := app.Test(req)
 	if err != nil {
@@ -355,9 +354,11 @@ func TestRenderHandler_Download_Success(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
-	body := testutil.DecodeJSONMap(t, resp)
-	if body["url"] != "https://minio/out.mp4" {
-		t.Fatalf("body=%v", body)
+	if ct := resp.Header.Get("Content-Type"); ct != "video/mp4" {
+		t.Fatalf("content-type=%q", ct)
+	}
+	if cd := resp.Header.Get("Content-Disposition"); !strings.Contains(cd, "attachment") {
+		t.Fatalf("content-disposition=%q", cd)
 	}
 }
 

@@ -144,5 +144,10 @@ purge-retention: cli-build
 		--days=$${DAYS:-7} \
 		$$( [ "$${DRY_RUN}" = "1" ] && echo --dry-run || true )
 
+# Empty media + renders S3 buckets (local MinIO). Refuses without --force via CLI.
+# Usage: make purge-s3
+purge-s3: cli-build
+	@$(COMPOSE_DEV) exec api ./bin/cli purge s3 --force
+
 shell:
 	$(COMPOSE_DEV) exec api sh

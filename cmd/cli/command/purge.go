@@ -119,6 +119,84 @@ func NewPurgeCommand() *cobra.Command {
 	retention.Flags().BoolVar(&dryRun, "dry-run", false, "List candidates without deleting")
 	retention.Flags().StringVar(&prefix, "prefix", "media/", "S3 key prefix to scan")
 	cmd.AddCommand(retention)
+
+	var s3Force bool
+	var s3DryRun bool
+	var s3Prefix string
+	var s3Buckets []string
+	s3Cmd := &cobra.Command{
+		Use:   "s3",
+		Short: "Delete all objects in media/renders buckets (or --bucket)",
+		Long: "Empty MinIO/S3 object content for local reset. " +
+			"Defaults to S3_BUCKET_MEDIA + S3_BUCKET_RENDERS. " +
+			"Refused when GO_ENV is production. Pass --force to apply.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg := config.Load()
+			if config.IsProduction(cfg.Environment) {
+				return errors.New("purge s3 is refused when GO_ENV is production")
+			}
+			store, err := s3store.New(s3store.Config{
+				Endpoint:  cfg.S3Endpoint,
+				Region:    cfg.S3Region,
+				AccessKey: cfg.S3AccessKey,
+				SecretKey: cfg.S3SecretKey,
+			})
+			if err != nil {
+				return err
+			}
+			buckets := s3Buckets
+			if len(buckets) == 0 {
+				media := cfg.S3BucketMedia
+				if media == "" {
+					media = "media"
+				}
+				renders := cfg.S3BucketRenders
+				if renders == "" {
+					renders = "renders"
+				}
+				buckets = []string{media, renders}
+			}
+			ctx := context.Background()
+			var total int
+			apply := s3Force && !s3DryRun
+			for _, bucket := range buckets {
+				objects, err := store.ListPrefix(ctx, bucket, s3Prefix)
+				if err != nil {
+					return err
+				}
+				keys := make([]string, 0, len(objects))
+				for _, obj := range objects {
+					keys = append(keys, obj.Key)
+				}
+				if !apply {
+					fmt.Printf("Would delete %d objects from s3://%s/%s\n", len(keys), bucket, s3Prefix)
+					total += len(keys)
+					continue
+				}
+				if err := store.DeleteObjects(ctx, bucket, keys); err != nil {
+					return err
+				}
+				fmt.Printf("Deleted %d objects from s3://%s/%s\n", len(keys), bucket, s3Prefix)
+				total += len(keys)
+			}
+			if !apply {
+				if s3DryRun {
+					fmt.Printf("purge s3 dry-run candidates=%d buckets=%s\n", total, strings.Join(buckets, ","))
+					return nil
+				}
+				return errors.New("refusing to purge s3 without --force")
+			}
+			fmt.Printf("purge s3 done deleted=%d buckets=%s\n", total, strings.Join(buckets, ","))
+			return nil
+		},
+	}
+	s3Cmd.Flags().BoolVar(&s3Force, "force", false, "actually delete objects")
+	s3Cmd.Flags().BoolVar(&s3DryRun, "dry-run", false, "list counts without deleting")
+	s3Cmd.Flags().StringVar(&s3Prefix, "prefix", "", "optional key prefix to scope deletes")
+	s3Cmd.Flags().StringSliceVar(&s3Buckets, "bucket", nil, "bucket(s) to empty (default: media + renders)")
+	cmd.AddCommand(s3Cmd)
 	return cmd
 }
 

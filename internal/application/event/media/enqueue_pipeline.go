@@ -59,8 +59,10 @@ func (h *EnqueueAfterProbedHandler) Handle(ctx context.Context, payload []byte) 
 			firstErr = err
 		}
 	}
-	if err := h.jobs.PublishProxyJob(ctx, evt.MediaID, evt.SourceKey); err != nil && firstErr == nil {
-		firstErr = err
+	if !evt.SkipProxy {
+		if err := h.jobs.PublishProxyJob(ctx, evt.MediaID, evt.SourceKey); err != nil && firstErr == nil {
+			firstErr = err
+		}
 	}
 	if firstErr != nil {
 		return messaging.Retryable(firstErr)
@@ -104,10 +106,15 @@ func (h *EnqueueAfterAudioReadyHandler) Handle(ctx context.Context, payload []by
 		cfg = domainmedia.DefaultConfiguration(mediaID)
 	}
 	if cfg.SilenceEnabled {
+		silenceAttempt := 1
+		if step, err := h.media.GetStep(ctx, mediaID, domainmedia.StepSilence); err == nil && step != nil && step.Attempt >= 1 {
+			silenceAttempt = step.Attempt
+		}
 		if err := h.jobs.PublishSilenceJob(ctx, evt.MediaID, evt.AnalysisKey, port.SilenceJobOptions{
 			ThresholdMode:      cfg.ThresholdMode,
 			SilenceThresholdDb: cfg.SilenceThresholdDB,
 			NoiseFloorOffsetDb: cfg.NoiseFloorOffsetDb(),
+			Attempt:            silenceAttempt,
 		}); err != nil && firstErr == nil {
 			firstErr = err
 		}
