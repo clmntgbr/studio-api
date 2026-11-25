@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"testing"
 
-	cmdtimeline "go-api/internal/application/command/timeline"
 	"go-api/internal/interfaces/http/presenter"
 	"go-api/internal/interfaces/http/testutil"
 )
@@ -205,88 +204,9 @@ func TestTimelineHandler_Preview_HandlerError_Internal(t *testing.T) {
 	}
 }
 
-func TestTimelineHandler_Validate_Success(t *testing.T) {
-	validate := &mockValidate{out: sampleTimeline()}
-	get := &mockGet{view: sampleView()}
-	h := newHandler(nil, validate, get)
-	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/validate", map[string]any{
-		"version": 1,
-	})
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status=%d", resp.StatusCode)
-	}
-	if validate.cmd.Version != 1 {
-		t.Fatalf("version=%d", validate.cmd.Version)
-	}
-}
-
-func TestTimelineHandler_Validate_GetAfterValidateFallback(t *testing.T) {
-	validate := &mockValidate{out: sampleTimeline()}
-	get := &mockGet{err: errors.New("timeline not found")}
-	h := newHandler(nil, validate, get)
-	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/validate", map[string]any{
-		"version": 1,
-	})
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status=%d", resp.StatusCode)
-	}
-}
-
-func TestTimelineHandler_Validate_Unauthorized(t *testing.T) {
-	h := newHandler(nil, nil, nil)
-	app := mount(h, false)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/validate", map[string]any{
-		"version": 1,
-	})
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("status=%d", resp.StatusCode)
-	}
-}
-
-func TestTimelineHandler_Validate_InvalidProjectID(t *testing.T) {
+func TestTimelineHandler_Validate_Gone(t *testing.T) {
 	h := newHandler(nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/bad/timeline/validate", map[string]any{"version": 1})
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status=%d", resp.StatusCode)
-	}
-}
-
-func TestTimelineHandler_Validate_InvalidInput(t *testing.T) {
-	h := newHandler(nil, nil, nil)
-	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/validate", map[string]any{})
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status=%d", resp.StatusCode)
-	}
-}
-
-func TestTimelineHandler_Validate_StaleVersion(t *testing.T) {
-	validate := &mockValidate{err: cmdtimeline.ErrStaleVersion}
-	h := newHandler(nil, validate, nil)
-	app := mount(h, true)
 	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/validate", map[string]any{
 		"version": 1,
 	})
@@ -294,44 +214,13 @@ func TestTimelineHandler_Validate_StaleVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusConflict {
+	if resp.StatusCode != http.StatusGone {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
 	var body map[string]any
 	testutil.DecodeJSON(t, resp, &body)
-	if body["code"] != "STALE_TIMELINE_VERSION" {
-		t.Fatalf("%+v", body)
-	}
-}
-
-func TestTimelineHandler_Validate_NotFound(t *testing.T) {
-	validate := &mockValidate{err: errors.New("timeline not found")}
-	h := newHandler(nil, validate, nil)
-	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/validate", map[string]any{
-		"version": 1,
-	})
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("status=%d", resp.StatusCode)
-	}
-}
-
-func TestTimelineHandler_Validate_HandlerError_Internal(t *testing.T) {
-	validate := &mockValidate{err: errors.New("boom")}
-	h := newHandler(nil, validate, nil)
-	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/validate", map[string]any{
-		"version": 1,
-	})
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Fatalf("status=%d", resp.StatusCode)
+	want := "timeline validate removed; POST /projects/:id/renders to ship"
+	if body["message"] != want {
+		t.Fatalf("message=%v", body["message"])
 	}
 }
