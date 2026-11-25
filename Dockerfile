@@ -5,7 +5,8 @@ FROM golang:1.25-alpine AS base
 
 WORKDIR /app
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git \
+    && git config --global --add safe.directory '*'
 
 COPY go.mod go.sum ./
 RUN go mod download

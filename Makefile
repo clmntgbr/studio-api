@@ -115,7 +115,7 @@ unit-tests:
 # ============================================
 
 cli-build:
-	@$(COMPOSE_DEV) exec api go build -o bin/cli ./cmd/cli
+	@$(COMPOSE_DEV) exec api go build -buildvcs=false -o bin/cli ./cmd/cli
 
 migrate: cli-build
 	@echo "Applying SQL migrations..."
