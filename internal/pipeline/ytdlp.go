@@ -14,7 +14,9 @@ type YTDLPConfig struct {
 	Bin           string
 	MaxFilesizeMB int
 	MaxDurationS  int
-	CookiesFile   string
+	// MaxHeight caps progressive download resolution (0 → 1080). Avoids 4K+ when proxy/ship do not need it.
+	MaxHeight   int
+	CookiesFile string
 }
 
 type downloadMeta struct {
@@ -42,6 +44,15 @@ func DownloadURL(ctx context.Context, cfg YTDLPConfig, rawURL, workDir string) (
 	if maxMB <= 0 {
 		maxMB = 8000
 	}
+	maxH := cfg.MaxHeight
+	if maxH <= 0 {
+		maxH = 1080
+	}
+	// Cap the short side at MaxHeight so landscape (≤1080h) and portrait/Shorts (≤1080w) both stay ~1080p-class.
+	format := fmt.Sprintf(
+		"bv*[height<=%[1]d]+ba/bv*[width<=%[1]d]+ba/b[height<=%[1]d]/b[width<=%[1]d]",
+		maxH,
+	)
 
 	outTemplate := filepath.Join(workDir, "original.%(ext)s")
 	args := []string{
@@ -49,7 +60,8 @@ func DownloadURL(ctx context.Context, cfg YTDLPConfig, rawURL, workDir string) (
 		"--no-mtime",
 		"--newline",
 		"--max-filesize", fmt.Sprintf("%dM", maxMB),
-		"-f", "bv*+ba/b",
+		"-f", format,
+		"-S", "res,ext:mp4:m4a",
 		"--merge-output-format", "mp4",
 		"-o", outTemplate,
 		"--print-json",

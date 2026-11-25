@@ -217,6 +217,7 @@ func handleAudio(ctx context.Context, bus *topology.Bus, store *s3store.Client, 
 		_ = bus.Nack(d)
 		return err
 	}
+	_ = publishProgress(ctx, bus, msg, "audio", 1, "download", "Downloading source for audio")
 	local, cleanup, err := downloadToWork(ctx, store, cfg, req.MediaID, req.SourceKey, "audio")
 	if err != nil {
 		return finish(ctx, bus, d, msg, "audio", false, nil, "DOWNLOAD", err.Error(), true)
@@ -228,6 +229,7 @@ func handleAudio(ctx context.Context, bus *topology.Bus, store *s3store.Client, 
 	txPath := filepath.Join(workDir, "transcription.m4a")
 	masterPath := filepath.Join(workDir, "master.flac")
 
+	_ = publishProgress(ctx, bus, msg, "audio", 20, "extract", "Extracting analysis / transcription / master")
 	type extractErr struct {
 		code string
 		err  error
@@ -263,6 +265,7 @@ func handleAudio(ctx context.Context, bus *topology.Bus, store *s3store.Client, 
 	txKey := fmt.Sprintf("media/%s/audio/transcription.m4a", req.MediaID)
 	masterKey := fmt.Sprintf("media/%s/audio/master.flac", req.MediaID)
 
+	_ = publishProgress(ctx, bus, msg, "audio", 80, "upload", "Uploading audio derivatives")
 	type uploadErr struct {
 		err error
 	}
@@ -347,17 +350,20 @@ func handleWaveform(ctx context.Context, bus *topology.Bus, store *s3store.Clien
 		return finish(ctx, bus, d, msg, "waveform", false, nil, "INVALID_PAYLOAD", "mediaId and audioKey required", false)
 	}
 
+	_ = publishProgress(ctx, bus, msg, "waveform", 1, "download", "Downloading analysis audio")
 	local, cleanup, err := downloadToWork(ctx, store, cfg, req.MediaID, req.AudioKey, "waveform")
 	if err != nil {
 		return finish(ctx, bus, d, msg, "waveform", false, nil, "DOWNLOAD", err.Error(), true)
 	}
 	defer cleanup()
 
+	_ = publishProgress(ctx, bus, msg, "waveform", 40, "peaks", "Building waveform peaks")
 	peaksPath := filepath.Join(filepath.Dir(local), "peaks.bin")
 	if err := pipeline.MakeWaveformPeaks(ctx, local, peaksPath); err != nil {
 		return finish(ctx, bus, d, msg, "waveform", false, nil, "WAVEFORM", err.Error(), false)
 	}
 	peaksKey := fmt.Sprintf("media/%s/peaks/peaks.bin", req.MediaID)
+	_ = publishProgress(ctx, bus, msg, "waveform", 90, "upload", "Uploading peaks")
 	if err := store.UploadFile(ctx, cfg.MediaBucket, peaksKey, peaksPath, "application/octet-stream"); err != nil {
 		return finish(ctx, bus, d, msg, "waveform", false, nil, "UPLOAD", err.Error(), true)
 	}
