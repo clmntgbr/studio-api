@@ -284,6 +284,8 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-password}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+      # Raise consumer_timeout for long worker-render ffmpeg jobs (see rabbitmq/rabbitmq.conf).
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     networks: [backend]
     restart: unless-stopped
 
