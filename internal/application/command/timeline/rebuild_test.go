@@ -146,8 +146,8 @@ func expectedFingerprint(mediaID uuid.UUID, dets []domaindetection.Detection) st
 			PaddingBeforeMs:      cfg.PaddingBeforeMs,
 			PaddingAfterMs:       cfg.PaddingAfterMs,
 			SpeechMinDurationMs:  cfg.SpeechMinDurationMs,
-			SponsorsAction:       eng.Action(cfg.SponsorsAction),
-			AdsAction:            eng.Action(cfg.AdsAction),
+			SponsorsAction:       eng.ActionRemove,
+			AdsAction:            eng.ActionRemove,
 		},
 	}
 	for _, d := range dets {

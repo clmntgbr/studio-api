@@ -172,9 +172,7 @@ func (p *Publisher) PublishRenderJob(ctx context.Context, renderID string, plan 
 }
 
 func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string, opts port.TextJobOptions) error {
-	if opts.Language == "" {
-		opts.Language = "fr"
-	}
+	// Empty language = auto (no forced locale).
 	if opts.DetectionLevel == "" {
 		opts.DetectionLevel = "standard"
 	}
@@ -199,8 +197,9 @@ func (p *Publisher) PublishTextJob(ctx context.Context, mediaID, wordsKey string
 }
 
 func (p *Publisher) PublishLLMJob(ctx context.Context, mediaID, wordsKey string, opts port.LLMJobOptions) error {
-	if opts.Language == "" {
-		opts.Language = "fr"
+	// Empty language = auto. Sponsors are always removed in the product.
+	if opts.SponsorsAction == "" {
+		opts.SponsorsAction = "remove"
 	}
 	tasks := opts.Tasks
 	if len(tasks) == 0 {

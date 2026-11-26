@@ -25,9 +25,6 @@ type UpdateConfigurationCommand struct {
 	FillersEnabled       *bool
 	RepetitionsEnabled   *bool
 	FalseStartsEnabled   *bool
-	SponsorsAction       *string
-	AdsAction            *string
-	Language             *string
 	MasterSplit          *string // "" | parts:N | durationMs:N
 	BurnSubtitles        *bool
 	OutputPresetID       *uuid.UUID
@@ -104,15 +101,10 @@ func (h *UpdateConfigurationHandler) Handle(ctx context.Context, cmd UpdateConfi
 	if cmd.FalseStartsEnabled != nil {
 		cfg.FalseStartsEnabled = *cmd.FalseStartsEnabled
 	}
-	if cmd.SponsorsAction != nil {
-		cfg.SponsorsAction = domainmedia.DecisionAction(*cmd.SponsorsAction)
-	}
-	if cmd.AdsAction != nil {
-		cfg.AdsAction = domainmedia.DecisionAction(*cmd.AdsAction)
-	}
-	if cmd.Language != nil {
-		cfg.Language = cmd.Language
-	}
+	// Product rule: sponsors/ads always removed; language always auto.
+	cfg.SponsorsAction = domainmedia.DecisionRemove
+	cfg.AdsAction = domainmedia.DecisionRemove
+	cfg.Language = nil
 	if cmd.MasterSplit != nil {
 		raw := strings.TrimSpace(*cmd.MasterSplit)
 		if _, err := mastersplit.Parse(raw); err != nil {

@@ -36,25 +36,15 @@ func (h *EnqueueLLMHandler) Handle(ctx context.Context, payload []byte) error {
 	if err != nil {
 		return messaging.NonRetryable(err)
 	}
-	cfg, err := h.media.GetConfiguration(ctx, mediaID)
-	if err != nil {
-		return messaging.Retryable(err)
-	}
-	if cfg == nil {
-		cfg = domainmedia.DefaultConfiguration(mediaID)
-	}
 
-	lang := evt.Language
-	if lang == "" && cfg.Language != nil {
-		lang = *cfg.Language
-	}
+	// Language stays auto: use detected transcript language when present, else empty.
 	if err := mediacmd.QueueStep(ctx, h.media, mediaID, domainmedia.StepLLM, time.Now().UTC()); err != nil {
 		return messaging.Retryable(err)
 	}
 	if err := h.jobs.PublishLLMJob(ctx, evt.MediaID, evt.WordsKey, port.LLMJobOptions{
-		Language:       lang,
+		Language:       evt.Language,
 		Tasks:          []string{"sponsors", "chapters", "viral"},
-		SponsorsAction: string(cfg.SponsorsAction),
+		SponsorsAction: string(domainmedia.DecisionRemove),
 	}); err != nil {
 		return messaging.Retryable(err)
 	}

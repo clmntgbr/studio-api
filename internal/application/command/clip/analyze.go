@@ -40,18 +40,6 @@ func (h *AnalyzeHandler) Handle(ctx context.Context, cmd AnalyzeCommand) error {
 	if asset == nil || asset.StorageKey == "" {
 		return errors.New("words not ready")
 	}
-	cfg, err := h.media.GetConfiguration(ctx, m.ID)
-	if err != nil {
-		return err
-	}
-	if cfg == nil {
-		cfg = domainmedia.DefaultConfiguration(m.ID)
-	}
-	lang := ""
-	if cfg.Language != nil {
-		lang = *cfg.Language
-	}
-
 	now := time.Now().UTC()
 	step, err := h.media.GetStep(ctx, m.ID, domainmedia.StepLLM)
 	if err != nil {
@@ -82,8 +70,8 @@ func (h *AnalyzeHandler) Handle(ctx context.Context, cmd AnalyzeCommand) error {
 	}
 
 	return h.jobs.PublishLLMJob(ctx, m.ID.String(), asset.StorageKey, port.LLMJobOptions{
-		Language:       lang,
+		Language:       "",
 		Tasks:          []string{"sponsors", "chapters", "viral"},
-		SponsorsAction: string(cfg.SponsorsAction),
+		SponsorsAction: string(domainmedia.DecisionRemove),
 	})
 }

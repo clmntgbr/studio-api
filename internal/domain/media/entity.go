@@ -359,8 +359,9 @@ func DefaultConfiguration(mediaFileID uuid.UUID) *Configuration {
 		FillersEnabled:       false,
 		RepetitionsEnabled:   false,
 		FalseStartsEnabled:   false,
-		SponsorsAction:       DecisionSuggest,
-		AdsAction:            DecisionSuggest,
+		SponsorsAction:       DecisionRemove,
+		AdsAction:            DecisionRemove,
+		Language:             nil, // always auto (transcribe language detection)
 		MasterSplit:          "",
 		BurnSubtitles:        false,
 		OutputPresetID:       nil,

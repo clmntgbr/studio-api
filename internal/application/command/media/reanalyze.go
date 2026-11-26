@@ -226,12 +226,8 @@ func (h *ReanalyzeHandler) requeueText(ctx context.Context, m *domainmedia.Media
 		}
 	}
 
-	lang := ""
-	if cfg.Language != nil {
-		lang = *cfg.Language
-	}
 	return h.jobs.PublishTextJob(ctx, m.ID.String(), asset.StorageKey, port.TextJobOptions{
-		Language:           lang,
+		Language:           "", // always auto
 		DetectionLevel:     cfg.DetectionLevel,
 		FillersEnabled:     cfg.FillersEnabled,
 		RepetitionsEnabled: cfg.RepetitionsEnabled,
@@ -304,14 +300,6 @@ func (h *ReanalyzeHandler) requeueLLM(ctx context.Context, m *domainmedia.MediaF
 	if asset == nil || asset.StorageKey == "" {
 		return errors.New("words not ready")
 	}
-	cfg, err := h.media.GetConfiguration(ctx, m.ID)
-	if err != nil {
-		return err
-	}
-	if cfg == nil {
-		cfg = domainmedia.DefaultConfiguration(m.ID)
-	}
-
 	now := time.Now().UTC()
 	step, err := h.media.GetStep(ctx, m.ID, domainmedia.StepLLM)
 	if err != nil {
@@ -341,14 +329,10 @@ func (h *ReanalyzeHandler) requeueLLM(ctx context.Context, m *domainmedia.MediaF
 		}
 	}
 
-	lang := ""
-	if cfg.Language != nil {
-		lang = *cfg.Language
-	}
 	return h.jobs.PublishLLMJob(ctx, m.ID.String(), asset.StorageKey, port.LLMJobOptions{
-		Language:       lang,
+		Language:       "",
 		Tasks:          []string{"sponsors", "chapters", "viral"},
-		SponsorsAction: string(cfg.SponsorsAction),
+		SponsorsAction: string(domainmedia.DecisionRemove),
 	})
 }
 

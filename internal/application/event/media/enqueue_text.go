@@ -47,9 +47,6 @@ func (h *EnqueueTextHandler) Handle(ctx context.Context, payload []byte) error {
 		return nil
 	}
 	lang := evt.Language
-	if lang == "" && cfg.Language != nil {
-		lang = *cfg.Language
-	}
 	if err := mediacmd.QueueStep(ctx, h.media, mediaID, domainmedia.StepText, time.Now().UTC()); err != nil {
 		return messaging.Retryable(err)
 	}

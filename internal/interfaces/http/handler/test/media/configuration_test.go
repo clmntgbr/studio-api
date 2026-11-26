@@ -224,7 +224,7 @@ func TestMediaHandler_UpdateConfiguration_InvalidInput(t *testing.T) {
 	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	app := mount(h, true)
 	req, _ := testutil.JSONRequest(http.MethodPatch, "/api/media/"+testutil.TestMediaID.String()+"/configuration", map[string]any{
-		"sponsorsAction": "explode",
+		"detectionLevel": "explode",
 	})
 	resp, err := app.Test(req)
 	if err != nil {

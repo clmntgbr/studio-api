@@ -280,11 +280,8 @@ type updateConfigurationBody struct {
 	SpeechMinDurationMs  *int     `json:"speechMinDurationMs" validate:"omitempty,min=0"`
 	FillersEnabled       *bool    `json:"fillersEnabled"`
 	RepetitionsEnabled   *bool    `json:"repetitionsEnabled"`
-	FalseStartsEnabled   *bool    `json:"falseStartsEnabled"`
-	SponsorsAction       *string  `json:"sponsorsAction" validate:"omitempty,oneof=remove suggest keep"`
-	AdsAction            *string  `json:"adsAction" validate:"omitempty,oneof=remove suggest keep"`
-	Language             *string  `json:"language" validate:"omitempty,max=10"`
-	MasterSplit          *string  `json:"masterSplit" validate:"omitempty,max=64"`
+	FalseStartsEnabled *bool   `json:"falseStartsEnabled"`
+	MasterSplit        *string `json:"masterSplit" validate:"omitempty,max=64"`
 	BurnSubtitles        *bool    `json:"burnSubtitles"`
 	// Empty string clears the preset; non-empty must be a UUID (validated below).
 	OutputPresetID *string `json:"outputPresetId" validate:"omitempty"`
@@ -364,11 +361,8 @@ func (h *MediaHandler) UpdateConfiguration(c fiber.Ctx) error {
 		SpeechMinDurationMs:  body.SpeechMinDurationMs,
 		FillersEnabled:       body.FillersEnabled,
 		RepetitionsEnabled:   body.RepetitionsEnabled,
-		FalseStartsEnabled:   body.FalseStartsEnabled,
-		SponsorsAction:       body.SponsorsAction,
-		AdsAction:            body.AdsAction,
-		Language:             body.Language,
-		MasterSplit:          body.MasterSplit,
+		FalseStartsEnabled: body.FalseStartsEnabled,
+		MasterSplit:        body.MasterSplit,
 		BurnSubtitles:        body.BurnSubtitles,
 		OutputPresetID:       presetID,
 		ClearOutputPresetID:  clearPreset,

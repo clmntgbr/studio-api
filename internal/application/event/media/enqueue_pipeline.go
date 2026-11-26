@@ -125,7 +125,7 @@ func (h *EnqueueAfterAudioReadyHandler) Handle(ctx context.Context, payload []by
 		txKey = evt.AnalysisKey
 	}
 	if err := h.jobs.PublishTranscribeJob(ctx, evt.MediaID, txKey, port.TranscribeJobOptions{
-		Language: cfg.Language,
+		Language: nil, // always auto-detect
 	}); err != nil && firstErr == nil {
 		firstErr = err
 	}
