@@ -10,8 +10,9 @@ import (
 )
 
 type fakeReadyMediaRepo struct {
-	media  *domainmedia.MediaFile
-	steps  map[domainmedia.StepKind]*domainmedia.ProcessingStep
+	media   *domainmedia.MediaFile
+	cfg     *domainmedia.Configuration
+	steps   map[domainmedia.StepKind]*domainmedia.ProcessingStep
 	updated *domainmedia.MediaFile
 }
 
@@ -38,8 +39,11 @@ func (f *fakeReadyMediaRepo) SaveAsset(context.Context, *domainmedia.Asset) erro
 func (f *fakeReadyMediaRepo) SaveConfiguration(context.Context, *domainmedia.Configuration) error {
 	panic("unused")
 }
-func (f *fakeReadyMediaRepo) GetConfiguration(context.Context, uuid.UUID) (*domainmedia.Configuration, error) {
-	panic("unused")
+func (f *fakeReadyMediaRepo) GetConfiguration(_ context.Context, id uuid.UUID) (*domainmedia.Configuration, error) {
+	if f.cfg != nil {
+		return f.cfg, nil
+	}
+	return domainmedia.DefaultConfiguration(id), nil
 }
 func (f *fakeReadyMediaRepo) UpdateConfiguration(context.Context, *domainmedia.Configuration) error {
 	panic("unused")
@@ -60,10 +64,10 @@ func (f *fakeReadyMediaRepo) SaveStepRun(context.Context, *domainmedia.Processin
 	panic("unused")
 }
 
-func TestRequiredStepsForReady_WithAudio(t *testing.T) {
+func TestRequiredStepsForReady_WithAudio_TextEnabled(t *testing.T) {
 	has := true
 	m := &domainmedia.MediaFile{HasAudio: &has}
-	got := requiredStepsForReady(m)
+	got := requiredStepsForReady(m, true)
 	want := []domainmedia.StepKind{
 		domainmedia.StepProbe,
 		domainmedia.StepProxy,
@@ -84,12 +88,45 @@ func TestRequiredStepsForReady_WithAudio(t *testing.T) {
 	}
 }
 
+func TestRequiredStepsForReady_WithAudio_TextDisabled(t *testing.T) {
+	has := true
+	m := &domainmedia.MediaFile{HasAudio: &has}
+	got := requiredStepsForReady(m, false)
+	for _, k := range got {
+		if k == domainmedia.StepText {
+			t.Fatal("text must not be required when disabled")
+		}
+	}
+	if len(got) != 7 {
+		t.Fatalf("len=%d want 7: %v", len(got), got)
+	}
+}
+
 func TestRequiredStepsForReady_NoAudio(t *testing.T) {
 	has := false
 	m := &domainmedia.MediaFile{HasAudio: &has}
-	got := requiredStepsForReady(m)
+	got := requiredStepsForReady(m, true)
 	if len(got) != 2 || got[0] != domainmedia.StepProbe || got[1] != domainmedia.StepProxy {
 		t.Fatalf("got=%v", got)
+	}
+}
+
+func TestTryMarkMediaReady_ReadyWithoutTextWhenDisabled(t *testing.T) {
+	has := true
+	id := uuid.New()
+	repo := &fakeReadyMediaRepo{
+		media: &domainmedia.MediaFile{ID: id, Status: domainmedia.StatusProcessing, HasAudio: &has},
+		cfg:   domainmedia.DefaultConfiguration(id), // text detectors off
+		steps: map[domainmedia.StepKind]*domainmedia.ProcessingStep{},
+	}
+	for _, k := range requiredStepsForReady(repo.media, false) {
+		repo.steps[k] = &domainmedia.ProcessingStep{Kind: k, Status: domainmedia.StepStatusCompleted}
+	}
+	if err := tryMarkMediaReady(context.Background(), repo, nil, id); err != nil {
+		t.Fatal(err)
+	}
+	if repo.media.Status != domainmedia.StatusReady {
+		t.Fatalf("status=%s want ready", repo.media.Status)
 	}
 }
 
@@ -98,9 +135,10 @@ func TestTryMarkMediaReady_WaitsForLLM(t *testing.T) {
 	id := uuid.New()
 	repo := &fakeReadyMediaRepo{
 		media: &domainmedia.MediaFile{ID: id, Status: domainmedia.StatusProcessing, HasAudio: &has},
+		cfg:   domainmedia.DefaultConfiguration(id),
 		steps: map[domainmedia.StepKind]*domainmedia.ProcessingStep{},
 	}
-	for _, k := range requiredStepsForReady(repo.media) {
+	for _, k := range requiredStepsForReady(repo.media, false) {
 		if k == domainmedia.StepLLM {
 			continue
 		}

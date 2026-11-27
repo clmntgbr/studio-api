@@ -23,9 +23,17 @@ func stepDone(status domainmedia.StepStatus) bool {
 		status == domainmedia.StepStatusCancelled
 }
 
+// TextDetectionEnabled is true when any transcript-based cut detector is on.
+func TextDetectionEnabled(cfg *domainmedia.Configuration) bool {
+	if cfg == nil {
+		return false
+	}
+	return cfg.FillersEnabled || cfg.RepetitionsEnabled || cfg.FalseStartsEnabled
+}
+
 // requiredStepsForReady lists pipeline steps that must finish before media becomes editable.
-// Excludes render / reframe / scenes (on-demand).
-func requiredStepsForReady(m *domainmedia.MediaFile) []domainmedia.StepKind {
+// Excludes render / reframe / scenes (on-demand). Text is only required when enabled in config.
+func requiredStepsForReady(m *domainmedia.MediaFile, textEnabled bool) []domainmedia.StepKind {
 	required := []domainmedia.StepKind{
 		domainmedia.StepProbe,
 		domainmedia.StepProxy,
@@ -37,9 +45,11 @@ func requiredStepsForReady(m *domainmedia.MediaFile) []domainmedia.StepKind {
 			domainmedia.StepWaveform,
 			domainmedia.StepSilence,
 			domainmedia.StepTranscribe,
-			domainmedia.StepText,
-			domainmedia.StepLLM,
 		)
+		if textEnabled {
+			required = append(required, domainmedia.StepText)
+		}
+		required = append(required, domainmedia.StepLLM)
 	}
 	return required
 }
@@ -59,7 +69,12 @@ func tryMarkMediaReady(ctx context.Context, repo domainmedia.WriteRepository, ou
 		return nil
 	}
 
-	for _, kind := range requiredStepsForReady(m) {
+	cfg, err := repo.GetConfiguration(ctx, mediaID)
+	if err != nil {
+		return err
+	}
+
+	for _, kind := range requiredStepsForReady(m, TextDetectionEnabled(cfg)) {
 		step, err := repo.GetStep(ctx, mediaID, kind)
 		if err != nil {
 			return err

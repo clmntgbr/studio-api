@@ -131,6 +131,36 @@ func stepStartAt(step *domainmedia.ProcessingStep, at time.Time) time.Time {
 	return started
 }
 
+// SkipStep marks a processing step as skipped (optional work that will not run).
+func SkipStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {
+	step, err := repo.GetStep(ctx, mediaID, kind)
+	if err != nil {
+		return err
+	}
+	if step == nil {
+		step = domainmedia.NewProcessingStep(mediaID, kind)
+		step.Status = domainmedia.StepStatusSkipped
+		step.Attempt = 1
+		step.Progress = 1
+		done := at
+		step.CompletedAt = &done
+		q := at
+		step.QueuedAt = &q
+		return repo.SaveStep(ctx, step)
+	}
+	if step.Status == domainmedia.StepStatusCompleted ||
+		step.Status == domainmedia.StepStatusSkipped ||
+		step.Status == domainmedia.StepStatusCancelled {
+		return nil
+	}
+	step.Status = domainmedia.StepStatusSkipped
+	step.Progress = 1
+	step.ErrorMessage = nil
+	done := at
+	step.CompletedAt = &done
+	return repo.UpdateStep(ctx, step)
+}
+
 // QueueStep marks a processing step as queued.
 func QueueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {
 	return queueStep(ctx, repo, mediaID, kind, at)

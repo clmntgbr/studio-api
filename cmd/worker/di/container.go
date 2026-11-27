@@ -138,7 +138,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	reg.Register(domainmedia.EventTypeMediaTranscribed, dedup.With(
 		dedupRepo,
 		"enqueue_text_on_transcribed",
-		eventmedia.NewEnqueueTextHandler(jobPublisher, mediaWriteRepo).Handle,
+		eventmedia.NewEnqueueTextHandler(jobPublisher, mediaWriteRepo, outboxRepo).Handle,
 	))
 	reg.Register(domainmedia.EventTypeMediaTranscribed, dedup.With(
 		dedupRepo,

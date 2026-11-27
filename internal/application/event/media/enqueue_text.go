@@ -16,12 +16,17 @@ import (
 
 // EnqueueTextHandler starts text detection after media.transcribed.v1.
 type EnqueueTextHandler struct {
-	jobs  port.JobPublisher
-	media domainmedia.WriteRepository
+	jobs   port.JobPublisher
+	media  domainmedia.WriteRepository
+	outbox port.OutboxRepository
 }
 
-func NewEnqueueTextHandler(jobs port.JobPublisher, media domainmedia.WriteRepository) *EnqueueTextHandler {
-	return &EnqueueTextHandler{jobs: jobs, media: media}
+func NewEnqueueTextHandler(
+	jobs port.JobPublisher,
+	media domainmedia.WriteRepository,
+	outbox port.OutboxRepository,
+) *EnqueueTextHandler {
+	return &EnqueueTextHandler{jobs: jobs, media: media, outbox: outbox}
 }
 
 func (h *EnqueueTextHandler) Handle(ctx context.Context, payload []byte) error {
@@ -43,11 +48,19 @@ func (h *EnqueueTextHandler) Handle(ctx context.Context, payload []byte) error {
 	if cfg == nil {
 		cfg = domainmedia.DefaultConfiguration(mediaID)
 	}
-	if !cfg.FillersEnabled && !cfg.RepetitionsEnabled && !cfg.FalseStartsEnabled {
+	now := time.Now().UTC()
+	if !mediacmd.TextDetectionEnabled(cfg) {
+		// Optional step — skip + re-evaluate ready (llm may already be done).
+		if err := mediacmd.SkipStep(ctx, h.media, mediaID, domainmedia.StepText, now); err != nil {
+			return messaging.Retryable(err)
+		}
+		if err := mediacmd.TryMarkMediaReady(ctx, h.media, h.outbox, mediaID); err != nil {
+			return messaging.Retryable(err)
+		}
 		return nil
 	}
 	lang := evt.Language
-	if err := mediacmd.QueueStep(ctx, h.media, mediaID, domainmedia.StepText, time.Now().UTC()); err != nil {
+	if err := mediacmd.QueueStep(ctx, h.media, mediaID, domainmedia.StepText, now); err != nil {
 		return messaging.Retryable(err)
 	}
 	attempt := 1
