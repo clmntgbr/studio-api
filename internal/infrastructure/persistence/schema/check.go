@@ -16,7 +16,6 @@ func Models() []any {
 		&write.UserModel{},
 		&outbox.OutboxEvent{},
 		&processed.ProcessedEvent{},
-		&write.ProjectModel{},
 		&write.MediaFileModel{},
 		&write.MediaAssetModel{},
 		&write.MediaConfigurationModel{},

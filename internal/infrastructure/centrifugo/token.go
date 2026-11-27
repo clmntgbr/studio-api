@@ -32,7 +32,7 @@ func NewConnectionInfo(env *config.Config, userID uuid.UUID) (ConnectionInfo, er
 
 func generateConnectionToken(secret string, userID uuid.UUID) (string, error) {
 	// No channels claim: clients may subscribe to namespaces with
-	// allow_subscribe_for_client (users + projects).
+	// allow_subscribe_for_client (users + media).
 	claims := jwt.MapClaims{
 		"sub": userID.String(),
 		"exp": time.Now().Add(24 * time.Hour).Unix(),

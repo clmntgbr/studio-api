@@ -179,14 +179,13 @@ func (f *fakeJobs) PublishReframeJob(_ context.Context, mediaID, proxyKey string
 
 func TestCreateHandler_defersWhenCropMissing_faceTrack(t *testing.T) {
 	ctx := context.Background()
-	projectID := uuid.New()
 	timelineID := uuid.New()
 	presetID := uuid.New()
 	mediaID := uuid.New()
 
 	renders := &fakeRenderRepo{}
 	timelines := &fakeTimelineRead{
-		head:     &domaintimeline.Timeline{ID: timelineID, ProjectID: projectID},
+		head:     &domaintimeline.Timeline{ID: timelineID},
 		segments: []domaintimeline.Segment{{MediaFileID: mediaID, SourceStartMs: 0, SourceEndMs: 5000}},
 	}
 	presets := &fakePresetRepo{

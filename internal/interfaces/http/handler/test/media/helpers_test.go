@@ -145,7 +145,6 @@ func sampleMedia() *domainmedia.MediaFile {
 	fn := "clip.mp4"
 	return &domainmedia.MediaFile{
 		ID:               testutil.TestMediaID,
-		ProjectID:        testutil.TestProjectID,
 		SourceKind:       domainmedia.SourceKindUpload,
 		OriginalFilename: &fn,
 		StorageKey:       &key,
@@ -232,9 +231,9 @@ func mount(h *handler.MediaHandler, withUser bool) *fiber.App {
 		}
 		app.Add([]string{method}, path, fn)
 	}
-	register(fiber.MethodPost, "/api/projects/:id/media/uploads", h.InitiateUpload)
-	register(fiber.MethodPost, "/api/projects/:id/media/from-url", h.FromURL)
-	register(fiber.MethodGet, "/api/projects/:id/media", h.ListByProject)
+	register(fiber.MethodPost, "/api/media/uploads", h.InitiateUpload)
+	register(fiber.MethodPost, "/api/media/from-url", h.FromURL)
+	register(fiber.MethodGet, "/api/media", h.List)
 	register(fiber.MethodGet, "/api/media/:id", h.GetByID)
 	register(fiber.MethodDelete, "/api/media/:id", h.Delete)
 	register(fiber.MethodPost, "/api/media/:id/uploads/parts", h.PresignParts)

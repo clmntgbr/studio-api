@@ -14,6 +14,6 @@ type WriteRepository interface {
 }
 
 type ReadRepository interface {
-	ListByProject(ctx context.Context, projectID uuid.UUID) ([]Clip, error)
+	ListByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]Clip, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Clip, error)
 }

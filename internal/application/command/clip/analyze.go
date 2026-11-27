@@ -12,8 +12,7 @@ import (
 )
 
 type AnalyzeCommand struct {
-	ProjectID uuid.UUID
-	MediaID   uuid.UUID
+	MediaID uuid.UUID
 }
 
 type AnalyzeHandler struct {
@@ -30,7 +29,7 @@ func (h *AnalyzeHandler) Handle(ctx context.Context, cmd AnalyzeCommand) error {
 	if err != nil {
 		return err
 	}
-	if m == nil || m.ProjectID != cmd.ProjectID {
+	if m == nil {
 		return errors.New("media not found")
 	}
 	asset, err := h.media.GetAssetByKind(ctx, m.ID, domainmedia.AssetKindWords)

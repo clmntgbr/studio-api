@@ -13,8 +13,7 @@ import (
 )
 
 type RebuildCommand struct {
-	ProjectID uuid.UUID
-	MediaID   uuid.UUID
+	MediaID uuid.UUID
 }
 
 type RebuildHandler struct {
@@ -38,7 +37,7 @@ func (h *RebuildHandler) Handle(ctx context.Context, cmd RebuildCommand) (*domai
 	if err != nil {
 		return nil, eng.Output{}, err
 	}
-	if m == nil || m.ProjectID != cmd.ProjectID {
+	if m == nil {
 		return nil, eng.Output{}, errors.New("media not found")
 	}
 	out, err := buildForMedia(ctx, h.media, h.detections, m)
@@ -58,7 +57,7 @@ func (h *RebuildHandler) Handle(ctx context.Context, cmd RebuildCommand) (*domai
 	decisions := mapDecisions(out)
 
 	if head == nil {
-		t := domaintimeline.New(cmd.ProjectID, cmd.MediaID, 1, out.Fingerprint, out.DurationMs)
+		t := domaintimeline.New(cmd.MediaID, 1, out.Fingerprint, out.DurationMs)
 		err = h.timelines.WithTransaction(ctx, func(txCtx context.Context) error {
 			return h.timelines.Save(txCtx, t, segments, decisions)
 		})

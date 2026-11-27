@@ -13,7 +13,6 @@ import (
 
 type ClipResponse struct {
 	ID            string    `json:"id"`
-	ProjectID     string    `json:"projectId"`
 	MediaFileID   string    `json:"mediaFileId"`
 	SourceStartMs int64     `json:"sourceStartMs"`
 	SourceEndMs   int64     `json:"sourceEndMs"`
@@ -35,7 +34,6 @@ func NewClipResponse(c *domainclip.Clip) ClipResponse {
 	}
 	return ClipResponse{
 		ID:            c.ID.String(),
-		ProjectID:     c.ProjectID.String(),
 		MediaFileID:   c.MediaFileID.String(),
 		SourceStartMs: c.SourceStartMs,
 		SourceEndMs:   c.SourceEndMs,

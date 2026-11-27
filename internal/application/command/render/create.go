@@ -135,7 +135,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		if err != nil {
 			return nil, err
 		}
-		if clip == nil || clip.ProjectID != mediaFile.ProjectID || clip.MediaFileID != cmd.MediaID {
+		if clip == nil || clip.MediaFileID != cmd.MediaID {
 			return nil, errors.New("clip not found")
 		}
 	}
@@ -240,7 +240,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 			return nil, err
 		}
 
-		r := domainrender.New(mediaFile.ProjectID, cmd.MediaID, t.ID, preset.ID, kind, fp, markerPlan)
+		r := domainrender.New(cmd.MediaID, t.ID, preset.ID, kind, fp, markerPlan)
 		r.ID = renderID
 		r.SubtitleStyleID = cmd.SubtitleStyleID
 		r.ClipID = cmd.ClipID
@@ -292,7 +292,6 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		storage:      h.storage,
 		renderBucket: h.renderBucket,
 	}, queuedPlanRequest{
-		ProjectID:       mediaFile.ProjectID,
 		MediaID:         cmd.MediaID,
 		RenderID:        renderID,
 		TimelineID:      t.ID,
@@ -307,7 +306,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		return nil, err
 	}
 
-	r := domainrender.New(mediaFile.ProjectID, cmd.MediaID, t.ID, preset.ID, kind, fp, rawPlan)
+	r := domainrender.New(cmd.MediaID, t.ID, preset.ID, kind, fp, rawPlan)
 	r.ID = renderID
 	r.SubtitleStyleID = cmd.SubtitleStyleID
 	r.ClipID = cmd.ClipID

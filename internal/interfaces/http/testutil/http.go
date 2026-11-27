@@ -29,14 +29,10 @@ func NewTestApp() *fiber.App {
 	})
 }
 
-// WithActiveProject injects a user with the given active project into the request context.
-func WithActiveProject(userID, projectID uuid.UUID) fiber.Handler {
+// WithActiveProject injects the test user into the request context (legacy name).
+func WithActiveProject(userID, _ uuid.UUID) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		projectIDCopy := projectID
-		httpctx.SetUser(c, domainuser.User{
-			ID:              userID,
-			ActiveProjectID: &projectIDCopy,
-		})
+		httpctx.SetUser(c, domainuser.User{ID: userID})
 		return c.Next()
 	}
 }

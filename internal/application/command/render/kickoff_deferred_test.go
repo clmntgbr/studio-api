@@ -70,7 +70,7 @@ func (f *fakeMediaKickoff) GetByID(_ context.Context, id uuid.UUID) (*domainmedi
 		return nil, nil
 	}
 	key := f.source
-	return &domainmedia.MediaFile{ID: id, ProjectID: f.projectID, StorageKey: &key}, nil
+	return &domainmedia.MediaFile{ID: id, StorageKey: &key}, nil
 }
 func (f *fakeMediaKickoff) Delete(context.Context, uuid.UUID) error             { panic("unused") }
 func (f *fakeMediaKickoff) SaveAsset(context.Context, *domainmedia.Asset) error { panic("unused") }
@@ -124,7 +124,6 @@ func TestKickoffDeferredHandler_queuesPendingRenderForMedia(t *testing.T) {
 	marker := markerPlan(mediaID)
 	rendersRead := &fakeRenderReadRepo{byProject: []domainrender.Render{{
 		ID:             renderID,
-		ProjectID:      projectID,
 		TimelineID:     timelineID,
 		OutputPresetID: presetID,
 		Kind:           domainrender.KindMaster,
@@ -133,7 +132,7 @@ func TestKickoffDeferredHandler_queuesPendingRenderForMedia(t *testing.T) {
 	}}}
 	rendersWrite := &fakeRenderWriteKickoff{}
 	timelines := &fakeTimelineRead{
-		head:     &domaintimeline.Timeline{ID: timelineID, ProjectID: projectID},
+		head:     &domaintimeline.Timeline{ID: timelineID},
 		segments: []domaintimeline.Segment{{MediaFileID: mediaID, SourceStartMs: 0, SourceEndMs: 5000}},
 	}
 	presets := &fakePresetRepo{
@@ -172,7 +171,6 @@ func TestKickoffDeferredHandler_ignoresOtherMediaAndNonPending(t *testing.T) {
 	rendersRead := &fakeRenderReadRepo{byProject: []domainrender.Render{
 		{
 			ID:             uuid.New(),
-			ProjectID:      projectID,
 			TimelineID:     timelineID,
 			OutputPresetID: presetID,
 			Kind:           domainrender.KindMaster,
@@ -181,7 +179,6 @@ func TestKickoffDeferredHandler_ignoresOtherMediaAndNonPending(t *testing.T) {
 		},
 		{
 			ID:             uuid.New(),
-			ProjectID:      projectID,
 			TimelineID:     timelineID,
 			OutputPresetID: presetID,
 			Kind:           domainrender.KindMaster,

@@ -7,12 +7,9 @@ import (
 	"strings"
 
 	domainstyle "go-api/internal/domain/subtitlestyle"
-
-	"github.com/google/uuid"
 )
 
 type CreateCommand struct {
-	ProjectID      *uuid.UUID
 	Name           string
 	FontFamily     *string
 	FontSize       *int
@@ -38,9 +35,6 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domains
 	if cmd.Name == "" {
 		return nil, errors.New("name is required")
 	}
-	if cmd.ProjectID == nil {
-		return nil, errors.New("projectId is required")
-	}
 	if cmd.FontFamily != nil && strings.ContainsAny(*cmd.FontFamily, ",\r\n{}") {
 		return nil, errors.New("fontFamily is invalid")
 	}
@@ -55,7 +49,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domains
 		}
 	}
 
-	s := domainstyle.New(cmd.Name, cmd.ProjectID)
+	s := domainstyle.New(cmd.Name)
 	s.FontFamily = cmd.FontFamily
 	s.FontSize = cmd.FontSize
 	s.BaseColor = cmd.BaseColor

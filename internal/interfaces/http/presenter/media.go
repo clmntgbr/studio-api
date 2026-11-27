@@ -38,7 +38,6 @@ type MediaStepsResponse struct {
 
 type MediaResponse struct {
 	ID               string              `json:"id"`
-	ProjectID        string              `json:"projectId"`
 	Position         int                 `json:"position"`
 	SourceKind       string              `json:"sourceKind"`
 	SourceURL        *string             `json:"sourceUrl,omitempty"`
@@ -63,7 +62,6 @@ func NewMediaResponseFromView(v domainmedia.FileView) MediaResponse {
 	}
 	return MediaResponse{
 		ID:               v.ID.String(),
-		ProjectID:        v.ProjectID.String(),
 		Position:         v.Position,
 		SourceKind:       string(v.SourceKind),
 		SourceURL:        v.SourceURL,
@@ -85,7 +83,6 @@ func NewMediaResponseFromView(v domainmedia.FileView) MediaResponse {
 func NewMediaResponseFromEntity(m *domainmedia.MediaFile) MediaResponse {
 	return MediaResponse{
 		ID:               m.ID.String(),
-		ProjectID:        m.ProjectID.String(),
 		Position:         m.Position,
 		SourceKind:       string(m.SourceKind),
 		SourceURL:        m.SourceURL,

@@ -8,7 +8,7 @@ import (
 
 type RealtimePublisher interface {
 	PublishToUser(ctx context.Context, userID uuid.UUID, eventType string, payload any) error
-	PublishToProject(ctx context.Context, projectID uuid.UUID, eventType string, payload any) error
+	PublishToMedia(ctx context.Context, mediaID uuid.UUID, eventType string, payload any) error
 }
 
 // RealtimeConnection carries the credentials a client needs to open a realtime

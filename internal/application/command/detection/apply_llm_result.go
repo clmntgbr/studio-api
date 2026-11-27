@@ -128,7 +128,7 @@ func (h *ApplyLLMResultHandler) Handle(ctx context.Context, cmd ApplyLLMResultCo
 		if c.SourceEndMs <= c.SourceStartMs {
 			continue
 		}
-		clip := domainclip.New(m.ProjectID, m.ID, c.SourceStartMs, c.SourceEndMs, "llm")
+		clip := domainclip.New(m.ID, c.SourceStartMs, c.SourceEndMs, "llm")
 		clip.Score = c.Score
 		if c.Hook != "" {
 			h := c.Hook

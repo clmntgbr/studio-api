@@ -104,7 +104,6 @@ const (
 
 type MediaFile struct {
 	ID               uuid.UUID
-	ProjectID        uuid.UUID
 	Position         int
 	SourceKind       SourceKind
 	SourceURL        *string
@@ -127,12 +126,11 @@ type MediaFile struct {
 	events []event.DomainEvent
 }
 
-func NewUpload(projectID uuid.UUID, filename string, position int) *MediaFile {
+func NewUpload(filename string, position int) *MediaFile {
 	now := time.Now().UTC()
 	fn := filename
 	m := &MediaFile{
 		ID:               uuid.New(),
-		ProjectID:        projectID,
 		Position:         position,
 		SourceKind:       SourceKindUpload,
 		OriginalFilename: &fn,
@@ -143,18 +141,16 @@ func NewUpload(projectID uuid.UUID, filename string, position int) *MediaFile {
 	m.recordEvent(MediaUploaded{
 		ID:        uuid.New().String(),
 		MediaID:   m.ID.String(),
-		ProjectID: projectID.String(),
 		Timestamp: now,
 	})
 	return m
 }
 
-func NewFromURL(projectID uuid.UUID, rawURL string, position int) *MediaFile {
+func NewFromURL(rawURL string, position int) *MediaFile {
 	now := time.Now().UTC()
 	u := rawURL
 	m := &MediaFile{
 		ID:         uuid.New(),
-		ProjectID:  projectID,
 		Position:   position,
 		SourceKind: SourceKindURL,
 		SourceURL:  &u,
@@ -165,7 +161,6 @@ func NewFromURL(projectID uuid.UUID, rawURL string, position int) *MediaFile {
 	m.recordEvent(MediaFetchRequested{
 		ID:        uuid.New().String(),
 		MediaID:   m.ID.String(),
-		ProjectID: projectID.String(),
 		URL:       rawURL,
 		Timestamp: now,
 	})
@@ -189,7 +184,6 @@ func (m *MediaFile) MarkReady() {
 	m.recordEvent(MediaReady{
 		ID:        uuid.New().String(),
 		MediaID:   m.ID.String(),
-		ProjectID: m.ProjectID.String(),
 		Timestamp: now,
 	})
 }
@@ -226,7 +220,6 @@ func (m *MediaFile) RecordDetectionsUpdated(kind string) {
 	m.recordEvent(DetectionsUpdated{
 		ID:        uuid.New().String(),
 		MediaID:   m.ID.String(),
-		ProjectID: m.ProjectID.String(),
 		Kind:      kind,
 		Timestamp: now,
 	})
@@ -248,7 +241,6 @@ func (m *MediaFile) MarkSourceReady(sourceKey string) {
 	m.recordEvent(MediaSourceReady{
 		ID:        uuid.New().String(),
 		MediaID:   m.ID.String(),
-		ProjectID: m.ProjectID.String(),
 		SourceKey: sourceKey,
 		Timestamp: now,
 	})
@@ -272,7 +264,6 @@ func (m *MediaFile) ApplyProbe(durationMs int64, width, height int, fps float64,
 	m.recordEvent(MediaProbed{
 		ID:         uuid.New().String(),
 		MediaID:    m.ID.String(),
-		ProjectID:  m.ProjectID.String(),
 		SourceKey:  sourceKey,
 		HasAudio:   hasAudio,
 		DurationMs: durationMs,
@@ -289,7 +280,6 @@ func (m *MediaFile) RecordAudioReady(analysisKey, transcriptionKey, masterKey st
 	m.recordEvent(MediaAudioReady{
 		ID:               uuid.New().String(),
 		MediaID:          m.ID.String(),
-		ProjectID:        m.ProjectID.String(),
 		AnalysisKey:      analysisKey,
 		TranscriptionKey: transcriptionKey,
 		MasterKey:        masterKey,
@@ -303,7 +293,6 @@ func (m *MediaFile) RecordProxyReady(proxyKey string) {
 	m.recordEvent(MediaProxyReady{
 		ID:        uuid.New().String(),
 		MediaID:   m.ID.String(),
-		ProjectID: m.ProjectID.String(),
 		ProxyKey:  proxyKey,
 		Timestamp: now,
 	})
@@ -315,7 +304,6 @@ func (m *MediaFile) RecordWaveformReady(peaksKey string) {
 	m.recordEvent(MediaWaveformReady{
 		ID:        uuid.New().String(),
 		MediaID:   m.ID.String(),
-		ProjectID: m.ProjectID.String(),
 		PeaksKey:  peaksKey,
 		Timestamp: now,
 	})
@@ -327,7 +315,6 @@ func (m *MediaFile) RecordTranscribed(wordsKey, language string) {
 	m.recordEvent(MediaTranscribed{
 		ID:        uuid.New().String(),
 		MediaID:   m.ID.String(),
-		ProjectID: m.ProjectID.String(),
 		WordsKey:  wordsKey,
 		Language:  language,
 		Timestamp: now,

@@ -23,7 +23,6 @@ func NewRenderReadRepository(db *gorm.DB) domainrender.ReadRepository {
 
 type renderScan struct {
 	ID              uuid.UUID    `gorm:"column:id"`
-	ProjectID       uuid.UUID    `gorm:"column:project_id"`
 	MediaFileID     uuid.UUID    `gorm:"column:media_file_id"`
 	TimelineID      uuid.UUID    `gorm:"column:timeline_id"`
 	Kind            string       `gorm:"column:kind"`
@@ -100,7 +99,6 @@ func renderFromScan(row renderScan) domainrender.Render {
 	}
 	return domainrender.Render{
 		ID:              row.ID,
-		ProjectID:       row.ProjectID,
 		MediaFileID:     row.MediaFileID,
 		TimelineID:      row.TimelineID,
 		Kind:            domainrender.Kind(row.Kind),

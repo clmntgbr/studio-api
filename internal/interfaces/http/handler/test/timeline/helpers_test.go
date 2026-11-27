@@ -108,7 +108,6 @@ func sampleTimeline() *domaintimeline.Timeline {
 	now := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)
 	return &domaintimeline.Timeline{
 		ID:          testutil.TestTimelineID,
-		ProjectID:   testutil.TestProjectID,
 		MediaFileID: testutil.TestMediaID,
 		Version:     1,
 		Status:      domaintimeline.StatusDraft,

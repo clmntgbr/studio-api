@@ -39,7 +39,6 @@ func NewSubtitleStyleHandler(
 }
 
 type subtitleStyleBody struct {
-	ProjectID      string          `json:"projectId" validate:"required,uuid"`
 	Name           string          `json:"name" validate:"required,min=1,max=100"`
 	FontFamily     *string         `json:"fontFamily" validate:"omitempty,max=255"`
 	FontSize       *int            `json:"fontSize" validate:"omitempty,min=8,max=200"`
@@ -71,15 +70,7 @@ func (h *SubtitleStyleHandler) List(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	var projectID *uuid.UUID
-	if v := c.Query("projectId"); v != "" {
-		id, err := uuid.Parse(v)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid projectId"})
-		}
-		projectID = &id
-	}
-	items, err := h.listHandler.Handle(c.Context(), querystyle.ListQuery{ProjectID: projectID})
+	items, err := h.listHandler.Handle(c.Context(), querystyle.ListQuery{})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list subtitle styles"})
 	}
@@ -112,9 +103,7 @@ func (h *SubtitleStyleHandler) Create(c fiber.Ctx) error {
 	if err := validation.BindBody(c, &body); err != nil {
 		return err
 	}
-	projectID := uuid.MustParse(body.ProjectID)
 	s, err := h.createHandler.Handle(c.Context(), cmdstyle.CreateCommand{
-		ProjectID:      &projectID,
 		Name:           body.Name,
 		FontFamily:     body.FontFamily,
 		FontSize:       body.FontSize,

@@ -83,24 +83,24 @@ func (p *Publisher) ToUser(
 	return nil
 }
 
-// ToProject delivers the event on projects:{projectId}.
-func (p *Publisher) ToProject(
+// ToMedia delivers the event on media:{mediaId}.
+func (p *Publisher) ToMedia(
 	ctx context.Context,
 	entity string,
 	action string,
-	projectIDRaw string,
+	mediaIDRaw string,
 	payload any,
 ) error {
-	projectID, err := uuid.Parse(projectIDRaw)
+	mediaID, err := uuid.Parse(mediaIDRaw)
 	if err != nil {
 		return messaging.NonRetryable(err)
 	}
 	eventType := EventType(entity, action)
-	if err := p.transport.PublishToProject(ctx, projectID, eventType, payload); err != nil {
+	if err := p.transport.PublishToMedia(ctx, mediaID, eventType, payload); err != nil {
 		// Best-effort: never fail the domain event pipeline on realtime outages.
-		log.Printf("centrifugo publish failed type=%s projectId=%s: %v", eventType, projectIDRaw, err)
+		log.Printf("centrifugo publish failed type=%s mediaId=%s: %v", eventType, mediaIDRaw, err)
 		return nil
 	}
-	log.Printf("centrifugo published type=%s projectId=%s", eventType, projectIDRaw)
+	log.Printf("centrifugo published type=%s mediaId=%s", eventType, mediaIDRaw)
 	return nil
 }

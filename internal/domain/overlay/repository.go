@@ -12,5 +12,5 @@ type WriteRepository interface {
 }
 
 type ReadRepository interface {
-	ListByProject(ctx context.Context, projectID uuid.UUID) ([]Overlay, error)
+	ListByClip(ctx context.Context, clipID uuid.UUID) ([]Overlay, error)
 }

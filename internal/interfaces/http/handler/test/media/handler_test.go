@@ -22,7 +22,7 @@ func TestMediaHandler_InitiateUpload_Success(t *testing.T) {
 	}}
 	h := newHandler(init, nil, nil, nil, nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/media/uploads", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/uploads", map[string]any{
 		"filename":  "clip.mp4",
 		"partCount": 1,
 	})
@@ -43,7 +43,7 @@ func TestMediaHandler_InitiateUpload_Success(t *testing.T) {
 func TestMediaHandler_InitiateUpload_Unauthorized(t *testing.T) {
 	h := newHandler(nil, nil, nil, nil, nil, nil, nil)
 	app := mount(h, false)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/media/uploads", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/uploads", map[string]any{
 		"filename": "clip.mp4",
 	})
 	resp, err := app.Test(req)
@@ -58,7 +58,7 @@ func TestMediaHandler_InitiateUpload_Unauthorized(t *testing.T) {
 func TestMediaHandler_FromURL_InvalidURL_Blocked(t *testing.T) {
 	h := newHandler(nil, nil, nil, nil, nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/media/from-url", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/from-url", map[string]any{
 		"url": "http://127.0.0.1/secret",
 	})
 	resp, err := app.Test(req)
@@ -73,7 +73,7 @@ func TestMediaHandler_FromURL_InvalidURL_Blocked(t *testing.T) {
 func TestMediaHandler_GetByID_Success(t *testing.T) {
 	m := sampleMedia()
 	get := &mockGet{view: &domainmedia.FileView{
-		ID: m.ID, ProjectID: m.ProjectID, SourceKind: m.SourceKind, Status: m.Status,
+		ID: m.ID, SourceKind: m.SourceKind, Status: m.Status,
 		CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
 	}}
 	h := newHandler(nil, nil, nil, nil, nil, get, nil)
@@ -136,11 +136,11 @@ func TestMediaHandler_PresignParts_Success(t *testing.T) {
 	}
 }
 
-func TestMediaHandler_ListByProject_Success(t *testing.T) {
-	list := &mockList{views: []domainmedia.FileView{{ID: testutil.TestMediaID, ProjectID: testutil.TestProjectID, Status: domainmedia.StatusPending}}, total: 1}
+func TestMediaHandler_ListByMedia_Success(t *testing.T) {
+	list := &mockList{views: []domainmedia.FileView{{ID: testutil.TestMediaID, Status: domainmedia.StatusPending}}, total: 1}
 	h := newHandler(nil, nil, nil, nil, nil, nil, list)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/media", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestMediaHandler_FromURL_Success(t *testing.T) {
 	fromURL := &mockFromURL{out: sampleMedia()}
 	h := newHandler(nil, nil, nil, fromURL, nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/media/from-url", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/from-url", map[string]any{
 		"url": "https://1.1.1.1/video.mp4",
 	})
 	resp, err := app.Test(req)
@@ -162,19 +162,6 @@ func TestMediaHandler_FromURL_Success(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp.StatusCode != http.StatusCreated {
-		t.Fatalf("status=%d", resp.StatusCode)
-	}
-}
-
-func TestMediaHandler_InitiateUpload_InvalidProjectID(t *testing.T) {
-	h := newHandler(nil, nil, nil, nil, nil, nil, nil)
-	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/bad/media/uploads", map[string]any{"filename": "a.mp4"})
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
 }

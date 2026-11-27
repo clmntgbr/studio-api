@@ -11,7 +11,7 @@ import (
 func TestSubtitleStyleHandler_List_Success(t *testing.T) {
 	list := &mockList{}
 	app := mount(nil, nil, nil, nil, list, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/subtitle-styles?projectId="+testutil.TestProjectID.String(), nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/subtitle-styles", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -36,17 +36,6 @@ func TestSubtitleStyleHandler_List_Unauthorized(t *testing.T) {
 	}
 }
 
-func TestSubtitleStyleHandler_List_InvalidProjectID(t *testing.T) {
-	app := mount(nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/subtitle-styles?projectId=bad", nil)
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Fatalf("status=%d", resp.StatusCode)
-	}
-}
 
 func TestSubtitleStyleHandler_List_HandlerError(t *testing.T) {
 	list := &mockList{err: errors.New("boom")}
@@ -135,7 +124,7 @@ func TestSubtitleStyleHandler_Create_Success(t *testing.T) {
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
-	if create.calls != 1 || create.last.Name != "Karaoke" || create.last.ProjectID == nil {
+	if create.calls != 1 || create.last.Name != "Karaoke" {
 		t.Fatalf("cmd=%+v", create.last)
 	}
 }

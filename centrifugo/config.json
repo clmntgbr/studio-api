@@ -8,7 +8,7 @@
       "allow_subscribe_for_client": true
     },
     {
-      "name": "projects",
+      "name": "media",
       "history_size": 64,
       "history_ttl": 600,
       "allow_subscribe_for_client": true

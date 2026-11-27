@@ -9,7 +9,6 @@ import (
 
 type SubtitleStyleResponse struct {
 	ID             string          `json:"id"`
-	ProjectID      *string         `json:"projectId,omitempty"`
 	Name           string          `json:"name"`
 	FontFamily     *string         `json:"fontFamily,omitempty"`
 	FontSize       *int            `json:"fontSize,omitempty"`
@@ -29,14 +28,8 @@ func NewSubtitleStyleResponse(s *domainstyle.Style) SubtitleStyleResponse {
 	if len(settings) == 0 {
 		settings = json.RawMessage(`{}`)
 	}
-	var projectID *string
-	if s.ProjectID != nil {
-		v := s.ProjectID.String()
-		projectID = &v
-	}
 	return SubtitleStyleResponse{
 		ID:             s.ID.String(),
-		ProjectID:      projectID,
 		Name:           s.Name,
 		FontFamily:     s.FontFamily,
 		FontSize:       s.FontSize,

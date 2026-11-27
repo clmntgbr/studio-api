@@ -9,13 +9,11 @@ import (
 
 	domainmedia "go-api/internal/domain/media"
 	"go-api/internal/domain/port"
-	domainproject "go-api/internal/domain/project"
 
 	"github.com/google/uuid"
 )
 
 type InitiateUploadCommand struct {
-	ProjectID uuid.UUID
 	Filename  string
 	MimeType  string
 	SizeBytes int64
@@ -31,28 +29,25 @@ type InitiateUploadResult struct {
 }
 
 type InitiateUploadHandler struct {
-	projects domainproject.WriteRepository
-	media    domainmedia.WriteRepository
-	outbox   port.OutboxRepository
-	storage  port.ObjectStorage
-	bucket   string
-	public   string
+	media   domainmedia.WriteRepository
+	outbox  port.OutboxRepository
+	storage port.ObjectStorage
+	bucket  string
+	public  string
 }
 
 func NewInitiateUploadHandler(
-	projects domainproject.WriteRepository,
 	media domainmedia.WriteRepository,
 	outbox port.OutboxRepository,
 	storage port.ObjectStorage,
 	bucket, publicEndpoint string,
 ) *InitiateUploadHandler {
 	return &InitiateUploadHandler{
-		projects: projects,
-		media:    media,
-		outbox:   outbox,
-		storage:  storage,
-		bucket:   bucket,
-		public:   publicEndpoint,
+		media:   media,
+		outbox:  outbox,
+		storage: storage,
+		bucket:  bucket,
+		public:  publicEndpoint,
 	}
 }
 
@@ -67,19 +62,11 @@ func (h *InitiateUploadHandler) Handle(ctx context.Context, cmd InitiateUploadCo
 		return nil, errors.New("partCount too large")
 	}
 
-	project, err := h.projects.GetByID(ctx, cmd.ProjectID)
-	if err != nil {
-		return nil, err
-	}
-	if project == nil {
-		return nil, errors.New("project not found")
-	}
-
 	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(cmd.Filename)), ".")
 	if ext == "" {
 		ext = "bin"
 	}
-	m := domainmedia.NewUpload(cmd.ProjectID, cmd.Filename, 0)
+	m := domainmedia.NewUpload(cmd.Filename, 0)
 	if cmd.MimeType != "" {
 		mt := cmd.MimeType
 		m.MimeType = &mt
@@ -94,7 +81,7 @@ func (h *InitiateUploadHandler) Handle(ctx context.Context, cmd InitiateUploadCo
 	cfg := domainmedia.DefaultConfiguration(m.ID)
 
 	var uploadID string
-	err = h.media.WithTransaction(ctx, func(txCtx context.Context) error {
+	err := h.media.WithTransaction(ctx, func(txCtx context.Context) error {
 		if err := h.media.Save(txCtx, m); err != nil {
 			return err
 		}

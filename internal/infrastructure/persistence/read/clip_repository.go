@@ -19,10 +19,10 @@ func NewClipReadRepository(db *gorm.DB) domainclip.ReadRepository {
 	return &clipReadRepository{db: db}
 }
 
-func (r *clipReadRepository) ListByProject(ctx context.Context, projectID uuid.UUID) ([]domainclip.Clip, error) {
+func (r *clipReadRepository) ListByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]domainclip.Clip, error) {
 	var rows []write.ClipModel
 	if err := r.db.WithContext(ctx).
-		Where("project_id = ?", projectID).
+		Where("media_file_id = ?", mediaFileID).
 		Order("source_start_ms ASC").
 		Find(&rows).Error; err != nil {
 		return nil, err
@@ -53,7 +53,6 @@ func clipDomainFromModel(m *write.ClipModel) *domainclip.Clip {
 	}
 	return &domainclip.Clip{
 		ID:            m.ID,
-		ProjectID:     m.ProjectID,
 		MediaFileID:   m.MediaFileID,
 		SourceStartMs: m.SourceStartMs,
 		SourceEndMs:   m.SourceEndMs,

@@ -116,7 +116,7 @@ func (m *mockRender) Handle(_ context.Context, cmd cmdrender.CreateCommand) (*do
 	}
 	return &domainrender.Render{
 		ID:             uuid.MustParse("01960000-0000-7000-8000-0000000000e1"),
-		ProjectID:      testutil.TestProjectID,
+		MediaFileID: testutil.TestMediaID,
 		TimelineID:     testutil.TestTimelineID,
 		Kind:           domainrender.KindClip,
 		Strategy:       domainrender.StrategyFullRender,
@@ -133,7 +133,6 @@ func sampleClip() *domainclip.Clip {
 	hook := "hook"
 	return &domainclip.Clip{
 		ID:            testClipID,
-		ProjectID:     testutil.TestProjectID,
 		MediaFileID:   testutil.TestMediaID,
 		SourceStartMs: 1000,
 		SourceEndMs:   5000,
@@ -172,19 +171,19 @@ func mount(list *mockList, create *mockCreate, update *mockUpdate, analyze *mock
 	app := testutil.NewTestApp()
 	auth := testutil.WithUserWithoutProject(testutil.TestUserID)
 	if withUser {
-		app.Get("/api/projects/:id/clips", auth, h.ListByProject)
-		app.Get("/api/projects/:id/clips/numbered-pack", auth, h.NumberedPack)
-		app.Post("/api/projects/:id/clips", auth, h.Create)
-		app.Post("/api/projects/:id/clips/analyze", auth, h.Analyze)
+		app.Get("/api/media/:id/clips", auth, h.ListByMedia)
+		app.Get("/api/media/:id/clips/numbered-pack", auth, h.NumberedPack)
+		app.Post("/api/media/:id/clips", auth, h.Create)
+		app.Post("/api/media/:id/clips/analyze", auth, h.Analyze)
 		app.Patch("/api/clips/:id", auth, h.Update)
 		app.Post("/api/clips/:id/render", auth, h.Render)
 		app.Get("/api/media/:id/llm-artifacts", auth, h.ListArtifactsByMedia)
 		return app
 	}
-	app.Get("/api/projects/:id/clips", h.ListByProject)
-	app.Get("/api/projects/:id/clips/numbered-pack", h.NumberedPack)
-	app.Post("/api/projects/:id/clips", h.Create)
-	app.Post("/api/projects/:id/clips/analyze", h.Analyze)
+	app.Get("/api/media/:id/clips", h.ListByMedia)
+	app.Get("/api/media/:id/clips/numbered-pack", h.NumberedPack)
+	app.Post("/api/media/:id/clips", h.Create)
+	app.Post("/api/media/:id/clips/analyze", h.Analyze)
 	app.Patch("/api/clips/:id", h.Update)
 	app.Post("/api/clips/:id/render", h.Render)
 	app.Get("/api/media/:id/llm-artifacts", h.ListArtifactsByMedia)

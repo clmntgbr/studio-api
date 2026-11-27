@@ -130,7 +130,6 @@ func testMedia(projectID, mediaID uuid.UUID) *domainmedia.MediaFile {
 	dur := int64(10_000)
 	return &domainmedia.MediaFile{
 		ID:         mediaID,
-		ProjectID:  projectID,
 		DurationMs: &dur,
 	}
 }
@@ -161,7 +160,7 @@ func expectedFingerprint(mediaID uuid.UUID, dets []domaindetection.Detection) st
 func TestRebuildHandler_Handle(t *testing.T) {
 	projectID := uuid.New()
 	mediaID := uuid.New()
-	cmd := RebuildCommand{ProjectID: projectID, MediaID: mediaID}
+	cmd := RebuildCommand{MediaID: mediaID}
 
 	t.Run("first rebuild nil head saves version 1", func(t *testing.T) {
 		tw := &fakeTimelineWrite{}
@@ -195,7 +194,7 @@ func TestRebuildHandler_Handle(t *testing.T) {
 		fp := expectedFingerprint(mediaID, dets)
 		tw := &fakeTimelineWrite{}
 		head := &domaintimeline.Timeline{
-			ID: headID, ProjectID: projectID, Version: 1, Status: domaintimeline.StatusValidated,
+			ID: headID, Version: 1, Status: domaintimeline.StatusValidated,
 			Fingerprint: "stale-" + fp, DurationMs: 10_000,
 		}
 		h := NewRebuildHandler(
@@ -229,7 +228,7 @@ func TestRebuildHandler_Handle(t *testing.T) {
 		fp := expectedFingerprint(mediaID, nil)
 		tw := &fakeTimelineWrite{}
 		head := &domaintimeline.Timeline{
-			ID: uuid.New(), ProjectID: projectID, Version: 1,
+			ID: uuid.New(), Version: 1,
 			Fingerprint: fp, DurationMs: 10_000,
 		}
 		h := NewRebuildHandler(

@@ -77,9 +77,6 @@ func (h *GetSubtitlesHandler) Handle(ctx context.Context, q GetSubtitlesQuery) (
 		if style == nil {
 			return "", "", errors.New("subtitle style not found")
 		}
-		if style.ProjectID != nil && *style.ProjectID != t.ProjectID {
-			return "", "", errors.New("subtitle style not found")
-		}
 	}
 
 	engSegs := make([]eng.Segment, 0, len(segments))

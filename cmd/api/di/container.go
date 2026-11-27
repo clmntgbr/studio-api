@@ -8,7 +8,6 @@ import (
 	detectioncmd "go-api/internal/application/command/detection"
 	identitycmd "go-api/internal/application/command/identity"
 	mediacmd "go-api/internal/application/command/media"
-	projectcmd "go-api/internal/application/command/project"
 	rendercmd "go-api/internal/application/command/render"
 	subtitlestylecmd "go-api/internal/application/command/subtitlestyle"
 	timelinecmd "go-api/internal/application/command/timeline"
@@ -18,7 +17,6 @@ import (
 	queryllm "go-api/internal/application/query/llmartifact"
 	querymedia "go-api/internal/application/query/media"
 	queryoutputpreset "go-api/internal/application/query/outputpreset"
-	queryproject "go-api/internal/application/query/project"
 	queryrender "go-api/internal/application/query/render"
 	querysubtitlestyle "go-api/internal/application/query/subtitlestyle"
 	querytimeline "go-api/internal/application/query/timeline"
@@ -46,7 +44,6 @@ type Container struct {
 	MinioWebhookHandler    *httphandler.MinioWebhookHandler
 	UserHandler            *httphandler.UserHandler
 	RealtimeHandler        *httphandler.RealtimeHandler
-	ProjectHandler         *httphandler.ProjectHandler
 	MediaHandler           *httphandler.MediaHandler
 	PlaybackHandler        *httphandler.PlaybackHandler
 	DetectionHandler       *httphandler.DetectionHandler
@@ -68,8 +65,6 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	userWriteRepo := write.NewUserWriteRepository(db)
 	userReadRepo := read.NewUserReadRepository(db)
 	outboxRepo := outbox.NewRepository(db)
-	projectWriteRepo := write.NewProjectWriteRepository(db)
-	projectReadRepo := read.NewProjectReadRepository(db)
 	mediaWriteRepo := write.NewMediaWriteRepository(db)
 	mediaReadRepo := read.NewMediaReadRepository(db)
 	detectionWriteRepo := write.NewDetectionWriteRepository(db)
@@ -103,19 +98,13 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	fetchUserHandler := identitycmd.NewFetchUserHandler(infraClerk.NewUserGateway(env.ClerkSecretKey))
 	getUserByIDHandler := queryuser.NewGetUserByIDHandler(userReadRepo)
 
-	createProjectHandler := projectcmd.NewCreateProjectHandler(projectWriteRepo, outboxRepo)
-	updateProjectHandler := projectcmd.NewUpdateProjectHandler(projectWriteRepo)
-	deleteProjectHandler := projectcmd.NewDeleteProjectHandler(projectWriteRepo)
-	getProjectHandler := queryproject.NewGetProjectHandler(projectReadRepo)
-	listProjectsHandler := queryproject.NewListProjectsHandler(projectReadRepo)
-
 	initiateUploadHandler := mediacmd.NewInitiateUploadHandler(
-		projectWriteRepo, mediaWriteRepo, outboxRepo, storage, env.S3BucketMedia, env.S3PublicEndpoint,
+		mediaWriteRepo, outboxRepo, storage, env.S3BucketMedia, env.S3PublicEndpoint,
 	)
 	presignPartsHandler := mediacmd.NewPresignPartsHandler(mediaWriteRepo, storage, env.S3BucketMedia, env.S3PublicEndpoint)
 	markSourceReadyHandler := mediacmd.NewMarkSourceReadyHandler(mediaWriteRepo, outboxRepo)
 	completeUploadHandler := mediacmd.NewCompleteUploadHandler(mediaWriteRepo, storage, env.S3BucketMedia, markSourceReadyHandler)
-	fromURLHandler := mediacmd.NewFromURLHandler(projectWriteRepo, mediaWriteRepo, outboxRepo, jobPublisher)
+	fromURLHandler := mediacmd.NewFromURLHandler(mediaWriteRepo, outboxRepo, jobPublisher)
 	deleteMediaHandler := mediacmd.NewDeleteMediaHandler(mediaWriteRepo)
 	getMediaHandler := querymedia.NewGetMediaHandler(mediaReadRepo)
 	listMediaHandler := querymedia.NewListMediaHandler(mediaReadRepo)
@@ -136,7 +125,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	getTimeline := querytimeline.NewGetTimelineHandler(timelineReadRepo)
 	listTimelineVersions := querytimeline.NewListVersionsHandler(timelineReadRepo)
 	getSubtitles := querytimeline.NewGetSubtitlesHandler(timelineReadRepo, subtitleStyleReadRepo, transcriptReadRepo)
-	getExport := querytimeline.NewGetExportHandler(timelineReadRepo, projectWriteRepo, mediaWriteRepo)
+	getExport := querytimeline.NewGetExportHandler(timelineReadRepo, mediaWriteRepo)
 
 	createSubtitleStyle := subtitlestylecmd.NewCreateHandler(subtitleStyleWriteRepo)
 	updateSubtitleStyle := subtitlestylecmd.NewUpdateHandler(subtitleStyleWriteRepo)
@@ -196,13 +185,6 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		MinioWebhookHandler:    httphandler.NewMinioWebhookHandler(markSourceReadyHandler, env.S3BucketMedia),
 		UserHandler:            httphandler.NewUserHandler(getUserByIDHandler),
 		RealtimeHandler:        httphandler.NewRealtimeHandler(centrifugo.NewConnectionInfoCreator(env)),
-		ProjectHandler: httphandler.NewProjectHandler(
-			createProjectHandler,
-			updateProjectHandler,
-			deleteProjectHandler,
-			getProjectHandler,
-			listProjectsHandler,
-		),
 		MediaHandler: httphandler.NewMediaHandler(
 			initiateUploadHandler,
 			presignPartsHandler,

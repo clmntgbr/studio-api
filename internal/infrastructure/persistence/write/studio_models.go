@@ -8,19 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-type ProjectModel struct {
-	ID        uuid.UUID `gorm:"column:id;primaryKey"`
-	Name      string    `gorm:"column:name"`
-	Status    string    `gorm:"column:status"`
-	CreatedAt time.Time `gorm:"column:created_at"`
-	UpdatedAt time.Time `gorm:"column:updated_at"`
-}
-
-func (ProjectModel) TableName() string { return "project" }
-
 type MediaFileModel struct {
 	ID               uuid.UUID `gorm:"column:id;primaryKey"`
-	ProjectID        uuid.UUID `gorm:"column:project_id"`
 	Position         int       `gorm:"column:position"`
 	SourceKind       string    `gorm:"column:source_kind"`
 	SourceURL        *string   `gorm:"column:source_url"`
@@ -168,7 +157,6 @@ func (UserOverrideModel) TableName() string { return "user_override" }
 
 type TimelineModel struct {
 	ID          uuid.UUID  `gorm:"column:id;primaryKey"`
-	ProjectID   uuid.UUID  `gorm:"column:project_id"`
 	MediaFileID uuid.UUID  `gorm:"column:media_file_id"`
 	Version     int        `gorm:"column:version"`
 	Status      string     `gorm:"column:status"`
@@ -206,7 +194,6 @@ func (TimelineDecisionModel) TableName() string { return "timeline_decision" }
 
 type ClipModel struct {
 	ID            uuid.UUID          `gorm:"column:id;primaryKey"`
-	ProjectID     uuid.UUID          `gorm:"column:project_id"`
 	MediaFileID   uuid.UUID          `gorm:"column:media_file_id"`
 	SourceStartMs int64              `gorm:"column:source_start_ms"`
 	SourceEndMs   int64              `gorm:"column:source_end_ms"`
@@ -236,7 +223,6 @@ func (LLMArtifactModel) TableName() string { return "llm_artifact" }
 
 type SubtitleStyleModel struct {
 	ID             uuid.UUID    `gorm:"column:id;primaryKey"`
-	ProjectID      *uuid.UUID   `gorm:"column:project_id"`
 	Name           string       `gorm:"column:name"`
 	FontFamily     *string      `gorm:"column:font_family"`
 	FontSize       *int         `gorm:"column:font_size"`
@@ -255,7 +241,6 @@ func (SubtitleStyleModel) TableName() string { return "subtitle_style" }
 
 type OverlayModel struct {
 	ID         uuid.UUID    `gorm:"column:id;primaryKey"`
-	ProjectID  uuid.UUID    `gorm:"column:project_id"`
 	ClipID     *uuid.UUID   `gorm:"column:clip_id"`
 	Kind       string       `gorm:"column:kind"`
 	Text       *string      `gorm:"column:text"`
@@ -288,7 +273,6 @@ func (OutputPresetModel) TableName() string { return "output_preset" }
 
 type RenderModel struct {
 	ID              uuid.UUID    `gorm:"column:id;primaryKey"`
-	ProjectID       uuid.UUID    `gorm:"column:project_id"`
 	MediaFileID     uuid.UUID    `gorm:"column:media_file_id"`
 	TimelineID      uuid.UUID    `gorm:"column:timeline_id"`
 	Kind            string       `gorm:"column:kind"`

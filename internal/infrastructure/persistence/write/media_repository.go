@@ -175,7 +175,6 @@ func (r *mediaWriteRepository) Delete(ctx context.Context, id uuid.UUID) error {
 func mediaFileModelFromDomain(m *domainmedia.MediaFile) *MediaFileModel {
 	return &MediaFileModel{
 		ID:               m.ID,
-		ProjectID:        m.ProjectID,
 		Position:         m.Position,
 		SourceKind:       string(m.SourceKind),
 		SourceURL:        m.SourceURL,
@@ -200,7 +199,6 @@ func mediaFileModelFromDomain(m *domainmedia.MediaFile) *MediaFileModel {
 func mediaFileDomainFromModel(m *MediaFileModel) *domainmedia.MediaFile {
 	return &domainmedia.MediaFile{
 		ID:               m.ID,
-		ProjectID:        m.ProjectID,
 		Position:         m.Position,
 		SourceKind:       domainmedia.SourceKind(m.SourceKind),
 		SourceURL:        m.SourceURL,

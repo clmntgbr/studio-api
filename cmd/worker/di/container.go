@@ -187,8 +187,6 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	)
 	progressConsumer := studiojobs.NewProgressConsumer(
 		env.RabbitMQURL,
-		read.NewMediaProjectResolver(db),
-		read.NewRenderProjectResolver(db),
 		renderWriteRepo,
 		mediaWriteRepo,
 		realtimePublisher,

@@ -23,7 +23,6 @@ func NewSubtitleStyleReadRepository(db *gorm.DB) domainstyle.ReadRepository {
 
 type subtitleStyleScan struct {
 	ID             uuid.UUID    `gorm:"column:id"`
-	ProjectID      *uuid.UUID   `gorm:"column:project_id"`
 	Name           string       `gorm:"column:name"`
 	FontFamily     *string      `gorm:"column:font_family"`
 	FontSize       *int         `gorm:"column:font_size"`
@@ -51,13 +50,8 @@ func (r *subtitleStyleReadRepository) FindByID(ctx context.Context, id uuid.UUID
 	return &s, nil
 }
 
-func (r *subtitleStyleReadRepository) List(ctx context.Context, projectID *uuid.UUID) ([]domainstyle.Style, error) {
+func (r *subtitleStyleReadRepository) List(ctx context.Context) ([]domainstyle.Style, error) {
 	q := r.db.WithContext(ctx).Table("subtitle_style").Order("created_at ASC")
-	if projectID != nil {
-		q = q.Where("project_id = ? OR project_id IS NULL", *projectID)
-	} else {
-		q = q.Where("project_id IS NULL")
-	}
 	var rows []subtitleStyleScan
 	if err := q.Find(&rows).Error; err != nil {
 		return nil, err
@@ -81,7 +75,6 @@ func styleFromScan(row subtitleStyleScan) domainstyle.Style {
 	}
 	return domainstyle.Style{
 		ID:             row.ID,
-		ProjectID:      row.ProjectID,
 		Name:           row.Name,
 		FontFamily:     row.FontFamily,
 		FontSize:       row.FontSize,

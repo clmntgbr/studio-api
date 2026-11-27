@@ -23,7 +23,6 @@ func NewMediaReadRepository(db *gorm.DB) domainmedia.ReadRepository {
 
 type mediaScan struct {
 	ID               uuid.UUID `gorm:"column:id"`
-	ProjectID        uuid.UUID `gorm:"column:project_id"`
 	Position         int       `gorm:"column:position"`
 	SourceKind       string    `gorm:"column:source_kind"`
 	SourceURL        *string   `gorm:"column:source_url"`
@@ -153,13 +152,13 @@ func (r *mediaReadRepository) ListStepRuns(ctx context.Context, mediaFileID uuid
 	return out, nil
 }
 
-func (r *mediaReadRepository) ListByProject(ctx context.Context, projectID uuid.UUID, query paginate.PaginateQuery) ([]domainmedia.FileView, int64, error) {
-	db := r.db.WithContext(ctx).Table("media_file").Where("project_id = ?", projectID)
+func (r *mediaReadRepository) ListAll(ctx context.Context, query paginate.PaginateQuery) ([]domainmedia.FileView, int64, error) {
+	db := r.db.WithContext(ctx).Table("media_file")
 	if query.Search != "" {
 		db = db.Where("(title ILIKE ? OR original_filename ILIKE ?)", "%"+query.Search+"%", "%"+query.Search+"%")
 	}
 	if query.SortBy == "" {
-		query.SortBy = "position"
+		query.SortBy = "created_at"
 	}
 	scoped, total, err := Paginate(db, query)
 	if err != nil {
@@ -238,7 +237,6 @@ func (r *mediaReadRepository) GetConfiguration(ctx context.Context, mediaFileID 
 func scanMediaView(m mediaScan) *domainmedia.FileView {
 	return &domainmedia.FileView{
 		ID:               m.ID,
-		ProjectID:        m.ProjectID,
 		Position:         m.Position,
 		SourceKind:       domainmedia.SourceKind(m.SourceKind),
 		SourceURL:        m.SourceURL,

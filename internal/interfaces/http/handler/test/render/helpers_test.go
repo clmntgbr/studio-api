@@ -104,7 +104,6 @@ func (m *mockDownload) Handle(_ context.Context, q queryrender.DownloadQuery) (*
 func sampleRender() *domainrender.Render {
 	return &domainrender.Render{
 		ID:             testRenderID,
-		ProjectID:      testutil.TestProjectID,
 		MediaFileID:    testutil.TestMediaID,
 		TimelineID:     testutil.TestTimelineID,
 		Kind:           domainrender.KindMaster,

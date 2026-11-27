@@ -31,7 +31,7 @@ type WriteRepository interface {
 
 type ReadRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*FileView, error)
-	ListByProject(ctx context.Context, projectID uuid.UUID, query paginate.PaginateQuery) ([]FileView, int64, error)
+	ListAll(ctx context.Context, query paginate.PaginateQuery) ([]FileView, int64, error)
 	ListSteps(ctx context.Context, mediaFileID uuid.UUID) ([]StepView, error)
 	ListStepRuns(ctx context.Context, mediaFileID uuid.UUID) ([]StepRunView, error)
 	GetConfiguration(ctx context.Context, mediaFileID uuid.UUID) (*Configuration, error)
@@ -39,7 +39,6 @@ type ReadRepository interface {
 
 type FileView struct {
 	ID               uuid.UUID
-	ProjectID        uuid.UUID
 	Position         int
 	SourceKind       SourceKind
 	SourceURL        *string

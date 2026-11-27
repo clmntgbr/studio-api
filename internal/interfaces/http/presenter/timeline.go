@@ -28,7 +28,7 @@ type TimelineDecisionResponse struct {
 
 type TimelineResponse struct {
 	ID          string                     `json:"id,omitempty"`
-	ProjectID   string                     `json:"projectId"`
+	MediaFileID string                     `json:"mediaFileId,omitempty"`
 	Version     int                        `json:"version,omitempty"`
 	Status      string                     `json:"status,omitempty"`
 	Fingerprint string                     `json:"fingerprint"`
@@ -71,7 +71,7 @@ func NewTimelineResponseFromView(v *querytimeline.TimelineView) TimelineResponse
 	created := t.CreatedAt
 	return TimelineResponse{
 		ID:          t.ID.String(),
-		ProjectID:   t.ProjectID.String(),
+		MediaFileID: t.MediaFileID.String(),
 		Version:     t.Version,
 		Status:      string(t.Status),
 		Fingerprint: t.Fingerprint,
@@ -83,7 +83,7 @@ func NewTimelineResponseFromView(v *querytimeline.TimelineView) TimelineResponse
 	}
 }
 
-func NewTimelinePreviewResponse(projectID string, out eng.Output) TimelineResponse {
+func NewTimelinePreviewResponse(mediaFileID string, out eng.Output) TimelineResponse {
 	segments := make([]TimelineSegmentResponse, 0, len(out.Segments))
 	for _, s := range out.Segments {
 		var reason *string
@@ -111,7 +111,7 @@ func NewTimelinePreviewResponse(projectID string, out eng.Output) TimelineRespon
 		})
 	}
 	return TimelineResponse{
-		ProjectID:   projectID,
+		MediaFileID: mediaFileID,
 		Fingerprint: out.Fingerprint,
 		DurationMs:  out.DurationMs,
 		Segments:    segments,
@@ -120,7 +120,7 @@ func NewTimelinePreviewResponse(projectID string, out eng.Output) TimelineRespon
 }
 
 func NewTimelineResponseFromEntity(t *domaintimeline.Timeline, out eng.Output) TimelineResponse {
-	resp := NewTimelinePreviewResponse(t.ProjectID.String(), out)
+	resp := NewTimelinePreviewResponse(t.MediaFileID.String(), out)
 	resp.ID = t.ID.String()
 	resp.Version = t.Version
 	resp.Status = string(t.Status)
@@ -132,7 +132,7 @@ func NewTimelineResponseFromEntity(t *domaintimeline.Timeline, out eng.Output) T
 
 type TimelineVersionResponse struct {
 	ID          string     `json:"id"`
-	ProjectID   string     `json:"projectId"`
+	MediaFileID string     `json:"mediaFileId"`
 	Version     int        `json:"version"`
 	Status      string     `json:"status"`
 	Fingerprint string     `json:"fingerprint"`
@@ -146,7 +146,7 @@ func NewTimelineVersionListResponse(items []domaintimeline.Timeline) []TimelineV
 	for _, t := range items {
 		out = append(out, TimelineVersionResponse{
 			ID:          t.ID.String(),
-			ProjectID:   t.ProjectID.String(),
+			MediaFileID: t.MediaFileID.String(),
 			Version:     t.Version,
 			Status:      string(t.Status),
 			Fingerprint: t.Fingerprint,

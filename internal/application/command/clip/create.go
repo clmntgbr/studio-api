@@ -11,7 +11,6 @@ import (
 )
 
 type CreateCommand struct {
-	ProjectID     uuid.UUID
 	MediaFileID   uuid.UUID
 	SourceStartMs int64
 	SourceEndMs   int64
@@ -35,10 +34,10 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainc
 	if err != nil {
 		return nil, err
 	}
-	if m == nil || m.ProjectID != cmd.ProjectID {
+	if m == nil {
 		return nil, errors.New("media not found")
 	}
-	c := domainclip.New(cmd.ProjectID, cmd.MediaFileID, cmd.SourceStartMs, cmd.SourceEndMs, "manual")
+	c := domainclip.New(cmd.MediaFileID, cmd.SourceStartMs, cmd.SourceEndMs, "manual")
 	c.Title = cmd.Title
 	c.Selected = true
 	if err := h.clips.Save(ctx, c); err != nil {

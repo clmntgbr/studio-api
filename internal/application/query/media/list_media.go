@@ -5,13 +5,10 @@ import (
 
 	domainmedia "go-api/internal/domain/media"
 	"go-api/internal/domain/paginate"
-
-	"github.com/google/uuid"
 )
 
 type ListMediaQuery struct {
-	ProjectID uuid.UUID
-	Query     paginate.PaginateQuery
+	Query paginate.PaginateQuery
 }
 
 type ListMediaHandler struct {
@@ -23,5 +20,5 @@ func NewListMediaHandler(repo domainmedia.ReadRepository) *ListMediaHandler {
 }
 
 func (h *ListMediaHandler) Handle(ctx context.Context, q ListMediaQuery) ([]domainmedia.FileView, int64, error) {
-	return h.repo.ListByProject(ctx, q.ProjectID, q.Query)
+	return h.repo.ListAll(ctx, q.Query)
 }

@@ -11,8 +11,8 @@ import (
 	mediacmd "go-api/internal/application/command/media"
 	"go-api/internal/application/realtime"
 	domainmedia "go-api/internal/domain/media"
-	"go-api/internal/domain/port"
 	domainrender "go-api/internal/domain/render"
+	"go-api/internal/domain/port"
 	"go-api/internal/studio/envelope"
 	"go-api/internal/studio/topology"
 
@@ -20,37 +20,23 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// ProgressConsumer fans studio.progress to Centrifugo projects:{id}.
+// ProgressConsumer fans studio.progress to Centrifugo media:{id}.
 // Progress messages are ephemeral: failures are logged and acked (never block the pipeline).
 type ProgressConsumer struct {
 	url        string
-	media      mediaProjectResolver
-	renders    renderProjectResolver
 	renderRepo domainrender.WriteRepository
 	steps      domainmedia.WriteRepository
 	publisher  *realtime.Publisher
 }
 
-type mediaProjectResolver interface {
-	ProjectIDForMedia(ctx context.Context, mediaID uuid.UUID) (uuid.UUID, error)
-}
-
-type renderProjectResolver interface {
-	ProjectIDForRender(ctx context.Context, renderID uuid.UUID) (uuid.UUID, error)
-}
-
 func NewProgressConsumer(
 	rabbitURL string,
-	media mediaProjectResolver,
-	renders renderProjectResolver,
 	renderRepo domainrender.WriteRepository,
 	steps domainmedia.WriteRepository,
 	transport port.RealtimePublisher,
 ) *ProgressConsumer {
 	return &ProgressConsumer{
 		url:        rabbitURL,
-		media:      media,
-		renders:    renders,
 		renderRepo: renderRepo,
 		steps:      steps,
 		publisher:  realtime.NewPublisher(transport),
@@ -125,11 +111,7 @@ func (c *ProgressConsumer) handle(ctx context.Context, d amqp.Delivery) error {
 			_ = mediacmd.MarkStepRunning(ctx, c.steps, corrID, kind, time.Now().UTC())
 		}
 	}
-	projectID, err := c.media.ProjectIDForMedia(ctx, corrID)
-	if err != nil || projectID == uuid.Nil {
-		return err
-	}
-	return c.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionProgress, projectID.String(), map[string]any{
+	return c.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionProgress, corrID.String(), map[string]any{
 		"mediaId": corrID.String(),
 		"step":    stepName,
 		"percent": pp.Pct,
@@ -139,19 +121,11 @@ func (c *ProgressConsumer) handle(ctx context.Context, d amqp.Delivery) error {
 }
 
 func (c *ProgressConsumer) handleRenderProgress(ctx context.Context, renderID uuid.UUID, pp envelope.ProgressPayload) error {
-	if c.renders == nil {
-		return nil
-	}
-	projectID, err := c.renders.ProjectIDForRender(ctx, renderID)
-	if err != nil || projectID == uuid.Nil {
-		return err
-	}
 	payload := map[string]any{
-		"renderId":  renderID.String(),
-		"projectId": projectID.String(),
-		"percent":   pp.Pct,
-		"stage":     pp.Stage,
-		"message":   pp.Message,
+		"renderId": renderID.String(),
+		"percent":  pp.Pct,
+		"stage":    pp.Stage,
+		"message":  pp.Message,
 	}
 	var mediaID uuid.UUID
 	var kind domainrender.Kind
@@ -177,9 +151,12 @@ func (c *ProgressConsumer) handleRenderProgress(ctx context.Context, renderID uu
 			}
 		}
 	}
-	if c.steps != nil && mediaID != uuid.Nil && kind == domainrender.KindMaster {
+	if mediaID == uuid.Nil {
+		return nil
+	}
+	if c.steps != nil && kind == domainrender.KindMaster {
 		_ = mediacmd.MarkStepRunning(ctx, c.steps, mediaID, domainmedia.StepRender, time.Now().UTC())
-		_ = c.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionProgress, projectID.String(), map[string]any{
+		_ = c.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionProgress, mediaID.String(), map[string]any{
 			"mediaId": mediaID.String(),
 			"step":    string(domainmedia.StepRender),
 			"percent": pp.Pct,
@@ -187,7 +164,7 @@ func (c *ProgressConsumer) handleRenderProgress(ctx context.Context, renderID uu
 			"message": pp.Message,
 		})
 	}
-	return c.publisher.ToProject(ctx, realtime.EntityRender, realtime.ActionRenderProgress, projectID.String(), payload)
+	return c.publisher.ToMedia(ctx, realtime.EntityRender, realtime.ActionRenderProgress, mediaID.String(), payload)
 }
 
 func progressStepKind(name string) (domainmedia.StepKind, bool) {

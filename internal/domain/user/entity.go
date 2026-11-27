@@ -15,7 +15,6 @@ type User struct {
 	LastName        string
 	Banned          bool
 	Email           string
-	ActiveProjectID *uuid.UUID
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 

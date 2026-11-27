@@ -86,7 +86,6 @@ func renderModelFromDomain(r *domainrender.Render) *RenderModel {
 	}
 	return &RenderModel{
 		ID:              r.ID,
-		ProjectID:       r.ProjectID,
 		MediaFileID:     r.MediaFileID,
 		TimelineID:      r.TimelineID,
 		Kind:            string(r.Kind),
@@ -120,7 +119,6 @@ func renderDomainFromModel(m *RenderModel) *domainrender.Render {
 	}
 	return &domainrender.Render{
 		ID:              m.ID,
-		ProjectID:       m.ProjectID,
 		MediaFileID:     m.MediaFileID,
 		TimelineID:      m.TimelineID,
 		Kind:            domainrender.Kind(m.Kind),

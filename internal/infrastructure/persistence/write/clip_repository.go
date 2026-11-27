@@ -45,7 +45,6 @@ func clipModelFromDomain(c *domainclip.Clip) *ClipModel {
 	}
 	return &ClipModel{
 		ID:            c.ID,
-		ProjectID:     c.ProjectID,
 		MediaFileID:   c.MediaFileID,
 		SourceStartMs: c.SourceStartMs,
 		SourceEndMs:   c.SourceEndMs,

@@ -31,7 +31,6 @@ func setupAPIRoutes(app *fiber.App, container *di.Container) {
 	protected := public.Group("", container.AuthenticateMiddleware.Protected())
 	setupUserRoutes(protected, container)
 	setupRealtimeRoutes(protected, container)
-	setupProjectRoutes(protected, container)
 	setupMediaRoutes(protected, container)
 	setupDetectionRoutes(protected, container)
 	setupOverrideRoutes(protected, container)
@@ -51,19 +50,10 @@ func setupUserRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/users/me", container.UserHandler.GetUser)
 }
 
-func setupProjectRoutes(api fiber.Router, container *di.Container) {
-	api.Get("/projects", container.ProjectHandler.List)
-	api.Post("/projects", container.ProjectHandler.Create)
-	api.Get("/projects/:id", container.ProjectHandler.GetByID)
-	api.Patch("/projects/:id", container.ProjectHandler.Update)
-	api.Delete("/projects/:id", container.ProjectHandler.Delete)
-
-	api.Get("/projects/:id/media", container.MediaHandler.ListByProject)
-	api.Post("/projects/:id/media/uploads", container.MediaHandler.InitiateUpload)
-	api.Post("/projects/:id/media/from-url", container.MediaHandler.FromURL)
-}
-
 func setupMediaRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/media", container.MediaHandler.List)
+	api.Post("/media/uploads", container.MediaHandler.InitiateUpload)
+	api.Post("/media/from-url", container.MediaHandler.FromURL)
 	api.Get("/media/:id", container.MediaHandler.GetByID)
 	api.Get("/media/:id/steps", container.MediaHandler.ListSteps)
 	api.Get("/media/:id/playback", container.PlaybackHandler.Get)
@@ -124,10 +114,10 @@ func setupRenderRoutes(api fiber.Router, container *di.Container) {
 }
 
 func setupClipRoutes(api fiber.Router, container *di.Container) {
-	api.Get("/projects/:id/clips", container.ClipHandler.ListByProject)
-	api.Get("/projects/:id/clips/numbered-pack", container.ClipHandler.NumberedPack)
-	api.Post("/projects/:id/clips", container.ClipHandler.Create)
-	api.Post("/projects/:id/clips/analyze", container.ClipHandler.Analyze)
+	api.Get("/media/:id/clips", container.ClipHandler.ListByMedia)
+	api.Get("/media/:id/clips/numbered-pack", container.ClipHandler.NumberedPack)
+	api.Post("/media/:id/clips", container.ClipHandler.Create)
+	api.Post("/media/:id/clips/analyze", container.ClipHandler.Analyze)
 	api.Patch("/clips/:id", container.ClipHandler.Update)
 	api.Post("/clips/:id/render", container.ClipHandler.Render)
 	api.Get("/media/:id/llm-artifacts", container.ClipHandler.ListArtifactsByMedia)

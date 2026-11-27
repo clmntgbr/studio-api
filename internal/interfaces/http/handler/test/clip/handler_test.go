@@ -8,9 +8,9 @@ import (
 	"go-api/internal/interfaces/http/testutil"
 )
 
-func TestClipHandler_ListByProject_Success(t *testing.T) {
+func TestClipHandler_ListByMedia_Success(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/clips", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -22,7 +22,7 @@ func TestClipHandler_ListByProject_Success(t *testing.T) {
 
 func TestClipHandler_NumberedPack_Success(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips/numbered-pack", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/clips/numbered-pack", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func TestClipHandler_NumberedPack_Success(t *testing.T) {
 
 func TestClipHandler_NumberedPack_Manifest(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips/numbered-pack?format=txt", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/clips/numbered-pack?format=txt", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -46,7 +46,7 @@ func TestClipHandler_NumberedPack_Manifest(t *testing.T) {
 
 func TestClipHandler_NumberedPack_Unauthorized(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, false)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips/numbered-pack", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/clips/numbered-pack", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestClipHandler_NumberedPack_Unauthorized(t *testing.T) {
 
 func TestClipHandler_NumberedPack_InvalidProjectID(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/bad/clips/numbered-pack", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/bad/clips/numbered-pack", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestClipHandler_NumberedPack_InvalidProjectID(t *testing.T) {
 func TestClipHandler_NumberedPack_HandlerError(t *testing.T) {
 	list := &mockList{err: errors.New("boom")}
 	app := mount(list, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips/numbered-pack", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/clips/numbered-pack", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -81,9 +81,9 @@ func TestClipHandler_NumberedPack_HandlerError(t *testing.T) {
 	}
 }
 
-func TestClipHandler_ListByProject_Unauthorized(t *testing.T) {
+func TestClipHandler_ListByMedia_Unauthorized(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, false)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/clips", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -93,9 +93,9 @@ func TestClipHandler_ListByProject_Unauthorized(t *testing.T) {
 	}
 }
 
-func TestClipHandler_ListByProject_InvalidProjectID(t *testing.T) {
+func TestClipHandler_ListByMedia_InvalidProjectID(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/bad/clips", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/bad/clips", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -105,10 +105,10 @@ func TestClipHandler_ListByProject_InvalidProjectID(t *testing.T) {
 	}
 }
 
-func TestClipHandler_ListByProject_HandlerError(t *testing.T) {
+func TestClipHandler_ListByMedia_HandlerError(t *testing.T) {
 	list := &mockList{err: errors.New("boom")}
 	app := mount(list, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/clips", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/clips", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +121,7 @@ func TestClipHandler_ListByProject_HandlerError(t *testing.T) {
 func TestClipHandler_Create_Success(t *testing.T) {
 	create := &mockCreate{}
 	app := mount(nil, create, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips", map[string]any{
 		"mediaFileId":   testutil.TestMediaID.String(),
 		"sourceStartMs": 0,
 		"sourceEndMs":   2000,
@@ -137,7 +137,7 @@ func TestClipHandler_Create_Success(t *testing.T) {
 
 func TestClipHandler_Create_Unauthorized(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, false)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips", map[string]any{
 		"mediaFileId":   testutil.TestMediaID.String(),
 		"sourceStartMs": 0,
 		"sourceEndMs":   2000,
@@ -153,7 +153,7 @@ func TestClipHandler_Create_Unauthorized(t *testing.T) {
 
 func TestClipHandler_Create_InvalidProjectID(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/bad/clips", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/bad/clips", map[string]any{
 		"mediaFileId": testutil.TestMediaID.String(), "sourceStartMs": 0, "sourceEndMs": 1,
 	})
 	resp, err := app.Test(req)
@@ -167,7 +167,7 @@ func TestClipHandler_Create_InvalidProjectID(t *testing.T) {
 
 func TestClipHandler_Create_InvalidInput(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips", map[string]any{})
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips", map[string]any{})
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -180,7 +180,7 @@ func TestClipHandler_Create_InvalidInput(t *testing.T) {
 func TestClipHandler_Create_NotFound(t *testing.T) {
 	create := &mockCreate{err: errors.New("media not found")}
 	app := mount(nil, create, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips", map[string]any{
 		"mediaFileId": testutil.TestMediaID.String(), "sourceStartMs": 0, "sourceEndMs": 1,
 	})
 	resp, err := app.Test(req)
@@ -195,7 +195,7 @@ func TestClipHandler_Create_NotFound(t *testing.T) {
 func TestClipHandler_Create_BadBounds(t *testing.T) {
 	create := &mockCreate{err: errors.New("sourceEndMs must be greater than sourceStartMs")}
 	app := mount(nil, create, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips", map[string]any{
 		"mediaFileId": testutil.TestMediaID.String(), "sourceStartMs": 0, "sourceEndMs": 1,
 	})
 	resp, err := app.Test(req)
@@ -210,7 +210,7 @@ func TestClipHandler_Create_BadBounds(t *testing.T) {
 func TestClipHandler_Create_HandlerError(t *testing.T) {
 	create := &mockCreate{err: errors.New("boom")}
 	app := mount(nil, create, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips", map[string]any{
 		"mediaFileId": testutil.TestMediaID.String(), "sourceStartMs": 0, "sourceEndMs": 1,
 	})
 	resp, err := app.Test(req)
@@ -315,7 +315,7 @@ func TestClipHandler_Update_HandlerError(t *testing.T) {
 func TestClipHandler_Analyze_Success(t *testing.T) {
 	analyze := &mockAnalyze{}
 	app := mount(nil, nil, nil, analyze, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips/analyze", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips/analyze", map[string]any{
 		"mediaId": testutil.TestMediaID.String(),
 	})
 	resp, err := app.Test(req)
@@ -329,7 +329,7 @@ func TestClipHandler_Analyze_Success(t *testing.T) {
 
 func TestClipHandler_Analyze_Unauthorized(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, false)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips/analyze", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips/analyze", map[string]any{
 		"mediaId": testutil.TestMediaID.String(),
 	})
 	resp, err := app.Test(req)
@@ -343,7 +343,7 @@ func TestClipHandler_Analyze_Unauthorized(t *testing.T) {
 
 func TestClipHandler_Analyze_InvalidProjectID(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/bad/clips/analyze", map[string]any{"mediaId": testutil.TestMediaID.String()})
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/bad/clips/analyze", map[string]any{"mediaId": testutil.TestMediaID.String()})
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -355,7 +355,7 @@ func TestClipHandler_Analyze_InvalidProjectID(t *testing.T) {
 
 func TestClipHandler_Analyze_InvalidInput(t *testing.T) {
 	app := mount(nil, nil, nil, nil, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips/analyze", map[string]any{})
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips/analyze", map[string]any{})
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -368,7 +368,7 @@ func TestClipHandler_Analyze_InvalidInput(t *testing.T) {
 func TestClipHandler_Analyze_NotFound(t *testing.T) {
 	analyze := &mockAnalyze{err: errors.New("media not found")}
 	app := mount(nil, nil, nil, analyze, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips/analyze", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips/analyze", map[string]any{
 		"mediaId": testutil.TestMediaID.String(),
 	})
 	resp, err := app.Test(req)
@@ -383,7 +383,7 @@ func TestClipHandler_Analyze_NotFound(t *testing.T) {
 func TestClipHandler_Analyze_NotReady(t *testing.T) {
 	analyze := &mockAnalyze{err: errors.New("words not ready")}
 	app := mount(nil, nil, nil, analyze, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips/analyze", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips/analyze", map[string]any{
 		"mediaId": testutil.TestMediaID.String(),
 	})
 	resp, err := app.Test(req)
@@ -398,7 +398,7 @@ func TestClipHandler_Analyze_NotReady(t *testing.T) {
 func TestClipHandler_Analyze_HandlerError(t *testing.T) {
 	analyze := &mockAnalyze{err: errors.New("boom")}
 	app := mount(nil, nil, nil, analyze, nil, nil, nil, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/clips/analyze", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/clips/analyze", map[string]any{
 		"mediaId": testutil.TestMediaID.String(),
 	})
 	resp, err := app.Test(req)

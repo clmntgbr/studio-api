@@ -75,15 +75,15 @@ type renderClipBody struct {
 // Default vertical preset seed id (migrations/00005_output_presets_seed.sql).
 var defaultVerticalPresetID = uuid.MustParse("01960000-0000-7000-8000-0000000000a2")
 
-func (h *ClipHandler) ListByProject(c fiber.Ctx) error {
+func (h *ClipHandler) ListByMedia(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
-	items, err := h.listHandler.Handle(c.Context(), queryclip.ListQuery{ProjectID: projectID})
+	items, err := h.listHandler.Handle(c.Context(), queryclip.ListQuery{MediaID: mediaID})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list clips"})
 	}
@@ -95,11 +95,11 @@ func (h *ClipHandler) NumberedPack(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
-	items, err := h.listHandler.Handle(c.Context(), queryclip.ListQuery{ProjectID: projectID})
+	items, err := h.listHandler.Handle(c.Context(), queryclip.ListQuery{MediaID: mediaID})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list clips"})
 	}
@@ -117,17 +117,20 @@ func (h *ClipHandler) Create(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
 	var body createClipBody
 	if err := validation.BindBody(c, &body); err != nil {
 		return err
 	}
+	bodyMediaID := uuid.MustParse(body.MediaFileID)
+	if bodyMediaID != mediaID {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "mediaFileId must match media id in path"})
+	}
 	out, err := h.createHandler.Handle(c.Context(), cmdclip.CreateCommand{
-		ProjectID:     projectID,
-		MediaFileID:   uuid.MustParse(body.MediaFileID),
+		MediaFileID:   mediaID,
 		SourceStartMs: body.SourceStartMs,
 		SourceEndMs:   body.SourceEndMs,
 		Title:         body.Title,
@@ -184,17 +187,27 @@ func (h *ClipHandler) Analyze(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
 	var body analyzeClipsBody
-	if err := validation.BindBody(c, &body); err != nil {
-		return err
+	if len(c.Body()) > 0 {
+		if err := validation.BindBody(c, &body); err != nil {
+			return err
+		}
+		if body.MediaID != "" {
+			parsed, err := uuid.Parse(body.MediaID)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id in body"})
+			}
+			if parsed != mediaID {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "mediaId must match media id in path"})
+			}
+		}
 	}
 	if err := h.analyzeHandler.Handle(c.Context(), cmdclip.AnalyzeCommand{
-		ProjectID: projectID,
-		MediaID:   uuid.MustParse(body.MediaID),
+		MediaID: mediaID,
 	}); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": err.Error()})

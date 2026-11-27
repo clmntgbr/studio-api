@@ -8,7 +8,6 @@ import (
 
 type Clip struct {
 	ID            uuid.UUID
-	ProjectID     uuid.UUID
 	MediaFileID   uuid.UUID
 	SourceStartMs int64
 	SourceEndMs   int64
@@ -23,13 +22,12 @@ type Clip struct {
 	CreatedAt     time.Time
 }
 
-func New(projectID, mediaFileID uuid.UUID, startMs, endMs int64, origin string) *Clip {
+func New(mediaFileID uuid.UUID, startMs, endMs int64, origin string) *Clip {
 	if origin == "" {
 		origin = "llm"
 	}
 	return &Clip{
 		ID:            uuid.New(),
-		ProjectID:     projectID,
 		MediaFileID:   mediaFileID,
 		SourceStartMs: startMs,
 		SourceEndMs:   endMs,

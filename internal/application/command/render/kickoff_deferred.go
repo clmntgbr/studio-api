@@ -77,7 +77,6 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 			masterSplit = marker.MasterSplit
 		}
 		rawPlan, err := buildQueuedPlan(ctx, h.planDeps, queuedPlanRequest{
-			ProjectID:       r.ProjectID,
 			MediaID:         r.MediaFileID,
 			RenderID:        r.ID,
 			TimelineID:      r.TimelineID,

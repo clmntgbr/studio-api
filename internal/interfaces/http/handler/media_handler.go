@@ -86,10 +86,6 @@ func (h *MediaHandler) InitiateUpload(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
-	}
 	var body initiateUploadBody
 	if err := validation.BindBody(c, &body); err != nil {
 		return err
@@ -98,16 +94,12 @@ func (h *MediaHandler) InitiateUpload(c fiber.Ctx) error {
 		body.PartCount = 1
 	}
 	result, err := h.initiateHandler.Handle(c.Context(), cmdmedia.InitiateUploadCommand{
-		ProjectID: projectID,
 		Filename:  body.Filename,
 		MimeType:  body.MimeType,
 		SizeBytes: body.SizeBytes,
 		PartCount: body.PartCount,
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Project not found"})
-		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to initiate upload"})
 	}
 	return c.Status(fiber.StatusCreated).JSON(presenter.NewInitiateUploadResponse(result))
@@ -173,10 +165,6 @@ func (h *MediaHandler) FromURL(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
-	}
 	var body fromURLBody
 	if err := validation.BindBody(c, &body); err != nil {
 		return err
@@ -185,25 +173,17 @@ func (h *MediaHandler) FromURL(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid or blocked url"})
 	}
 	m, err := h.fromURLHandler.Handle(c.Context(), cmdmedia.FromURLCommand{
-		ProjectID: projectID,
-		URL:       body.URL,
+		URL: body.URL,
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Project not found"})
-		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to create media from url"})
 	}
 	return c.Status(fiber.StatusCreated).JSON(presenter.NewMediaResponseFromEntity(m))
 }
 
-func (h *MediaHandler) ListByProject(c fiber.Ctx) error {
+func (h *MediaHandler) List(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
-	}
-	projectID, err := uuid.Parse(c.Params("id"))
-	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
 	}
 	var listQuery paginate.PaginateQuery
 	if err := c.Bind().Query(&listQuery); err != nil {
@@ -215,14 +195,13 @@ func (h *MediaHandler) ListByProject(c fiber.Ctx) error {
 	sortBy, orderBy := listQuery.SortBy, listQuery.OrderBy
 	listQuery.Normalize()
 	if sortBy == "" {
-		listQuery.SortBy = "position"
+		listQuery.SortBy = "created_at"
 	}
 	if orderBy == "" {
-		listQuery.OrderBy = paginate.OrderByAsc
+		listQuery.OrderBy = paginate.OrderByDesc
 	}
 	views, total, err := h.listHandler.Handle(c.Context(), querymedia.ListMediaQuery{
-		ProjectID: projectID,
-		Query:     listQuery,
+		Query: listQuery,
 	})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list media"})

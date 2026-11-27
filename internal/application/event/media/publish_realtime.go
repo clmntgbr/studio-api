@@ -23,7 +23,7 @@ func (h *PublishRealtimeHandler) OnSourceReady(ctx context.Context, payload []by
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
-	return h.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionStarted, evt.ProjectID, map[string]any{
+	return h.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionStarted, evt.MediaID, map[string]any{
 		"mediaId": evt.MediaID,
 		"step":    "probe",
 	})
@@ -34,7 +34,7 @@ func (h *PublishRealtimeHandler) OnProbed(ctx context.Context, payload []byte) e
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
-	return h.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.ProjectID, map[string]any{
+	return h.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.MediaID, map[string]any{
 		"mediaId": evt.MediaID,
 		"step":    "probe",
 	})
@@ -45,7 +45,7 @@ func (h *PublishRealtimeHandler) OnAudioReady(ctx context.Context, payload []byt
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
-	return h.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.ProjectID, map[string]any{
+	return h.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.MediaID, map[string]any{
 		"mediaId": evt.MediaID,
 		"step":    "audio",
 	})
@@ -56,7 +56,7 @@ func (h *PublishRealtimeHandler) OnProxyReady(ctx context.Context, payload []byt
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
-	return h.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.ProjectID, map[string]any{
+	return h.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.MediaID, map[string]any{
 		"mediaId": evt.MediaID,
 		"step":    "proxy",
 	})
@@ -67,7 +67,7 @@ func (h *PublishRealtimeHandler) OnWaveformReady(ctx context.Context, payload []
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
-	return h.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.ProjectID, map[string]any{
+	return h.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.MediaID, map[string]any{
 		"mediaId": evt.MediaID,
 		"step":    "waveform",
 	})
@@ -78,7 +78,7 @@ func (h *PublishRealtimeHandler) OnReady(ctx context.Context, payload []byte) er
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
-	return h.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionUpdated, evt.ProjectID, map[string]any{
+	return h.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionUpdated, evt.MediaID, map[string]any{
 		"mediaId": evt.MediaID,
 		"status":  "ready",
 	})
@@ -89,7 +89,7 @@ func (h *PublishRealtimeHandler) OnDetectionsUpdated(ctx context.Context, payloa
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
-	return h.publisher.ToProject(ctx, "detections", "updated", evt.ProjectID, map[string]any{
+	return h.publisher.ToMedia(ctx, "detections", "updated", evt.MediaID, map[string]any{
 		"mediaId": evt.MediaID,
 		"kind":    evt.Kind,
 	})
@@ -100,7 +100,7 @@ func (h *PublishRealtimeHandler) OnTranscribed(ctx context.Context, payload []by
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
-	return h.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.ProjectID, map[string]any{
+	return h.publisher.ToMedia(ctx, realtime.EntityMedia, realtime.ActionCompleted, evt.MediaID, map[string]any{
 		"mediaId":  evt.MediaID,
 		"step":     "transcribe",
 		"wordsKey": evt.WordsKey,

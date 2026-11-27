@@ -8,7 +8,6 @@ import (
 
 type Overlay struct {
 	ID         uuid.UUID
-	ProjectID  uuid.UUID
 	ClipID     *uuid.UUID
 	Kind       string
 	Text       *string
@@ -19,10 +18,9 @@ type Overlay struct {
 	Settings   json.RawMessage
 }
 
-func New(projectID uuid.UUID, kind string, startMs, endMs int64) *Overlay {
+func New(kind string, startMs, endMs int64) *Overlay {
 	return &Overlay{
 		ID:        uuid.New(),
-		ProjectID: projectID,
 		Kind:      kind,
 		StartMs:   startMs,
 		EndMs:     endMs,

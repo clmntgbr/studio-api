@@ -29,7 +29,6 @@ type UserView struct {
 	LastName        string
 	Email           string
 	Banned          bool
-	ActiveProjectID *uuid.UUID
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

@@ -126,7 +126,6 @@ func (r *timelineWriteRepository) NextVersion(ctx context.Context, mediaFileID u
 func timelineModelFromDomain(t *domaintimeline.Timeline) *TimelineModel {
 	return &TimelineModel{
 		ID:          t.ID,
-		ProjectID:   t.ProjectID,
 		MediaFileID: t.MediaFileID,
 		Version:     t.Version,
 		Status:      string(t.Status),
@@ -140,7 +139,6 @@ func timelineModelFromDomain(t *domaintimeline.Timeline) *TimelineModel {
 func timelineDomainFromModel(t *TimelineModel) *domaintimeline.Timeline {
 	return &domaintimeline.Timeline{
 		ID:          t.ID,
-		ProjectID:   t.ProjectID,
 		MediaFileID: t.MediaFileID,
 		Version:     t.Version,
 		Status:      domaintimeline.Status(t.Status),

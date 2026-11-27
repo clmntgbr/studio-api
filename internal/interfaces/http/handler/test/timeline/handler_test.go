@@ -24,7 +24,7 @@ func TestTimelineHandler_Get_Success(t *testing.T) {
 	}
 	var out presenter.TimelineResponse
 	testutil.DecodeJSON(t, resp, &out)
-	if out.ProjectID != testutil.TestProjectID.String() || out.Fingerprint != "fp-1" {
+	if out.MediaFileID != testutil.TestMediaID.String() || out.Fingerprint != "fp-1" {
 		t.Fatalf("%+v", out)
 	}
 }

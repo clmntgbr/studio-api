@@ -56,7 +56,6 @@ func subtitleStyleModelFromDomain(s *domainstyle.Style) *SubtitleStyleModel {
 	}
 	return &SubtitleStyleModel{
 		ID:             s.ID,
-		ProjectID:      s.ProjectID,
 		Name:           s.Name,
 		FontFamily:     s.FontFamily,
 		FontSize:       s.FontSize,
@@ -84,7 +83,6 @@ func subtitleStyleDomainFromModel(m *SubtitleStyleModel) *domainstyle.Style {
 	}
 	return &domainstyle.Style{
 		ID:             m.ID,
-		ProjectID:      m.ProjectID,
 		Name:           m.Name,
 		FontFamily:     m.FontFamily,
 		FontSize:       m.FontSize,

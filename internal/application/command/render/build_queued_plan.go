@@ -52,7 +52,6 @@ func QueuedPlanDeps(
 }
 
 type queuedPlanRequest struct {
-	ProjectID       uuid.UUID
 	MediaID         uuid.UUID
 	RenderID        uuid.UUID
 	TimelineID      uuid.UUID
@@ -90,7 +89,7 @@ func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanReques
 		if err != nil {
 			return nil, err
 		}
-		if clip == nil || clip.ProjectID != req.ProjectID {
+		if clip == nil || clip.MediaFileID != req.MediaID {
 			return nil, errors.New("clip not found")
 		}
 	}
@@ -163,7 +162,7 @@ func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanReques
 		loudness = *preset.LoudnessLUFS
 	}
 
-	outputKey := fmt.Sprintf("projects/%s/renders/%s/out.mp4", req.ProjectID.String(), req.RenderID.String())
+	outputKey := fmt.Sprintf("media/%s/renders/%s/out.mp4", req.MediaID.String(), req.RenderID.String())
 
 	plan := renderplan.Plan{
 		RenderID: req.RenderID.String(),
@@ -223,7 +222,7 @@ func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanReques
 		if err != nil {
 			return nil, err
 		}
-		assKey := fmt.Sprintf("projects/%s/renders/%s/subs.ass", req.ProjectID.String(), req.RenderID.String())
+		assKey := fmt.Sprintf("media/%s/renders/%s/subs.ass", req.MediaID.String(), req.RenderID.String())
 		if err := d.storage.PutObject(ctx, d.renderBucket, assKey, []byte(body), contentType); err != nil {
 			return nil, errors.New("failed to upload subtitle track")
 		}

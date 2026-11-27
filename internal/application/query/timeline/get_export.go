@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	domainmedia "go-api/internal/domain/media"
-	domainproject "go-api/internal/domain/project"
 	domaintimeline "go-api/internal/domain/timeline"
 	"go-api/internal/export"
 
@@ -20,16 +19,14 @@ type GetExportQuery struct {
 
 type GetExportHandler struct {
 	timelines domaintimeline.ReadRepository
-	projects  domainproject.WriteRepository
 	media     domainmedia.WriteRepository
 }
 
 func NewGetExportHandler(
 	timelines domaintimeline.ReadRepository,
-	projects domainproject.WriteRepository,
 	media domainmedia.WriteRepository,
 ) *GetExportHandler {
-	return &GetExportHandler{timelines: timelines, projects: projects, media: media}
+	return &GetExportHandler{timelines: timelines, media: media}
 }
 
 func (h *GetExportHandler) Handle(ctx context.Context, q GetExportQuery) (body string, contentType string, filename string, err error) {
@@ -59,8 +56,12 @@ func (h *GetExportHandler) Handle(ctx context.Context, q GetExportQuery) (body s
 	}
 
 	projectName := "Studio"
-	if p, err := h.projects.GetByID(ctx, t.ProjectID); err == nil && p != nil {
-		projectName = p.Name
+	if m, err := h.media.GetByID(ctx, q.MediaID); err == nil && m != nil {
+		if m.Title != nil && *m.Title != "" {
+			projectName = *m.Title
+		} else if m.OriginalFilename != nil && *m.OriginalFilename != "" {
+			projectName = *m.OriginalFilename
+		}
 	}
 
 	in := export.TimelineInput{

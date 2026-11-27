@@ -15,5 +15,5 @@ type WriteRepository interface {
 
 type ReadRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Style, error)
-	List(ctx context.Context, projectID *uuid.UUID) ([]Style, error)
+	List(ctx context.Context) ([]Style, error)
 }

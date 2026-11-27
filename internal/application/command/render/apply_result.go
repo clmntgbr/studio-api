@@ -128,6 +128,5 @@ func (h *ApplyResultHandler) publish(ctx context.Context, action string, r *doma
 		payload = map[string]any{}
 	}
 	payload["mediaFileId"] = r.MediaFileID.String()
-	payload["projectId"] = r.ProjectID.String()
-	_ = h.publisher.ToProject(ctx, realtime.EntityRender, action, r.ProjectID.String(), payload)
+	_ = h.publisher.ToMedia(ctx, realtime.EntityRender, action, r.MediaFileID.String(), payload)
 }

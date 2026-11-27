@@ -18,7 +18,6 @@ const (
 type MediaUploaded struct {
 	ID        string    `json:"eventId"`
 	MediaID   string    `json:"mediaId"`
-	ProjectID string    `json:"projectId"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -30,7 +29,6 @@ func (e MediaUploaded) OccurredAt() time.Time { return e.Timestamp }
 type MediaFetchRequested struct {
 	ID        string    `json:"eventId"`
 	MediaID   string    `json:"mediaId"`
-	ProjectID string    `json:"projectId"`
 	URL       string    `json:"url"`
 	Timestamp time.Time `json:"timestamp"`
 }
@@ -45,7 +43,6 @@ func (e MediaFetchRequested) OccurredAt() time.Time { return e.Timestamp }
 type MediaSourceReady struct {
 	ID        string    `json:"eventId"`
 	MediaID   string    `json:"mediaId"`
-	ProjectID string    `json:"projectId"`
 	SourceKey string    `json:"sourceKey"`
 	Timestamp time.Time `json:"timestamp"`
 }
@@ -58,7 +55,6 @@ func (e MediaSourceReady) OccurredAt() time.Time { return e.Timestamp }
 type MediaProbed struct {
 	ID         string    `json:"eventId"`
 	MediaID    string    `json:"mediaId"`
-	ProjectID  string    `json:"projectId"`
 	SourceKey  string    `json:"sourceKey"`
 	HasAudio   bool      `json:"hasAudio"`
 	DurationMs int64     `json:"durationMs"`
@@ -76,7 +72,6 @@ func (e MediaProbed) OccurredAt() time.Time { return e.Timestamp }
 type MediaAudioReady struct {
 	ID               string    `json:"eventId"`
 	MediaID          string    `json:"mediaId"`
-	ProjectID        string    `json:"projectId"`
 	AnalysisKey      string    `json:"analysisKey"`
 	TranscriptionKey string    `json:"transcriptionKey"`
 	MasterKey        string    `json:"masterKey"`
@@ -91,7 +86,6 @@ func (e MediaAudioReady) OccurredAt() time.Time { return e.Timestamp }
 type MediaProxyReady struct {
 	ID        string    `json:"eventId"`
 	MediaID   string    `json:"mediaId"`
-	ProjectID string    `json:"projectId"`
 	ProxyKey  string    `json:"proxyKey"`
 	Timestamp time.Time `json:"timestamp"`
 }
@@ -104,7 +98,6 @@ func (e MediaProxyReady) OccurredAt() time.Time { return e.Timestamp }
 type MediaWaveformReady struct {
 	ID        string    `json:"eventId"`
 	MediaID   string    `json:"mediaId"`
-	ProjectID string    `json:"projectId"`
 	PeaksKey  string    `json:"peaksKey"`
 	Timestamp time.Time `json:"timestamp"`
 }
@@ -117,7 +110,6 @@ func (e MediaWaveformReady) OccurredAt() time.Time { return e.Timestamp }
 type MediaReady struct {
 	ID        string    `json:"eventId"`
 	MediaID   string    `json:"mediaId"`
-	ProjectID string    `json:"projectId"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -129,7 +121,6 @@ func (e MediaReady) OccurredAt() time.Time { return e.Timestamp }
 type DetectionsUpdated struct {
 	ID        string    `json:"eventId"`
 	MediaID   string    `json:"mediaId"`
-	ProjectID string    `json:"projectId"`
 	Kind      string    `json:"kind"`
 	Timestamp time.Time `json:"timestamp"`
 }
@@ -142,7 +133,6 @@ func (e DetectionsUpdated) OccurredAt() time.Time { return e.Timestamp }
 type MediaTranscribed struct {
 	ID        string    `json:"eventId"`
 	MediaID   string    `json:"mediaId"`
-	ProjectID string    `json:"projectId"`
 	WordsKey  string    `json:"wordsKey"`
 	Language  string    `json:"language,omitempty"`
 	Timestamp time.Time `json:"timestamp"`

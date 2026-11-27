@@ -46,12 +46,12 @@ func (p *Publisher) PublishToUser(ctx context.Context, userID uuid.UUID, eventTy
 	return nil
 }
 
-func (p *Publisher) PublishToProject(ctx context.Context, projectID uuid.UUID, eventType string, payload any) error {
+func (p *Publisher) PublishToMedia(ctx context.Context, mediaID uuid.UUID, eventType string, payload any) error {
 	body, err := marshalRealtimeEvent(eventType, payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal centrifugo event: %w", err)
 	}
-	channel := ProjectChannel(projectID)
+	channel := MediaChannel(mediaID)
 	if _, err := p.client.Publish(ctx, channel, body); err != nil {
 		return fmt.Errorf("failed to publish to centrifugo channel %q: %w", channel, err)
 	}

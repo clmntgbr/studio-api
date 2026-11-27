@@ -138,7 +138,6 @@ func (r *timelineReadRepository) ListDecisions(ctx context.Context, timelineID u
 
 type timelineScan struct {
 	ID          uuid.UUID  `gorm:"column:id"`
-	ProjectID   uuid.UUID  `gorm:"column:project_id"`
 	MediaFileID uuid.UUID  `gorm:"column:media_file_id"`
 	Version     int        `gorm:"column:version"`
 	Status      string     `gorm:"column:status"`
@@ -151,7 +150,6 @@ type timelineScan struct {
 func timelineFromScan(row timelineScan) *domaintimeline.Timeline {
 	return &domaintimeline.Timeline{
 		ID:          row.ID,
-		ProjectID:   row.ProjectID,
 		MediaFileID: row.MediaFileID,
 		Version:     row.Version,
 		Status:      domaintimeline.Status(row.Status),

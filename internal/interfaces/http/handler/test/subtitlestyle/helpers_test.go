@@ -150,7 +150,6 @@ func mount(create *mockCreate, update *mockUpdate, del *mockDelete, get *mockGet
 
 func validCreateBody() map[string]any {
 	return map[string]any{
-		"projectId":      testutil.TestProjectID.String(),
 		"name":           "Karaoke",
 		"fontFamily":     "Montserrat",
 		"fontSize":       64,

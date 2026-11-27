@@ -37,13 +37,8 @@ func (h *RebuildTimelineHandler) OnDetectionsUpdated(ctx context.Context, payloa
 	if err != nil {
 		return messaging.NonRetryable(err)
 	}
-	projectID, err := uuid.Parse(evt.ProjectID)
-	if err != nil {
-		return messaging.NonRetryable(err)
-	}
 	tl, _, err := h.rebuild.Handle(ctx, cmdtimeline.RebuildCommand{
-		ProjectID: projectID,
-		MediaID:   mediaID,
+		MediaID: mediaID,
 	})
 	if err != nil {
 		return messaging.Retryable(err)
@@ -60,9 +55,8 @@ func (h *RebuildTimelineHandler) OnDetectionsUpdated(ctx context.Context, payloa
 
 	// Always notify the editor so it can reload after config/detection rebuilds,
 	// even when the fingerprint was unchanged.
-	if err := h.publisher.ToProject(ctx, realtime.EntityTimeline, realtime.ActionUpdated, evt.ProjectID, map[string]any{
+	if err := h.publisher.ToMedia(ctx, realtime.EntityTimeline, realtime.ActionUpdated, evt.MediaID, map[string]any{
 		"mediaId":     evt.MediaID,
-		"projectId":   evt.ProjectID,
 		"kind":        evt.Kind,
 		"version":     version,
 		"durationMs":  durationMs,

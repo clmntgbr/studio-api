@@ -37,7 +37,6 @@ const (
 
 type Render struct {
 	ID              uuid.UUID
-	ProjectID       uuid.UUID
 	MediaFileID     uuid.UUID
 	TimelineID      uuid.UUID
 	Kind            Kind
@@ -59,10 +58,9 @@ type Render struct {
 	CompletedAt     *time.Time
 }
 
-func New(projectID, mediaFileID, timelineID, presetID uuid.UUID, kind Kind, fingerprint string, plan json.RawMessage) *Render {
+func New(mediaFileID, timelineID, presetID uuid.UUID, kind Kind, fingerprint string, plan json.RawMessage) *Render {
 	return &Render{
 		ID:             uuid.New(),
-		ProjectID:      projectID,
 		MediaFileID:    mediaFileID,
 		TimelineID:     timelineID,
 		Kind:           kind,
