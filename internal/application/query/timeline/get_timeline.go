@@ -10,7 +10,7 @@ import (
 )
 
 type GetTimelineQuery struct {
-	ProjectID uuid.UUID
+	MediaID uuid.UUID
 }
 
 type TimelineView struct {
@@ -28,7 +28,7 @@ func NewGetTimelineHandler(repo domaintimeline.ReadRepository) *GetTimelineHandl
 }
 
 func (h *GetTimelineHandler) Handle(ctx context.Context, q GetTimelineQuery) (*TimelineView, error) {
-	t, err := h.repo.FindHeadByProject(ctx, q.ProjectID)
+	t, err := h.repo.FindHeadByMedia(ctx, q.MediaID)
 	if err != nil {
 		return nil, err
 	}

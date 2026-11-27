@@ -113,10 +113,10 @@ type fakeTimelineRead struct {
 func (f *fakeTimelineRead) FindByID(context.Context, uuid.UUID) (*domaintimeline.Timeline, error) {
 	panic("unused")
 }
-func (f *fakeTimelineRead) FindHeadByProject(context.Context, uuid.UUID) (*domaintimeline.Timeline, error) {
+func (f *fakeTimelineRead) FindHeadByMedia(context.Context, uuid.UUID) (*domaintimeline.Timeline, error) {
 	return f.head, nil
 }
-func (f *fakeTimelineRead) ListByProject(context.Context, uuid.UUID) ([]domaintimeline.Timeline, error) {
+func (f *fakeTimelineRead) ListByMedia(context.Context, uuid.UUID) ([]domaintimeline.Timeline, error) {
 	panic("unused")
 }
 func (f *fakeTimelineRead) ListSegments(context.Context, uuid.UUID) ([]domaintimeline.Segment, error) {

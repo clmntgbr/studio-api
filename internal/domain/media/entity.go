@@ -12,12 +12,21 @@ import (
 type Status string
 
 const (
-	StatusPending    Status = "pending"
+	StatusUploading  Status = "uploading"
 	StatusFetching   Status = "fetching"
 	StatusProcessing Status = "processing"
 	StatusReady      Status = "ready"
+	StatusRendering  Status = "rendering"
 	StatusFailed     Status = "failed"
 )
+
+// StatusPending is the legacy enum value; prefer StatusUploading for new writes.
+const StatusPending Status = "pending"
+
+// IsUploading reports multipart ingress (new uploading or legacy pending).
+func (m *MediaFile) IsUploading() bool {
+	return m.Status == StatusUploading || m.Status == StatusPending
+}
 
 type SourceKind string
 
@@ -70,6 +79,7 @@ const (
 	StepLLM        StepKind = "llm"
 	StepScenes     StepKind = "scenes"
 	StepReframe    StepKind = "reframe"
+	StepRender     StepKind = "render"
 )
 
 type StepStatus string
@@ -126,7 +136,7 @@ func NewUpload(projectID uuid.UUID, filename string, position int) *MediaFile {
 		Position:         position,
 		SourceKind:       SourceKindUpload,
 		OriginalFilename: &fn,
-		Status:           StatusPending,
+		Status:           StatusUploading,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -182,6 +192,32 @@ func (m *MediaFile) MarkReady() {
 		ProjectID: m.ProjectID.String(),
 		Timestamp: now,
 	})
+}
+
+// ReturnToReady restores ready after rendering without re-emitting MediaReady.
+func (m *MediaFile) ReturnToReady() {
+	m.Status = StatusReady
+	m.UpdatedAt = time.Now().UTC()
+}
+
+func (m *MediaFile) MarkProcessing() {
+	m.Status = StatusProcessing
+	m.UpdatedAt = time.Now().UTC()
+}
+
+func (m *MediaFile) MarkRendering() {
+	m.Status = StatusRendering
+	m.UpdatedAt = time.Now().UTC()
+}
+
+// Editable reports whether timeline/config edits are allowed.
+func (m *MediaFile) Editable() bool {
+	return m.Status == StatusReady
+}
+
+// CanEnqueueRender reports whether a new encode may be queued.
+func (m *MediaFile) CanEnqueueRender() bool {
+	return m.Status == StatusReady || m.Status == StatusRendering
 }
 
 func (m *MediaFile) RecordDetectionsUpdated(kind string) {
@@ -341,7 +377,7 @@ type Configuration struct {
 	Language             *string
 	MasterSplit          string // "" | parts:N | durationMs:N — one value for master TikTok splits
 	BurnSubtitles        bool
-	OutputPresetID       *uuid.UUID // last selected Ship format
+	OutputPresetID       *uuid.UUID // last selected render format
 	Settings             json.RawMessage
 	UpdatedAt            time.Time
 }

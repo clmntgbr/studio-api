@@ -99,16 +99,16 @@ func setupTranscriptRoutes(api fiber.Router, container *di.Container) {
 }
 
 func setupTimelineRoutes(api fiber.Router, container *di.Container) {
-	api.Get("/projects/:id/timeline", container.TimelineHandler.Get)
-	api.Get("/projects/:id/timeline/versions", container.TimelineHandler.ListVersions)
-	api.Get("/projects/:id/timeline/subtitles.ass", container.TimelineHandler.GetSubtitlesASS)
-	api.Get("/projects/:id/timeline/subtitles.srt", container.TimelineHandler.GetSubtitlesSRT)
-	api.Get("/projects/:id/timeline/export.fcpxml", container.TimelineHandler.GetExportFCPXML)
-	api.Get("/projects/:id/timeline/export.edl", container.TimelineHandler.GetExportEDL)
-	api.Get("/projects/:id/timeline/export.otio", container.TimelineHandler.GetExportOTIO)
-	api.Get("/projects/:id/timeline/export.premiere.xml", container.TimelineHandler.GetExportPremiere)
-	api.Post("/projects/:id/timeline/preview", container.TimelineHandler.Preview)
-	api.Post("/projects/:id/timeline/validate", container.TimelineHandler.Validate)
+	api.Get("/media/:id/timeline", container.TimelineHandler.Get)
+	api.Get("/media/:id/timeline/versions", container.TimelineHandler.ListVersions)
+	api.Get("/media/:id/timeline/subtitles.ass", container.TimelineHandler.GetSubtitlesASS)
+	api.Get("/media/:id/timeline/subtitles.srt", container.TimelineHandler.GetSubtitlesSRT)
+	api.Get("/media/:id/timeline/export.fcpxml", container.TimelineHandler.GetExportFCPXML)
+	api.Get("/media/:id/timeline/export.edl", container.TimelineHandler.GetExportEDL)
+	api.Get("/media/:id/timeline/export.otio", container.TimelineHandler.GetExportOTIO)
+	api.Get("/media/:id/timeline/export.premiere.xml", container.TimelineHandler.GetExportPremiere)
+	api.Post("/media/:id/timeline/preview", container.TimelineHandler.Preview)
+	api.Post("/media/:id/timeline/validate", container.TimelineHandler.Validate)
 }
 
 func setupOutputPresetRoutes(api fiber.Router, container *di.Container) {
@@ -116,8 +116,8 @@ func setupOutputPresetRoutes(api fiber.Router, container *di.Container) {
 }
 
 func setupRenderRoutes(api fiber.Router, container *di.Container) {
-	api.Post("/projects/:id/renders", container.RenderHandler.Create)
-	api.Get("/projects/:id/renders", container.RenderHandler.ListByProject)
+	api.Post("/media/:id/renders", container.RenderHandler.Create)
+	api.Get("/media/:id/renders", container.RenderHandler.ListByMedia)
 	api.Get("/renders/:id", container.RenderHandler.GetByID)
 	api.Post("/renders/:id/cancel", container.RenderHandler.Cancel)
 	api.Get("/renders/:id/download", container.RenderHandler.Download)

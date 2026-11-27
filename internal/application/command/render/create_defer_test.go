@@ -32,6 +32,9 @@ func (f *fakeRenderRepo) GetByID(context.Context, uuid.UUID) (*domainrender.Rend
 func (f *fakeRenderRepo) FindByFingerprint(context.Context, uuid.UUID, string) (*domainrender.Render, error) {
 	return nil, nil
 }
+func (f *fakeRenderRepo) HasInFlightByMedia(context.Context, uuid.UUID) (bool, error) {
+	return false, nil
+}
 
 type fakeTimelineRead struct {
 	head     *domaintimeline.Timeline
@@ -41,10 +44,10 @@ type fakeTimelineRead struct {
 func (f *fakeTimelineRead) FindByID(context.Context, uuid.UUID) (*domaintimeline.Timeline, error) {
 	panic("unused")
 }
-func (f *fakeTimelineRead) FindHeadByProject(context.Context, uuid.UUID) (*domaintimeline.Timeline, error) {
+func (f *fakeTimelineRead) FindHeadByMedia(context.Context, uuid.UUID) (*domaintimeline.Timeline, error) {
 	return f.head, nil
 }
-func (f *fakeTimelineRead) ListByProject(context.Context, uuid.UUID) ([]domaintimeline.Timeline, error) {
+func (f *fakeTimelineRead) ListByMedia(context.Context, uuid.UUID) ([]domaintimeline.Timeline, error) {
 	panic("unused")
 }
 func (f *fakeTimelineRead) ListSegments(context.Context, uuid.UUID) ([]domaintimeline.Segment, error) {
@@ -77,7 +80,7 @@ func (f *fakeMediaWrite) WithTransaction(context.Context, func(context.Context) 
 	panic("unused")
 }
 func (f *fakeMediaWrite) Save(context.Context, *domainmedia.MediaFile) error   { panic("unused") }
-func (f *fakeMediaWrite) Update(context.Context, *domainmedia.MediaFile) error { panic("unused") }
+func (f *fakeMediaWrite) Update(context.Context, *domainmedia.MediaFile) error { return nil }
 func (f *fakeMediaWrite) UpdateFromStatuses(context.Context, *domainmedia.MediaFile, []domainmedia.Status) (bool, error) {
 	panic("unused")
 }
@@ -86,7 +89,11 @@ func (f *fakeMediaWrite) GetByID(_ context.Context, id uuid.UUID) (*domainmedia.
 		return nil, nil
 	}
 	key := f.source
-	return &domainmedia.MediaFile{ID: id, StorageKey: &key}, nil
+	return &domainmedia.MediaFile{
+		ID:         id,
+		StorageKey: &key,
+		Status:     domainmedia.StatusReady,
+	}, nil
 }
 func (f *fakeMediaWrite) Delete(context.Context, uuid.UUID) error             { panic("unused") }
 func (f *fakeMediaWrite) SaveAsset(context.Context, *domainmedia.Asset) error { panic("unused") }
@@ -189,7 +196,7 @@ func TestCreateHandler_defersWhenCropMissing_faceTrack(t *testing.T) {
 	jobs := &fakeJobs{}
 
 	h := NewCreateHandler(renders, timelines, presets, media, nil, jobs, nil, nil, "")
-	got, err := h.Handle(ctx, CreateCommand{ProjectID: projectID, PresetID: presetID, Kind: string(domainrender.KindMaster)})
+	got, err := h.Handle(ctx, CreateCommand{MediaID: mediaID, PresetID: presetID, Kind: string(domainrender.KindMaster)})
 	if err != nil {
 		t.Fatalf("Handle: %v", err)
 	}

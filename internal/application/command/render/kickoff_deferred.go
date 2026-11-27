@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	mediacmd "go-api/internal/application/command/media"
 	domainmedia "go-api/internal/domain/media"
 	"go-api/internal/domain/port"
 	domainrender "go-api/internal/domain/render"
@@ -49,7 +50,7 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 		return errors.New("media not found")
 	}
 
-	renders, err := h.rendersRead.ListByProject(ctx, m.ProjectID)
+	renders, err := h.rendersRead.ListByMedia(ctx, mediaID)
 	if err != nil {
 		return err
 	}
@@ -77,6 +78,7 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 		}
 		rawPlan, err := buildQueuedPlan(ctx, h.planDeps, queuedPlanRequest{
 			ProjectID:       r.ProjectID,
+			MediaID:         r.MediaFileID,
 			RenderID:        r.ID,
 			TimelineID:      r.TimelineID,
 			PresetID:        r.OutputPresetID,
@@ -93,6 +95,7 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 			if upErr := h.rendersWrite.Update(ctx, r); upErr != nil {
 				return upErr
 			}
+			_ = mediacmd.ReturnMediaToReadyIfIdle(ctx, h.media, h.rendersWrite.HasInFlightByMedia, r.MediaFileID)
 			continue
 		}
 
@@ -107,6 +110,7 @@ func (h *KickoffDeferredHandler) Handle(ctx context.Context, mediaID uuid.UUID) 
 			r.Status = domainrender.StatusFailed
 			r.ErrorMessage = &msg
 			_ = h.rendersWrite.Update(ctx, r)
+			_ = mediacmd.ReturnMediaToReadyIfIdle(ctx, h.media, h.rendersWrite.HasInFlightByMedia, r.MediaFileID)
 			continue
 		}
 	}

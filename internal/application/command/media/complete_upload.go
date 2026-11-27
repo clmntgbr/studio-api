@@ -45,12 +45,12 @@ func (h *CompleteUploadHandler) Handle(ctx context.Context, cmd CompleteUploadCo
 	if m == nil || m.StorageKey == nil {
 		return nil, errors.New("media not found")
 	}
-	if m.Status != domainmedia.StatusPending && m.Status != domainmedia.StatusProcessing {
+	if !m.IsUploading() && m.Status != domainmedia.StatusProcessing {
 		return nil, errors.New("media is not awaiting upload")
 	}
 
 	// Idempotent re-complete: object may already exist after a previous success.
-	if m.Status == domainmedia.StatusPending {
+	if m.IsUploading() {
 		if err := h.storage.CompleteMultipartUpload(ctx, h.bucket, *m.StorageKey, cmd.UploadID, cmd.Parts); err != nil {
 			return nil, errors.New("failed to complete multipart upload")
 		}

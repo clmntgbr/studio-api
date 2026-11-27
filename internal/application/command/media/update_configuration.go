@@ -47,6 +47,29 @@ func (h *UpdateConfigurationHandler) Handle(ctx context.Context, cmd UpdateConfi
 	if m == nil {
 		return nil, errors.New("media not found")
 	}
+
+	silenceTouch := cmd.SilenceEnabled != nil ||
+		cmd.ThresholdMode != nil ||
+		cmd.SilenceThresholdDB != nil ||
+		cmd.DetectionLevel != nil ||
+		cmd.SilenceMinDurationMs != nil ||
+		cmd.PaddingBeforeMs != nil ||
+		cmd.PaddingAfterMs != nil ||
+		cmd.SpeechMinDurationMs != nil ||
+		cmd.FillersEnabled != nil ||
+		cmd.RepetitionsEnabled != nil ||
+		cmd.FalseStartsEnabled != nil
+	outputTouch := cmd.MasterSplit != nil ||
+		cmd.BurnSubtitles != nil ||
+		cmd.OutputPresetID != nil ||
+		cmd.ClearOutputPresetID
+	if silenceTouch && !m.Editable() {
+		return nil, ErrMediaNotEditable
+	}
+	if outputTouch && !m.CanEnqueueRender() {
+		return nil, ErrMediaNotReady
+	}
+
 	cfg, err := h.media.GetConfiguration(ctx, cmd.MediaID)
 	if err != nil {
 		return nil, err

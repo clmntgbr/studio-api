@@ -97,5 +97,5 @@ func (h *ApplySilenceResultHandler) Handle(ctx context.Context, cmd ApplySilence
 	if err != nil {
 		return errors.New("failed to apply silence result")
 	}
-	return nil
+	return tryMarkMediaReady(ctx, h.media, h.outbox, cmd.MediaID)
 }

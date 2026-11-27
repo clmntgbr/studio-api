@@ -121,5 +121,5 @@ func (h *ApplyTextResultHandler) Handle(ctx context.Context, cmd ApplyTextResult
 	if err != nil {
 		return errors.New("failed to apply text result")
 	}
-	return nil
+	return mediacmd.TryMarkMediaReady(ctx, h.media, h.outbox, cmd.MediaID)
 }

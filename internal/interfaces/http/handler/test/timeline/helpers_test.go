@@ -109,6 +109,7 @@ func sampleTimeline() *domaintimeline.Timeline {
 	return &domaintimeline.Timeline{
 		ID:          testutil.TestTimelineID,
 		ProjectID:   testutil.TestProjectID,
+		MediaFileID: testutil.TestMediaID,
 		Version:     1,
 		Status:      domaintimeline.StatusDraft,
 		Fingerprint: "fp-1",
@@ -189,27 +190,27 @@ func mount(h *handler.TimelineHandler, withUser bool) *fiber.App {
 	app := testutil.NewTestApp()
 	auth := testutil.WithUserWithoutProject(testutil.TestUserID)
 	if withUser {
-		app.Get("/api/projects/:id/timeline", auth, h.Get)
-		app.Get("/api/projects/:id/timeline/versions", auth, h.ListVersions)
-		app.Get("/api/projects/:id/timeline/subtitles.ass", auth, h.GetSubtitlesASS)
-		app.Get("/api/projects/:id/timeline/subtitles.srt", auth, h.GetSubtitlesSRT)
-		app.Get("/api/projects/:id/timeline/export.fcpxml", auth, h.GetExportFCPXML)
-		app.Get("/api/projects/:id/timeline/export.edl", auth, h.GetExportEDL)
-		app.Get("/api/projects/:id/timeline/export.otio", auth, h.GetExportOTIO)
-		app.Get("/api/projects/:id/timeline/export.premiere.xml", auth, h.GetExportPremiere)
-		app.Post("/api/projects/:id/timeline/preview", auth, h.Preview)
-		app.Post("/api/projects/:id/timeline/validate", auth, h.Validate)
+		app.Get("/api/media/:id/timeline", auth, h.Get)
+		app.Get("/api/media/:id/timeline/versions", auth, h.ListVersions)
+		app.Get("/api/media/:id/timeline/subtitles.ass", auth, h.GetSubtitlesASS)
+		app.Get("/api/media/:id/timeline/subtitles.srt", auth, h.GetSubtitlesSRT)
+		app.Get("/api/media/:id/timeline/export.fcpxml", auth, h.GetExportFCPXML)
+		app.Get("/api/media/:id/timeline/export.edl", auth, h.GetExportEDL)
+		app.Get("/api/media/:id/timeline/export.otio", auth, h.GetExportOTIO)
+		app.Get("/api/media/:id/timeline/export.premiere.xml", auth, h.GetExportPremiere)
+		app.Post("/api/media/:id/timeline/preview", auth, h.Preview)
+		app.Post("/api/media/:id/timeline/validate", auth, h.Validate)
 		return app
 	}
-	app.Get("/api/projects/:id/timeline", h.Get)
-	app.Get("/api/projects/:id/timeline/versions", h.ListVersions)
-	app.Get("/api/projects/:id/timeline/subtitles.ass", h.GetSubtitlesASS)
-	app.Get("/api/projects/:id/timeline/subtitles.srt", h.GetSubtitlesSRT)
-	app.Get("/api/projects/:id/timeline/export.fcpxml", h.GetExportFCPXML)
-	app.Get("/api/projects/:id/timeline/export.edl", h.GetExportEDL)
-	app.Get("/api/projects/:id/timeline/export.otio", h.GetExportOTIO)
-	app.Get("/api/projects/:id/timeline/export.premiere.xml", h.GetExportPremiere)
-	app.Post("/api/projects/:id/timeline/preview", h.Preview)
-	app.Post("/api/projects/:id/timeline/validate", h.Validate)
+	app.Get("/api/media/:id/timeline", h.Get)
+	app.Get("/api/media/:id/timeline/versions", h.ListVersions)
+	app.Get("/api/media/:id/timeline/subtitles.ass", h.GetSubtitlesASS)
+	app.Get("/api/media/:id/timeline/subtitles.srt", h.GetSubtitlesSRT)
+	app.Get("/api/media/:id/timeline/export.fcpxml", h.GetExportFCPXML)
+	app.Get("/api/media/:id/timeline/export.edl", h.GetExportEDL)
+	app.Get("/api/media/:id/timeline/export.otio", h.GetExportOTIO)
+	app.Get("/api/media/:id/timeline/export.premiere.xml", h.GetExportPremiere)
+	app.Post("/api/media/:id/timeline/preview", h.Preview)
+	app.Post("/api/media/:id/timeline/validate", h.Validate)
 	return app
 }

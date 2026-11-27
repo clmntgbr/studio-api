@@ -46,10 +46,23 @@ func (h *ReanalyzeHandler) Handle(ctx context.Context, cmd ReanalyzeCommand) err
 	if m == nil {
 		return errors.New("media not found")
 	}
+	if !m.Editable() && m.Status != domainmedia.StatusProcessing {
+		// Allow re-entry while already processing; block uploading/fetching/failed/rendering.
+		return ErrMediaNotEditable
+	}
 
 	steps := cmd.Steps
 	if len(steps) == 0 {
 		steps = []string{string(domainmedia.StepSilence)}
+	}
+
+	// Pipeline work again — leave ready/rendering until steps complete.
+	if err := MarkMediaProcessing(ctx, h.media, m.ID); err != nil {
+		return err
+	}
+	// Reload after status change.
+	if refreshed, err := h.media.GetByID(ctx, cmd.MediaID); err == nil && refreshed != nil {
+		m = refreshed
 	}
 
 	for _, step := range steps {
@@ -252,7 +265,7 @@ func (h *ReanalyzeHandler) clearDetectionsAndCancelStep(
 	}
 	m.RecordDetectionsUpdated(eventKind)
 	now := time.Now().UTC()
-	return h.media.WithTransaction(ctx, func(txCtx context.Context) error {
+	err = h.media.WithTransaction(ctx, func(txCtx context.Context) error {
 		for _, k := range clearKinds {
 			if err := h.detections.DeleteByMediaAndKind(txCtx, m.ID, k); err != nil {
 				return err
@@ -290,6 +303,10 @@ func (h *ReanalyzeHandler) clearDetectionsAndCancelStep(
 		}
 		return h.outbox.StoreEvents(txCtx, m.PullEvents())
 	})
+	if err != nil {
+		return err
+	}
+	return tryMarkMediaReady(ctx, h.media, h.outbox, mediaID)
 }
 
 func (h *ReanalyzeHandler) requeueLLM(ctx context.Context, m *domainmedia.MediaFile) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	mediacmd "go-api/internal/application/command/media"
 	domaindetection "go-api/internal/domain/detection"
 	domainmedia "go-api/internal/domain/media"
 	eng "go-api/internal/timeline"
@@ -12,8 +13,7 @@ import (
 )
 
 type PreviewCommand struct {
-	ProjectID uuid.UUID
-	MediaID   uuid.UUID // optional: first media of project if empty
+	MediaID uuid.UUID
 }
 
 type PreviewResult struct {
@@ -35,23 +35,18 @@ func NewPreviewHandler(
 }
 
 func (h *PreviewHandler) Handle(ctx context.Context, cmd PreviewCommand) (*PreviewResult, error) {
-	mediaID := cmd.MediaID
-	if mediaID == uuid.Nil {
-		views, _, err := h.mediaRead.ListByProject(ctx, cmd.ProjectID, paginateAll())
-		if err != nil {
-			return nil, err
-		}
-		if len(views) == 0 {
-			return nil, errors.New("no media in project")
-		}
-		mediaID = views[0].ID
+	if cmd.MediaID == uuid.Nil {
+		return nil, errors.New("mediaId is required")
 	}
-	m, err := h.media.GetByID(ctx, mediaID)
+	m, err := h.media.GetByID(ctx, cmd.MediaID)
 	if err != nil {
 		return nil, err
 	}
-	if m == nil || m.ProjectID != cmd.ProjectID {
+	if m == nil {
 		return nil, errors.New("media not found")
+	}
+	if !m.Editable() {
+		return nil, mediacmd.ErrMediaNotEditable
 	}
 	out, err := buildForMedia(ctx, h.media, h.detections, m)
 	if err != nil {

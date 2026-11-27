@@ -170,3 +170,31 @@ func EffectiveStepAttempt(attempt int) int {
 	}
 	return attempt
 }
+
+// RequeueStep resets a step to queued (render again / reanalyze). Always bumps attempt when the row exists.
+func RequeueStep(ctx context.Context, repo domainmedia.WriteRepository, mediaID uuid.UUID, kind domainmedia.StepKind, at time.Time) error {
+	step, err := repo.GetStep(ctx, mediaID, kind)
+	if err != nil {
+		return err
+	}
+	if step == nil {
+		step = domainmedia.NewProcessingStep(mediaID, kind)
+		step.Status = domainmedia.StepStatusQueued
+		step.Attempt = 1
+		q := at
+		step.QueuedAt = &q
+		return repo.SaveStep(ctx, step)
+	}
+	step.Status = domainmedia.StepStatusQueued
+	step.Progress = 0
+	step.ErrorMessage = nil
+	step.StartedAt = nil
+	step.CompletedAt = nil
+	q := at
+	step.QueuedAt = &q
+	step.Attempt++
+	if step.Attempt < 1 {
+		step.Attempt = 1
+	}
+	return repo.UpdateStep(ctx, step)
+}

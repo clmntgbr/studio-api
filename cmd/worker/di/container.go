@@ -181,7 +181,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		jobPublisher,
 	)
 	applyReframe := mediacmd.NewApplyReframeResultHandler(mediaWriteRepo, kickoffDeferred)
-	applyRender := rendercmd.NewApplyResultHandler(renderWriteRepo, realtimePublisher)
+	applyRender := rendercmd.NewApplyResultHandler(renderWriteRepo, mediaWriteRepo, realtimePublisher)
 	resultsConsumer := studiojobs.NewResultsConsumer(
 		env.RabbitMQURL, mediaWriteRepo, markReady, markFail, applyProbe, applyAudio, applyProxy, applyWave, applySilence, applyTranscript, applyText, applyLLM, applyScenes, applyReframe, applyRender,
 	)

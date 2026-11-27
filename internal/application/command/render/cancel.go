@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	mediacmd "go-api/internal/application/command/media"
+	domainmedia "go-api/internal/domain/media"
 	domainrender "go-api/internal/domain/render"
 
 	"github.com/google/uuid"
@@ -16,10 +18,11 @@ type CancelCommand struct {
 
 type CancelHandler struct {
 	renders domainrender.WriteRepository
+	media   domainmedia.WriteRepository
 }
 
-func NewCancelHandler(renders domainrender.WriteRepository) *CancelHandler {
-	return &CancelHandler{renders: renders}
+func NewCancelHandler(renders domainrender.WriteRepository, media domainmedia.WriteRepository) *CancelHandler {
+	return &CancelHandler{renders: renders, media: media}
 }
 
 func (h *CancelHandler) Handle(ctx context.Context, cmd CancelCommand) (*domainrender.Render, error) {
@@ -40,5 +43,9 @@ func (h *CancelHandler) Handle(ctx context.Context, cmd CancelCommand) (*domainr
 	if err := h.renders.Update(ctx, r); err != nil {
 		return nil, errors.New("failed to cancel render")
 	}
+	if r.Kind == domainrender.KindMaster && h.media != nil && r.MediaFileID != uuid.Nil {
+		_ = mediacmd.FailStep(ctx, h.media, r.MediaFileID, domainmedia.StepRender, now, "cancelled")
+	}
+	_ = mediacmd.ReturnMediaToReadyIfIdle(ctx, h.media, h.renders.HasInFlightByMedia, r.MediaFileID)
 	return r, nil
 }

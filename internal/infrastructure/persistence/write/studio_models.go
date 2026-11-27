@@ -169,6 +169,7 @@ func (UserOverrideModel) TableName() string { return "user_override" }
 type TimelineModel struct {
 	ID          uuid.UUID  `gorm:"column:id;primaryKey"`
 	ProjectID   uuid.UUID  `gorm:"column:project_id"`
+	MediaFileID uuid.UUID  `gorm:"column:media_file_id"`
 	Version     int        `gorm:"column:version"`
 	Status      string     `gorm:"column:status"`
 	Fingerprint string     `gorm:"column:fingerprint"`
@@ -288,6 +289,7 @@ func (OutputPresetModel) TableName() string { return "output_preset" }
 type RenderModel struct {
 	ID              uuid.UUID    `gorm:"column:id;primaryKey"`
 	ProjectID       uuid.UUID    `gorm:"column:project_id"`
+	MediaFileID     uuid.UUID    `gorm:"column:media_file_id"`
 	TimelineID      uuid.UUID    `gorm:"column:timeline_id"`
 	Kind            string       `gorm:"column:kind"`
 	Strategy        string       `gorm:"column:strategy"`

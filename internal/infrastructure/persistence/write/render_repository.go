@@ -46,10 +46,10 @@ func (r *renderWriteRepository) GetByID(ctx context.Context, id uuid.UUID) (*dom
 	return renderDomainFromModel(&model), nil
 }
 
-func (r *renderWriteRepository) FindByFingerprint(ctx context.Context, projectID uuid.UUID, fingerprint string) (*domainrender.Render, error) {
+func (r *renderWriteRepository) FindByFingerprint(ctx context.Context, mediaFileID uuid.UUID, fingerprint string) (*domainrender.Render, error) {
 	var model RenderModel
 	err := DBWithContext(ctx, r.db).
-		Where("project_id = ? AND fingerprint = ?", projectID, fingerprint).
+		Where("media_file_id = ? AND fingerprint = ?", mediaFileID, fingerprint).
 		First(&model).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -58,6 +58,21 @@ func (r *renderWriteRepository) FindByFingerprint(ctx context.Context, projectID
 		return nil, err
 	}
 	return renderDomainFromModel(&model), nil
+}
+
+func (r *renderWriteRepository) HasInFlightByMedia(ctx context.Context, mediaFileID uuid.UUID) (bool, error) {
+	var n int64
+	err := DBWithContext(ctx, r.db).Model(&RenderModel{}).
+		Where("media_file_id = ? AND status IN ?", mediaFileID, []string{
+			string(domainrender.StatusPending),
+			string(domainrender.StatusQueued),
+			string(domainrender.StatusRunning),
+		}).
+		Count(&n).Error
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 func renderModelFromDomain(r *domainrender.Render) *RenderModel {
@@ -72,6 +87,7 @@ func renderModelFromDomain(r *domainrender.Render) *RenderModel {
 	return &RenderModel{
 		ID:              r.ID,
 		ProjectID:       r.ProjectID,
+		MediaFileID:     r.MediaFileID,
 		TimelineID:      r.TimelineID,
 		Kind:            string(r.Kind),
 		Strategy:        string(r.Strategy),
@@ -105,6 +121,7 @@ func renderDomainFromModel(m *RenderModel) *domainrender.Render {
 	return &domainrender.Render{
 		ID:              m.ID,
 		ProjectID:       m.ProjectID,
+		MediaFileID:     m.MediaFileID,
 		TimelineID:      m.TimelineID,
 		Kind:            domainrender.Kind(m.Kind),
 		Strategy:        domainrender.Strategy(m.Strategy),

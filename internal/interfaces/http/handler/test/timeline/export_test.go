@@ -13,7 +13,7 @@ func TestTimelineHandler_GetExportFCPXML_Success(t *testing.T) {
 	exp := &mockGetExport{body: "<fcpxml/>", ctype: "application/xml", filename: "timeline.fcpxml"}
 	h := newHandlerFull(nil, nil, nil, nil, nil, exp)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.fcpxml", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline/export.fcpxml", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func TestTimelineHandler_GetExportEDL_Success(t *testing.T) {
 	exp := &mockGetExport{body: "TITLE: x\n", ctype: "application/x-edl"}
 	h := newHandlerFull(nil, nil, nil, nil, nil, exp)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.edl", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline/export.edl", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -48,7 +48,7 @@ func TestTimelineHandler_GetExportOTIO_Success(t *testing.T) {
 	exp := &mockGetExport{body: "{}", ctype: "application/otio+json"}
 	h := newHandlerFull(nil, nil, nil, nil, nil, exp)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.otio", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline/export.otio", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +62,7 @@ func TestTimelineHandler_GetExportPremiere_Success(t *testing.T) {
 	exp := &mockGetExport{body: "<xmeml/>", ctype: "application/xml", filename: "timeline.premiere.xml"}
 	h := newHandlerFull(nil, nil, nil, nil, nil, exp)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.premiere.xml", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline/export.premiere.xml", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestTimelineHandler_GetExportPremiere_Success(t *testing.T) {
 func TestTimelineHandler_GetExportFCPXML_Unauthorized(t *testing.T) {
 	h := newHandlerFull(nil, nil, nil, nil, nil, nil)
 	app := mount(h, false)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.fcpxml", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline/export.fcpxml", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -85,10 +85,10 @@ func TestTimelineHandler_GetExportFCPXML_Unauthorized(t *testing.T) {
 	}
 }
 
-func TestTimelineHandler_GetExportFCPXML_InvalidProjectID(t *testing.T) {
+func TestTimelineHandler_GetExportFCPXML_InvalidMediaID(t *testing.T) {
 	h := newHandlerFull(nil, nil, nil, nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/bad/timeline/export.fcpxml", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/bad/timeline/export.fcpxml", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +102,7 @@ func TestTimelineHandler_GetExportFCPXML_NotFound(t *testing.T) {
 	exp := &mockGetExport{err: errors.New("timeline not found")}
 	h := newHandlerFull(nil, nil, nil, nil, nil, exp)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.fcpxml", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline/export.fcpxml", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -116,7 +116,7 @@ func TestTimelineHandler_GetExportFCPXML_HandlerError_Internal(t *testing.T) {
 	exp := &mockGetExport{err: errors.New("boom")}
 	h := newHandlerFull(nil, nil, nil, nil, nil, exp)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.fcpxml", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline/export.fcpxml", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ func TestTimelineHandler_GetExportFCPXML_HandlerError_BadRequest(t *testing.T) {
 	exp := &mockGetExport{err: errors.New("format must be fcpxml, edl or otio")}
 	h := newHandlerFull(nil, nil, nil, nil, nil, exp)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/export.fcpxml", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline/export.fcpxml", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)

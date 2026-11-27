@@ -46,7 +46,7 @@ func (h *RebuildHandler) Handle(ctx context.Context, cmd RebuildCommand) (*domai
 		return nil, eng.Output{}, err
 	}
 
-	head, err := h.timelineR.FindHeadByProject(ctx, cmd.ProjectID)
+	head, err := h.timelineR.FindHeadByMedia(ctx, cmd.MediaID)
 	if err != nil {
 		return nil, eng.Output{}, err
 	}
@@ -58,7 +58,7 @@ func (h *RebuildHandler) Handle(ctx context.Context, cmd RebuildCommand) (*domai
 	decisions := mapDecisions(out)
 
 	if head == nil {
-		t := domaintimeline.New(cmd.ProjectID, 1, out.Fingerprint, out.DurationMs)
+		t := domaintimeline.New(cmd.ProjectID, cmd.MediaID, 1, out.Fingerprint, out.DurationMs)
 		err = h.timelines.WithTransaction(ctx, func(txCtx context.Context) error {
 			return h.timelines.Save(txCtx, t, segments, decisions)
 		})

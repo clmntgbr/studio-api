@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 
+	mediacmd "go-api/internal/application/command/media"
 	domainclip "go-api/internal/domain/clip"
+	domainmedia "go-api/internal/domain/media"
 
 	"github.com/google/uuid"
 )
@@ -22,10 +24,15 @@ type UpdateCommand struct {
 type UpdateHandler struct {
 	clips domainclip.WriteRepository
 	read  domainclip.ReadRepository
+	media domainmedia.WriteRepository
 }
 
-func NewUpdateHandler(clips domainclip.WriteRepository, read domainclip.ReadRepository) *UpdateHandler {
-	return &UpdateHandler{clips: clips, read: read}
+func NewUpdateHandler(
+	clips domainclip.WriteRepository,
+	read domainclip.ReadRepository,
+	media domainmedia.WriteRepository,
+) *UpdateHandler {
+	return &UpdateHandler{clips: clips, read: read, media: media}
 }
 
 func (h *UpdateHandler) Handle(ctx context.Context, cmd UpdateCommand) (*domainclip.Clip, error) {
@@ -35,6 +42,18 @@ func (h *UpdateHandler) Handle(ctx context.Context, cmd UpdateCommand) (*domainc
 	}
 	if c == nil {
 		return nil, errors.New("clip not found")
+	}
+	if h.media != nil {
+		m, err := h.media.GetByID(ctx, c.MediaFileID)
+		if err != nil {
+			return nil, err
+		}
+		if m == nil {
+			return nil, errors.New("media not found")
+		}
+		if !m.Editable() {
+			return nil, mediacmd.ErrMediaNotEditable
+		}
 	}
 	if cmd.Selected != nil {
 		c.Selected = *cmd.Selected

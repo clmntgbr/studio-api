@@ -124,5 +124,5 @@ func (h *ApplyResultHandler) Handle(ctx context.Context, cmd ApplyResultCommand)
 	if err != nil {
 		return errors.New("failed to apply transcript result")
 	}
-	return nil
+	return mediacmd.TryMarkMediaReady(ctx, h.media, h.outbox, cmd.MediaID)
 }

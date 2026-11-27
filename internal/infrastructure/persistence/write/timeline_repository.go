@@ -100,19 +100,19 @@ func (r *timelineWriteRepository) GetByID(ctx context.Context, id uuid.UUID) (*d
 	return timelineDomainFromModel(&model), nil
 }
 
-func (r *timelineWriteRepository) SupersedeDrafts(ctx context.Context, projectID uuid.UUID) error {
+func (r *timelineWriteRepository) SupersedeDrafts(ctx context.Context, mediaFileID uuid.UUID) error {
 	return DBWithContext(ctx, r.db).
 		Model(&TimelineModel{}).
-		Where("project_id = ? AND status = ?", projectID, string(domaintimeline.StatusDraft)).
+		Where("media_file_id = ? AND status = ?", mediaFileID, string(domaintimeline.StatusDraft)).
 		Update("status", string(domaintimeline.StatusSuperseded)).Error
 }
 
-func (r *timelineWriteRepository) NextVersion(ctx context.Context, projectID uuid.UUID) (int, error) {
+func (r *timelineWriteRepository) NextVersion(ctx context.Context, mediaFileID uuid.UUID) (int, error) {
 	var max *int
 	err := DBWithContext(ctx, r.db).
 		Model(&TimelineModel{}).
 		Select("MAX(version)").
-		Where("project_id = ?", projectID).
+		Where("media_file_id = ?", mediaFileID).
 		Scan(&max).Error
 	if err != nil {
 		return 0, err
@@ -127,6 +127,7 @@ func timelineModelFromDomain(t *domaintimeline.Timeline) *TimelineModel {
 	return &TimelineModel{
 		ID:          t.ID,
 		ProjectID:   t.ProjectID,
+		MediaFileID: t.MediaFileID,
 		Version:     t.Version,
 		Status:      string(t.Status),
 		Fingerprint: t.Fingerprint,
@@ -140,6 +141,7 @@ func timelineDomainFromModel(t *TimelineModel) *domaintimeline.Timeline {
 	return &domaintimeline.Timeline{
 		ID:          t.ID,
 		ProjectID:   t.ProjectID,
+		MediaFileID: t.MediaFileID,
 		Version:     t.Version,
 		Status:      domaintimeline.Status(t.Status),
 		Fingerprint: t.Fingerprint,

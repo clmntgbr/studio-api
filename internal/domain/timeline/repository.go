@@ -13,14 +13,14 @@ type WriteRepository interface {
 	ReplaceContents(ctx context.Context, t *Timeline, segments []Segment, decisions []Decision) error
 	Update(ctx context.Context, t *Timeline) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Timeline, error)
-	SupersedeDrafts(ctx context.Context, projectID uuid.UUID) error
-	NextVersion(ctx context.Context, projectID uuid.UUID) (int, error)
+	SupersedeDrafts(ctx context.Context, mediaFileID uuid.UUID) error
+	NextVersion(ctx context.Context, mediaFileID uuid.UUID) (int, error)
 }
 
 type ReadRepository interface {
 	FindByID(ctx context.Context, id uuid.UUID) (*Timeline, error)
-	FindHeadByProject(ctx context.Context, projectID uuid.UUID) (*Timeline, error)
-	ListByProject(ctx context.Context, projectID uuid.UUID) ([]Timeline, error)
+	FindHeadByMedia(ctx context.Context, mediaFileID uuid.UUID) (*Timeline, error)
+	ListByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]Timeline, error)
 	ListSegments(ctx context.Context, timelineID uuid.UUID) ([]Segment, error)
 	ListDecisions(ctx context.Context, timelineID uuid.UUID) ([]Decision, error)
 }

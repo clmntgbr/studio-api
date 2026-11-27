@@ -9,7 +9,7 @@ import (
 )
 
 type ListQuery struct {
-	ProjectID uuid.UUID
+	MediaID uuid.UUID
 }
 
 type ListHandler struct {
@@ -21,5 +21,5 @@ func NewListHandler(repo domainrender.ReadRepository) *ListHandler {
 }
 
 func (h *ListHandler) Handle(ctx context.Context, q ListQuery) ([]domainrender.Render, error) {
-	return h.repo.ListByProject(ctx, q.ProjectID)
+	return h.repo.ListByMedia(ctx, q.MediaID)
 }

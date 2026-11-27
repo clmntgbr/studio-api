@@ -49,6 +49,7 @@ func NewOutputPresetListResponse(items []domainpreset.Preset) []OutputPresetResp
 type RenderResponse struct {
 	ID              string          `json:"id"`
 	ProjectID       string          `json:"projectId"`
+	MediaFileID     string          `json:"mediaFileId"`
 	TimelineID      string          `json:"timelineId"`
 	Kind            string          `json:"kind"`
 	Strategy        string          `json:"strategy"`
@@ -87,6 +88,7 @@ func NewRenderResponse(r *domainrender.Render) RenderResponse {
 	return RenderResponse{
 		ID:              r.ID.String(),
 		ProjectID:       r.ProjectID.String(),
+		MediaFileID:     r.MediaFileID.String(),
 		TimelineID:      r.TimelineID.String(),
 		Kind:            string(r.Kind),
 		Strategy:        string(r.Strategy),

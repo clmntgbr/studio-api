@@ -14,9 +14,9 @@ import (
 )
 
 type GetSubtitlesQuery struct {
-	ProjectID uuid.UUID
-	StyleID   *uuid.UUID
-	Format    string // ass | srt
+	MediaID uuid.UUID
+	StyleID *uuid.UUID
+	Format  string // ass | srt
 	// Optional PlayRes override (render burn-in uses the output preset size).
 	PlayResX int
 	PlayResY int
@@ -53,7 +53,7 @@ func (h *GetSubtitlesHandler) Handle(ctx context.Context, q GetSubtitlesQuery) (
 		return "", "", errors.New("format must be ass or srt")
 	}
 
-	t, err := h.timelines.FindHeadByProject(ctx, q.ProjectID)
+	t, err := h.timelines.FindHeadByMedia(ctx, q.MediaID)
 	if err != nil {
 		return "", "", err
 	}
@@ -77,7 +77,7 @@ func (h *GetSubtitlesHandler) Handle(ctx context.Context, q GetSubtitlesQuery) (
 		if style == nil {
 			return "", "", errors.New("subtitle style not found")
 		}
-		if style.ProjectID != nil && *style.ProjectID != q.ProjectID {
+		if style.ProjectID != nil && *style.ProjectID != t.ProjectID {
 			return "", "", errors.New("subtitle style not found")
 		}
 	}

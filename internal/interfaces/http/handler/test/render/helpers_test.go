@@ -105,6 +105,7 @@ func sampleRender() *domainrender.Render {
 	return &domainrender.Render{
 		ID:             testRenderID,
 		ProjectID:      testutil.TestProjectID,
+		MediaFileID:    testutil.TestMediaID,
 		TimelineID:     testutil.TestTimelineID,
 		Kind:           domainrender.KindMaster,
 		Strategy:       domainrender.StrategyFullRender,
@@ -136,15 +137,15 @@ func mount(create *mockCreate, cancel *mockCancel, get *mockGet, list *mockList,
 	app := testutil.NewTestApp()
 	auth := testutil.WithUserWithoutProject(testutil.TestUserID)
 	if withUser {
-		app.Post("/api/projects/:id/renders", auth, h.Create)
-		app.Get("/api/projects/:id/renders", auth, h.ListByProject)
+		app.Post("/api/media/:id/renders", auth, h.Create)
+		app.Get("/api/media/:id/renders", auth, h.ListByMedia)
 		app.Get("/api/renders/:id", auth, h.GetByID)
 		app.Post("/api/renders/:id/cancel", auth, h.Cancel)
 		app.Get("/api/renders/:id/download", auth, h.Download)
 		return app
 	}
-	app.Post("/api/projects/:id/renders", h.Create)
-	app.Get("/api/projects/:id/renders", h.ListByProject)
+	app.Post("/api/media/:id/renders", h.Create)
+	app.Get("/api/media/:id/renders", h.ListByMedia)
 	app.Get("/api/renders/:id", h.GetByID)
 	app.Post("/api/renders/:id/cancel", h.Cancel)
 	app.Get("/api/renders/:id/download", h.Download)

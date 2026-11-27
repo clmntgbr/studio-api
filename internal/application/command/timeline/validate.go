@@ -10,8 +10,8 @@ import (
 )
 
 type ValidateCommand struct {
-	ProjectID uuid.UUID
-	Version   int
+	MediaID uuid.UUID
+	Version int
 }
 
 type ValidateHandler struct {
@@ -24,7 +24,7 @@ func NewValidateHandler(timelines domaintimeline.WriteRepository, timelineR doma
 }
 
 func (h *ValidateHandler) Handle(ctx context.Context, cmd ValidateCommand) (*domaintimeline.Timeline, error) {
-	head, err := h.timelineR.FindHeadByProject(ctx, cmd.ProjectID)
+	head, err := h.timelineR.FindHeadByMedia(ctx, cmd.MediaID)
 	if err != nil {
 		return nil, err
 	}

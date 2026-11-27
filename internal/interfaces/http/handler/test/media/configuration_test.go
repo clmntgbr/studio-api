@@ -108,7 +108,7 @@ func TestMediaHandler_UpdateConfiguration_Success(t *testing.T) {
 	}
 }
 
-func TestMediaHandler_UpdateConfiguration_OutputPresetAndShipPrefs(t *testing.T) {
+func TestMediaHandler_UpdateConfiguration_OutputPresetAndRenderPrefs(t *testing.T) {
 	updateCfg := &mockUpdateConfig{out: sampleConfig()}
 	h := newHandlerWithConfig(nil, nil, nil, nil, nil, nil, nil, updateCfg, nil, nil, nil)
 	app := mount(h, true)

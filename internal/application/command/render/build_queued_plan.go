@@ -53,6 +53,7 @@ func QueuedPlanDeps(
 
 type queuedPlanRequest struct {
 	ProjectID       uuid.UUID
+	MediaID         uuid.UUID
 	RenderID        uuid.UUID
 	TimelineID      uuid.UUID
 	PresetID        uuid.UUID
@@ -205,11 +206,11 @@ func buildQueuedPlan(ctx context.Context, d queuedPlanDeps, req queuedPlanReques
 			return nil, errors.New("subtitle burn-in is not configured")
 		}
 		q := querytimeline.GetSubtitlesQuery{
-			ProjectID: req.ProjectID,
-			StyleID:   req.SubtitleStyleID, // nil → DefaultStyle
-			Format:    "ass",
-			PlayResX:  preset.Width,
-			PlayResY:  preset.Height,
+			MediaID:  req.MediaID,
+			StyleID:  req.SubtitleStyleID, // nil → DefaultStyle
+			Format:   "ass",
+			PlayResX: preset.Width,
+			PlayResY: preset.Height,
 		}
 		if clip != nil {
 			mid := clip.MediaFileID

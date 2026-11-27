@@ -42,7 +42,7 @@ func (h *PresignPartsHandler) Handle(ctx context.Context, cmd PresignPartsComman
 	if m == nil || m.StorageKey == nil {
 		return nil, errors.New("media not found")
 	}
-	if m.Status != domainmedia.StatusPending {
+	if !m.IsUploading() {
 		return nil, errors.New("media is not awaiting upload")
 	}
 	return h.storage.PresignUploadParts(ctx, h.bucket, *m.StorageKey, cmd.UploadID, cmd.PartNumbers, 0, h.public)

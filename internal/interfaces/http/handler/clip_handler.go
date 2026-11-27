@@ -169,6 +169,9 @@ func (h *ClipHandler) Update(c fiber.Ctx) error {
 		if strings.Contains(err.Error(), "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Clip not found"})
 		}
+		if strings.Contains(err.Error(), "media is not editable") || strings.Contains(err.Error(), "media is not ready") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
+		}
 		if strings.Contains(err.Error(), "must be") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
 		}
@@ -237,7 +240,7 @@ func (h *ClipHandler) Render(c fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to load clip"})
 	}
 	r, err := h.renderHandler.Handle(c.Context(), cmdrender.CreateCommand{
-		ProjectID:       clip.ProjectID,
+		MediaID:         clip.MediaFileID,
 		PresetID:        presetID,
 		Kind:            "clip",
 		SubtitleStyleID: styleID,

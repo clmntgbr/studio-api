@@ -48,11 +48,11 @@ func (h *TimelineHandler) Get(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
-	view, err := h.getHandler.Handle(c.Context(), querytimeline.GetTimelineQuery{ProjectID: projectID})
+	view, err := h.getHandler.Handle(c.Context(), querytimeline.GetTimelineQuery{MediaID: mediaID})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Timeline not found"})
@@ -66,11 +66,11 @@ func (h *TimelineHandler) ListVersions(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
-	items, err := h.listVersionsHandler.Handle(c.Context(), querytimeline.ListVersionsQuery{ProjectID: projectID})
+	items, err := h.listVersionsHandler.Handle(c.Context(), querytimeline.ListVersionsQuery{MediaID: mediaID})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list timeline versions"})
 	}
@@ -81,9 +81,9 @@ func (h *TimelineHandler) Preview(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
 	var body timelinePreviewBody
 	if len(c.Body()) > 0 {
@@ -91,30 +91,29 @@ func (h *TimelineHandler) Preview(c fiber.Ctx) error {
 			return err
 		}
 	}
-	var mediaID uuid.UUID
-	if body.MediaID != "" {
-		// Validated as uuid by BindBody above.
-		mediaID = uuid.MustParse(body.MediaID)
-	}
+	// Body mediaId is optional; path media is the source of truth.
+	_ = body
 	result, err := h.previewHandler.Handle(c.Context(), cmdtimeline.PreviewCommand{
-		ProjectID: projectID,
-		MediaID:   mediaID,
+		MediaID: mediaID,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "no media") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": err.Error()})
+		}
+		if strings.Contains(err.Error(), "media is not editable") || strings.Contains(err.Error(), "media is not ready") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
 		}
 		if strings.Contains(err.Error(), "duration") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to preview timeline"})
 	}
-	return c.Status(fiber.StatusOK).JSON(presenter.NewTimelinePreviewResponse(projectID.String(), result.Output))
+	return c.Status(fiber.StatusOK).JSON(presenter.NewTimelinePreviewResponse(mediaID.String(), result.Output))
 }
 
 func (h *TimelineHandler) Validate(c fiber.Ctx) error {
 	return c.Status(fiber.StatusGone).JSON(fiber.Map{
-		"message": "timeline validate removed; POST /projects/:id/renders to ship",
+		"message": "timeline validate removed; POST /media/:id/renders to render",
 	})
 }
 
@@ -130,9 +129,9 @@ func (h *TimelineHandler) getSubtitles(c fiber.Ctx, format string) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
 	var styleID *uuid.UUID
 	if v := c.Query("styleId"); v != "" {
@@ -143,9 +142,9 @@ func (h *TimelineHandler) getSubtitles(c fiber.Ctx, format string) error {
 		styleID = &id
 	}
 	body, contentType, err := h.getSubtitlesHandler.Handle(c.Context(), querytimeline.GetSubtitlesQuery{
-		ProjectID: projectID,
-		StyleID:   styleID,
-		Format:    format,
+		MediaID: mediaID,
+		StyleID: styleID,
+		Format:  format,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "no segments") {
@@ -182,13 +181,13 @@ func (h *TimelineHandler) getExport(c fiber.Ctx, format string) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
 	body, contentType, filename, err := h.getExportHandler.Handle(c.Context(), querytimeline.GetExportQuery{
-		ProjectID: projectID,
-		Format:    format,
+		MediaID: mediaID,
+		Format:  format,
 	})
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "no segments") {

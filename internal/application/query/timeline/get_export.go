@@ -14,8 +14,8 @@ import (
 )
 
 type GetExportQuery struct {
-	ProjectID uuid.UUID
-	Format    string // fcpxml | edl | otio | premiere
+	MediaID uuid.UUID
+	Format  string // fcpxml | edl | otio | premiere
 }
 
 type GetExportHandler struct {
@@ -40,7 +40,7 @@ func (h *GetExportHandler) Handle(ctx context.Context, q GetExportQuery) (body s
 		return "", "", "", errors.New("format must be fcpxml, edl, otio or premiere")
 	}
 
-	t, err := h.timelines.FindHeadByProject(ctx, q.ProjectID)
+	t, err := h.timelines.FindHeadByMedia(ctx, q.MediaID)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -59,7 +59,7 @@ func (h *GetExportHandler) Handle(ctx context.Context, q GetExportQuery) (body s
 	}
 
 	projectName := "Studio"
-	if p, err := h.projects.GetByID(ctx, q.ProjectID); err == nil && p != nil {
+	if p, err := h.projects.GetByID(ctx, t.ProjectID); err == nil && p != nil {
 		projectName = p.Name
 	}
 

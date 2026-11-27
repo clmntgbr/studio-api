@@ -46,10 +46,12 @@ func (h *MarkSourceReadyHandler) Handle(ctx context.Context, cmd MarkSourceReady
 	}
 
 	// Already past ingress: still accept late metadata (fetch title/size after webhook).
-	if m.Status == domainmedia.StatusProcessing || m.Status == domainmedia.StatusReady {
+	if m.Status == domainmedia.StatusProcessing ||
+		m.Status == domainmedia.StatusReady ||
+		m.Status == domainmedia.StatusRendering {
 		return h.applyLateMetadata(ctx, m, cmd)
 	}
-	if m.Status != domainmedia.StatusPending && m.Status != domainmedia.StatusFetching {
+	if !m.IsUploading() && m.Status != domainmedia.StatusFetching {
 		return errors.New("media is not awaiting source")
 	}
 
@@ -75,6 +77,7 @@ func (h *MarkSourceReadyHandler) Handle(ctx context.Context, cmd MarkSourceReady
 
 	err = h.media.WithTransaction(ctx, func(txCtx context.Context) error {
 		claimed, err := h.media.UpdateFromStatuses(txCtx, m, []domainmedia.Status{
+			domainmedia.StatusUploading,
 			domainmedia.StatusPending,
 			domainmedia.StatusFetching,
 		})

@@ -31,11 +31,11 @@ func (r *timelineReadRepository) FindByID(ctx context.Context, id uuid.UUID) (*d
 	return timelineFromScan(row), nil
 }
 
-func (r *timelineReadRepository) FindHeadByProject(ctx context.Context, projectID uuid.UUID) (*domaintimeline.Timeline, error) {
+func (r *timelineReadRepository) FindHeadByMedia(ctx context.Context, mediaFileID uuid.UUID) (*domaintimeline.Timeline, error) {
 	var row timelineScan
 	err := r.db.WithContext(ctx).
 		Table("timeline").
-		Where("project_id = ? AND status IN ?", projectID, []string{
+		Where("media_file_id = ? AND status IN ?", mediaFileID, []string{
 			string(domaintimeline.StatusDraft),
 			string(domaintimeline.StatusValidated),
 		}).
@@ -50,11 +50,11 @@ func (r *timelineReadRepository) FindHeadByProject(ctx context.Context, projectI
 	return timelineFromScan(row), nil
 }
 
-func (r *timelineReadRepository) ListByProject(ctx context.Context, projectID uuid.UUID) ([]domaintimeline.Timeline, error) {
+func (r *timelineReadRepository) ListByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]domaintimeline.Timeline, error) {
 	var rows []timelineScan
 	err := r.db.WithContext(ctx).
 		Table("timeline").
-		Where("project_id = ?", projectID).
+		Where("media_file_id = ?", mediaFileID).
 		Order("version DESC").
 		Find(&rows).Error
 	if err != nil {
@@ -139,6 +139,7 @@ func (r *timelineReadRepository) ListDecisions(ctx context.Context, timelineID u
 type timelineScan struct {
 	ID          uuid.UUID  `gorm:"column:id"`
 	ProjectID   uuid.UUID  `gorm:"column:project_id"`
+	MediaFileID uuid.UUID  `gorm:"column:media_file_id"`
 	Version     int        `gorm:"column:version"`
 	Status      string     `gorm:"column:status"`
 	Fingerprint string     `gorm:"column:fingerprint"`
@@ -151,6 +152,7 @@ func timelineFromScan(row timelineScan) *domaintimeline.Timeline {
 	return &domaintimeline.Timeline{
 		ID:          row.ID,
 		ProjectID:   row.ProjectID,
+		MediaFileID: row.MediaFileID,
 		Version:     row.Version,
 		Status:      domaintimeline.Status(row.Status),
 		Fingerprint: row.Fingerprint,

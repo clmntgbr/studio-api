@@ -371,6 +371,9 @@ func (h *MediaHandler) UpdateConfiguration(c fiber.Ctx) error {
 		if strings.Contains(err.Error(), "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Media not found"})
 		}
+		if strings.Contains(err.Error(), "media is not ready") || strings.Contains(err.Error(), "media is not editable") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
+		}
 		if strings.Contains(err.Error(), "must be") || strings.Contains(err.Error(), "masterSplit") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
 		}
@@ -399,6 +402,9 @@ func (h *MediaHandler) Reanalyze(c fiber.Ctx) error {
 	}); err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Media not found"})
+		}
+		if strings.Contains(err.Error(), "media is not editable") || strings.Contains(err.Error(), "media is not ready") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
 		}
 		if strings.Contains(err.Error(), "not ready") || strings.Contains(err.Error(), "unsupported") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})

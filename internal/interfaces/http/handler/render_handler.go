@@ -53,9 +53,9 @@ func (h *RenderHandler) Create(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
 	var body createRenderBody
 	if err := validation.BindBody(c, &body); err != nil {
@@ -75,7 +75,7 @@ func (h *RenderHandler) Create(c fiber.Ctx) error {
 	burnSubs := body.BurnSubtitles != nil && *body.BurnSubtitles
 	force := body.Force != nil && *body.Force
 	r, err := h.createHandler.Handle(c.Context(), cmdrender.CreateCommand{
-		ProjectID:       projectID,
+		MediaID:         mediaID,
 		PresetID:        presetID,
 		Kind:            body.Kind,
 		SubtitleStyleID: styleID,
@@ -84,6 +84,9 @@ func (h *RenderHandler) Create(c fiber.Ctx) error {
 		Force:           force,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "media is not ready") || strings.Contains(err.Error(), "media is not editable") {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
+		}
 		if strings.Contains(err.Error(), "must be validated") {
 			return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{"message": err.Error()})
 		}
@@ -98,15 +101,15 @@ func (h *RenderHandler) Create(c fiber.Ctx) error {
 	return c.Status(fiber.StatusAccepted).JSON(presenter.NewRenderResponse(r))
 }
 
-func (h *RenderHandler) ListByProject(c fiber.Ctx) error {
+func (h *RenderHandler) ListByMedia(c fiber.Ctx) error {
 	if _, err := httpctx.GetUser(c); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Unauthorized"})
 	}
-	projectID, err := uuid.Parse(c.Params("id"))
+	mediaID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid project id"})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Invalid media id"})
 	}
-	items, err := h.listHandler.Handle(c.Context(), queryrender.ListQuery{ProjectID: projectID})
+	items, err := h.listHandler.Handle(c.Context(), queryrender.ListQuery{MediaID: mediaID})
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Failed to list renders"})
 	}

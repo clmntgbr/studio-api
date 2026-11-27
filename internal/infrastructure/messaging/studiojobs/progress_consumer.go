@@ -146,8 +146,20 @@ func (c *ProgressConsumer) handleRenderProgress(ctx context.Context, renderID uu
 	if err != nil || projectID == uuid.Nil {
 		return err
 	}
+	payload := map[string]any{
+		"renderId":  renderID.String(),
+		"projectId": projectID.String(),
+		"percent":   pp.Pct,
+		"stage":     pp.Stage,
+		"message":   pp.Message,
+	}
+	var mediaID uuid.UUID
+	var kind domainrender.Kind
 	if c.renderRepo != nil {
 		if r, err := c.renderRepo.GetByID(ctx, renderID); err == nil && r != nil {
+			mediaID = r.MediaFileID
+			kind = r.Kind
+			payload["mediaFileId"] = r.MediaFileID.String()
 			if r.Status != domainrender.StatusCompleted &&
 				r.Status != domainrender.StatusFailed &&
 				r.Status != domainrender.StatusCancelled {
@@ -165,12 +177,17 @@ func (c *ProgressConsumer) handleRenderProgress(ctx context.Context, renderID uu
 			}
 		}
 	}
-	return c.publisher.ToProject(ctx, realtime.EntityRender, realtime.ActionRenderProgress, projectID.String(), map[string]any{
-		"renderId": renderID.String(),
-		"percent":  pp.Pct,
-		"stage":    pp.Stage,
-		"message":  pp.Message,
-	})
+	if c.steps != nil && mediaID != uuid.Nil && kind == domainrender.KindMaster {
+		_ = mediacmd.MarkStepRunning(ctx, c.steps, mediaID, domainmedia.StepRender, time.Now().UTC())
+		_ = c.publisher.ToProject(ctx, realtime.EntityMedia, realtime.ActionProgress, projectID.String(), map[string]any{
+			"mediaId": mediaID.String(),
+			"step":    string(domainmedia.StepRender),
+			"percent": pp.Pct,
+			"stage":   pp.Stage,
+			"message": pp.Message,
+		})
+	}
+	return c.publisher.ToProject(ctx, realtime.EntityRender, realtime.ActionRenderProgress, projectID.String(), payload)
 }
 
 func progressStepKind(name string) (domainmedia.StepKind, bool) {

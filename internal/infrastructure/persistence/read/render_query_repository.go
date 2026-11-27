@@ -24,6 +24,7 @@ func NewRenderReadRepository(db *gorm.DB) domainrender.ReadRepository {
 type renderScan struct {
 	ID              uuid.UUID    `gorm:"column:id"`
 	ProjectID       uuid.UUID    `gorm:"column:project_id"`
+	MediaFileID     uuid.UUID    `gorm:"column:media_file_id"`
 	TimelineID      uuid.UUID    `gorm:"column:timeline_id"`
 	Kind            string       `gorm:"column:kind"`
 	Strategy        string       `gorm:"column:strategy"`
@@ -57,10 +58,10 @@ func (r *renderReadRepository) FindByID(ctx context.Context, id uuid.UUID) (*dom
 	return &out, nil
 }
 
-func (r *renderReadRepository) FindByFingerprint(ctx context.Context, projectID uuid.UUID, fingerprint string) (*domainrender.Render, error) {
+func (r *renderReadRepository) FindByFingerprint(ctx context.Context, mediaFileID uuid.UUID, fingerprint string) (*domainrender.Render, error) {
 	var row renderScan
 	err := r.db.WithContext(ctx).Table("render").
-		Where("project_id = ? AND fingerprint = ?", projectID, fingerprint).
+		Where("media_file_id = ? AND fingerprint = ?", mediaFileID, fingerprint).
 		Take(&row).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -72,10 +73,10 @@ func (r *renderReadRepository) FindByFingerprint(ctx context.Context, projectID 
 	return &out, nil
 }
 
-func (r *renderReadRepository) ListByProject(ctx context.Context, projectID uuid.UUID) ([]domainrender.Render, error) {
+func (r *renderReadRepository) ListByMedia(ctx context.Context, mediaFileID uuid.UUID) ([]domainrender.Render, error) {
 	var rows []renderScan
 	err := r.db.WithContext(ctx).Table("render").
-		Where("project_id = ?", projectID).
+		Where("media_file_id = ?", mediaFileID).
 		Order("created_at DESC").
 		Find(&rows).Error
 	if err != nil {
@@ -100,6 +101,7 @@ func renderFromScan(row renderScan) domainrender.Render {
 	return domainrender.Render{
 		ID:              row.ID,
 		ProjectID:       row.ProjectID,
+		MediaFileID:     row.MediaFileID,
 		TimelineID:      row.TimelineID,
 		Kind:            domainrender.Kind(row.Kind),
 		Strategy:        domainrender.Strategy(row.Strategy),

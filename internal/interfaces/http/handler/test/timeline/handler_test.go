@@ -14,7 +14,7 @@ func TestTimelineHandler_Get_Success(t *testing.T) {
 	h := newHandler(nil, nil, get)
 	app := mount(h, true)
 
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +32,7 @@ func TestTimelineHandler_Get_Success(t *testing.T) {
 func TestTimelineHandler_Get_Unauthorized(t *testing.T) {
 	h := newHandler(nil, nil, nil)
 	app := mount(h, false)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -42,10 +42,10 @@ func TestTimelineHandler_Get_Unauthorized(t *testing.T) {
 	}
 }
 
-func TestTimelineHandler_Get_InvalidProjectID(t *testing.T) {
+func TestTimelineHandler_Get_InvalidMediaID(t *testing.T) {
 	h := newHandler(nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/bad/timeline", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/bad/timeline", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +59,7 @@ func TestTimelineHandler_Get_NotFound(t *testing.T) {
 	get := &mockGet{err: errors.New("timeline not found")}
 	h := newHandler(nil, nil, get)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestTimelineHandler_Get_HandlerError_Internal(t *testing.T) {
 	get := &mockGet{err: errors.New("boom")}
 	h := newHandler(nil, nil, get)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodGet, "/api/projects/"+testutil.TestProjectID.String()+"/timeline", nil)
+	req, _ := testutil.JSONRequest(http.MethodGet, "/api/media/"+testutil.TestMediaID.String()+"/timeline", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestTimelineHandler_Preview_Success(t *testing.T) {
 	preview := &mockPreview{out: samplePreview()}
 	h := newHandler(preview, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/preview", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/timeline/preview", map[string]any{
 		"mediaId": testutil.TestMediaID.String(),
 	})
 	resp, err := app.Test(req)
@@ -111,7 +111,7 @@ func TestTimelineHandler_Preview_EmptyBody_Success(t *testing.T) {
 	preview := &mockPreview{out: samplePreview()}
 	h := newHandler(preview, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/preview", nil)
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/timeline/preview", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func TestTimelineHandler_Preview_EmptyBody_Success(t *testing.T) {
 func TestTimelineHandler_Preview_Unauthorized(t *testing.T) {
 	h := newHandler(nil, nil, nil)
 	app := mount(h, false)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/preview", nil)
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/timeline/preview", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -134,10 +134,10 @@ func TestTimelineHandler_Preview_Unauthorized(t *testing.T) {
 	}
 }
 
-func TestTimelineHandler_Preview_InvalidProjectID(t *testing.T) {
+func TestTimelineHandler_Preview_InvalidMediaID(t *testing.T) {
 	h := newHandler(nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/bad/timeline/preview", nil)
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/bad/timeline/preview", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -147,10 +147,10 @@ func TestTimelineHandler_Preview_InvalidProjectID(t *testing.T) {
 	}
 }
 
-func TestTimelineHandler_Preview_InvalidMediaID(t *testing.T) {
+func TestTimelineHandler_Preview_InvalidBodyMediaID(t *testing.T) {
 	h := newHandler(nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/preview", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/timeline/preview", map[string]any{
 		"mediaId": "not-a-uuid",
 	})
 	resp, err := app.Test(req)
@@ -166,7 +166,7 @@ func TestTimelineHandler_Preview_NotFound(t *testing.T) {
 	preview := &mockPreview{err: errors.New("media not found")}
 	h := newHandler(preview, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/preview", nil)
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/timeline/preview", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -180,7 +180,7 @@ func TestTimelineHandler_Preview_DurationError(t *testing.T) {
 	preview := &mockPreview{err: errors.New("duration unknown")}
 	h := newHandler(preview, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/preview", nil)
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/timeline/preview", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +194,7 @@ func TestTimelineHandler_Preview_HandlerError_Internal(t *testing.T) {
 	preview := &mockPreview{err: errors.New("boom")}
 	h := newHandler(preview, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/preview", nil)
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/timeline/preview", nil)
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatal(err)
@@ -207,7 +207,7 @@ func TestTimelineHandler_Preview_HandlerError_Internal(t *testing.T) {
 func TestTimelineHandler_Validate_Gone(t *testing.T) {
 	h := newHandler(nil, nil, nil)
 	app := mount(h, true)
-	req, _ := testutil.JSONRequest(http.MethodPost, "/api/projects/"+testutil.TestProjectID.String()+"/timeline/validate", map[string]any{
+	req, _ := testutil.JSONRequest(http.MethodPost, "/api/media/"+testutil.TestMediaID.String()+"/timeline/validate", map[string]any{
 		"version": 1,
 	})
 	resp, err := app.Test(req)
@@ -219,7 +219,7 @@ func TestTimelineHandler_Validate_Gone(t *testing.T) {
 	}
 	var body map[string]any
 	testutil.DecodeJSON(t, resp, &body)
-	want := "timeline validate removed; POST /projects/:id/renders to ship"
+	want := "timeline validate removed; POST /media/:id/renders to render"
 	if body["message"] != want {
 		t.Fatalf("message=%v", body["message"])
 	}

@@ -23,13 +23,13 @@ import (
 )
 
 type CreateCommand struct {
-	ProjectID       uuid.UUID
+	MediaID         uuid.UUID
 	PresetID        uuid.UUID
 	Kind            string
 	SubtitleStyleID *uuid.UUID
 	BurnSubtitles   bool // burn transcript captions (default style if SubtitleStyleID nil)
 	ClipID          *uuid.UUID
-	Force           bool // supersede any prior fingerprint (Ship again = full re-encode)
+	Force           bool // supersede any prior fingerprint (render again = full re-encode)
 }
 
 type assBuilder interface {
@@ -92,7 +92,18 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		return nil, errors.New("clipId is required for kind clip")
 	}
 
-	t, err := h.timelines.FindHeadByProject(ctx, cmd.ProjectID)
+	mediaFile, err := h.media.GetByID(ctx, cmd.MediaID)
+	if err != nil {
+		return nil, err
+	}
+	if mediaFile == nil {
+		return nil, errors.New("media not found")
+	}
+	if !mediaFile.CanEnqueueRender() {
+		return nil, mediacmd.ErrMediaNotReady
+	}
+
+	t, err := h.timelines.FindHeadByMedia(ctx, cmd.MediaID)
 	if err != nil {
 		return nil, err
 	}
@@ -124,15 +135,15 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		if err != nil {
 			return nil, err
 		}
-		if clip == nil || clip.ProjectID != cmd.ProjectID {
+		if clip == nil || clip.ProjectID != mediaFile.ProjectID || clip.MediaFileID != cmd.MediaID {
 			return nil, errors.New("clip not found")
 		}
 	}
 
 	burnSubs := cmd.BurnSubtitles || cmd.SubtitleStyleID != nil
 	masterSplit := ""
-	if kind == domainrender.KindMaster && len(segments) > 0 {
-		if cfg, err := h.media.GetConfiguration(ctx, segments[0].MediaFileID); err != nil {
+	if kind == domainrender.KindMaster {
+		if cfg, err := h.media.GetConfiguration(ctx, cmd.MediaID); err != nil {
 			return nil, err
 		} else if cfg != nil {
 			masterSplit = strings.TrimSpace(cfg.MasterSplit)
@@ -142,7 +153,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		}
 	}
 	fp := renderplan.Fingerprint(t.ID, preset.ID, cmd.SubtitleStyleID, cmd.ClipID, string(kind), preset.CropMode, burnSubs, masterSplit)
-	if existing, err := h.renders.FindByFingerprint(ctx, cmd.ProjectID, fp); err != nil {
+	if existing, err := h.renders.FindByFingerprint(ctx, cmd.MediaID, fp); err != nil {
 		return nil, err
 	} else if existing != nil {
 		reuse := !cmd.Force && (existing.Status == domainrender.StatusQueued ||
@@ -150,6 +161,13 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 			existing.Status == domainrender.StatusCompleted ||
 			existing.Status == domainrender.StatusPending)
 		if reuse {
+			if existing.Status == domainrender.StatusQueued ||
+				existing.Status == domainrender.StatusRunning ||
+				existing.Status == domainrender.StatusPending {
+				if err := mediacmd.MarkMediaRendering(ctx, h.media, cmd.MediaID); err != nil {
+					return nil, err
+				}
+			}
 			return existing, nil
 		}
 		// fingerprint is varchar(64); keep superseded marker short and unique.
@@ -222,7 +240,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 			return nil, err
 		}
 
-		r := domainrender.New(cmd.ProjectID, t.ID, preset.ID, kind, fp, markerPlan)
+		r := domainrender.New(mediaFile.ProjectID, cmd.MediaID, t.ID, preset.ID, kind, fp, markerPlan)
 		r.ID = renderID
 		r.SubtitleStyleID = cmd.SubtitleStyleID
 		r.ClipID = cmd.ClipID
@@ -231,11 +249,26 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		if err := h.renders.Save(ctx, r); err != nil {
 			return nil, errors.New("failed to create render")
 		}
-		if err := mediacmd.QueueStep(ctx, h.media, firstMediaID, domainmedia.StepReframe, time.Now().UTC()); err != nil {
+		if err := mediacmd.MarkMediaRendering(ctx, h.media, cmd.MediaID); err != nil {
+			return nil, err
+		}
+		now := time.Now().UTC()
+		if kind == domainrender.KindMaster {
+			if err := mediacmd.RequeueStep(ctx, h.media, cmd.MediaID, domainmedia.StepRender, now); err != nil {
+				r.Status = domainrender.StatusFailed
+				msg := "failed to queue render step"
+				r.ErrorMessage = &msg
+				_ = h.renders.Update(ctx, r)
+				_ = mediacmd.ReturnMediaToReadyIfIdle(ctx, h.media, h.renders.HasInFlightByMedia, cmd.MediaID)
+				return nil, err
+			}
+		}
+		if err := mediacmd.QueueStep(ctx, h.media, firstMediaID, domainmedia.StepReframe, now); err != nil {
 			r.Status = domainrender.StatusFailed
 			msg := "failed to queue reframe"
 			r.ErrorMessage = &msg
 			_ = h.renders.Update(ctx, r)
+			_ = mediacmd.ReturnMediaToReadyIfIdle(ctx, h.media, h.renders.HasInFlightByMedia, cmd.MediaID)
 			return nil, err
 		}
 		if err := h.jobs.PublishReframeJob(ctx, firstMediaID.String(), proxyAsset.StorageKey, preset.Width, preset.Height); err != nil {
@@ -243,6 +276,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 			msg := "failed to enqueue reframe"
 			r.ErrorMessage = &msg
 			_ = h.renders.Update(ctx, r)
+			_ = mediacmd.ReturnMediaToReadyIfIdle(ctx, h.media, h.renders.HasInFlightByMedia, cmd.MediaID)
 			return nil, errors.New("failed to enqueue reframe")
 		}
 		return r, nil
@@ -258,7 +292,8 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		storage:      h.storage,
 		renderBucket: h.renderBucket,
 	}, queuedPlanRequest{
-		ProjectID:       cmd.ProjectID,
+		ProjectID:       mediaFile.ProjectID,
+		MediaID:         cmd.MediaID,
 		RenderID:        renderID,
 		TimelineID:      t.ID,
 		PresetID:        cmd.PresetID,
@@ -272,7 +307,7 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 		return nil, err
 	}
 
-	r := domainrender.New(cmd.ProjectID, t.ID, preset.ID, kind, fp, rawPlan)
+	r := domainrender.New(mediaFile.ProjectID, cmd.MediaID, t.ID, preset.ID, kind, fp, rawPlan)
 	r.ID = renderID
 	r.SubtitleStyleID = cmd.SubtitleStyleID
 	r.ClipID = cmd.ClipID
@@ -284,11 +319,28 @@ func (h *CreateHandler) Handle(ctx context.Context, cmd CreateCommand) (*domainr
 	if err := h.renders.Save(ctx, r); err != nil {
 		return nil, errors.New("failed to create render")
 	}
+	if err := mediacmd.MarkMediaRendering(ctx, h.media, cmd.MediaID); err != nil {
+		return nil, err
+	}
+	if kind == domainrender.KindMaster {
+		if err := mediacmd.RequeueStep(ctx, h.media, cmd.MediaID, domainmedia.StepRender, time.Now().UTC()); err != nil {
+			r.Status = domainrender.StatusFailed
+			msg := "failed to queue render step"
+			r.ErrorMessage = &msg
+			_ = h.renders.Update(ctx, r)
+			_ = mediacmd.ReturnMediaToReadyIfIdle(ctx, h.media, h.renders.HasInFlightByMedia, cmd.MediaID)
+			return nil, err
+		}
+	}
 	if err := h.jobs.PublishRenderJob(ctx, r.ID.String(), rawPlan); err != nil {
 		r.Status = domainrender.StatusFailed
 		msg := "failed to enqueue render"
 		r.ErrorMessage = &msg
 		_ = h.renders.Update(ctx, r)
+		if kind == domainrender.KindMaster {
+			_ = mediacmd.FailStep(ctx, h.media, cmd.MediaID, domainmedia.StepRender, time.Now().UTC(), msg)
+		}
+		_ = mediacmd.ReturnMediaToReadyIfIdle(ctx, h.media, h.renders.HasInFlightByMedia, cmd.MediaID)
 		return nil, errors.New("failed to enqueue render")
 	}
 	return r, nil

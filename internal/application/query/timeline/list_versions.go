@@ -9,7 +9,7 @@ import (
 )
 
 type ListVersionsQuery struct {
-	ProjectID uuid.UUID
+	MediaID uuid.UUID
 }
 
 type ListVersionsHandler struct {
@@ -21,5 +21,5 @@ func NewListVersionsHandler(repo domaintimeline.ReadRepository) *ListVersionsHan
 }
 
 func (h *ListVersionsHandler) Handle(ctx context.Context, q ListVersionsQuery) ([]domaintimeline.Timeline, error) {
-	return h.repo.ListByProject(ctx, q.ProjectID)
+	return h.repo.ListByMedia(ctx, q.MediaID)
 }

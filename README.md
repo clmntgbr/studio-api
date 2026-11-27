@@ -1,6 +1,6 @@
 # Studio API
 
-Backend Go for **Studio**: ingest a video, cut silences, propose viral clips, then **Ship** a master (+ optional vertical clips) with FFmpeg.
+Backend Go for **Studio**: ingest a video, cut silences, propose viral clips, then **render** a master (+ optional vertical clips) with FFmpeg.
 
 Product design lives in [docs/docs.md](docs/docs.md).
 
@@ -52,12 +52,12 @@ make migrate
 
 Dev mocks (default): `TRANSCRIBE_PROVIDER=mock`, `LLM_PROVIDER=mock` → `testdata/mocks/external/`.
 
-## Ship / render (current behaviour)
+## Render (current behaviour)
 
-### Global Ship (editor)
+### Global render (editor)
 
 1. User picks **format** + optional **burn SRT** + **master split** (persisted on `media_configuration`).
-2. `POST /api/projects/:id/renders` with `force: true` → **master** job.
+2. `POST /api/media/:id/renders` with `force: true` → **master** job.
 3. For each selected clip → `POST /api/clips/:id/render` (queued **one after another** from the app).
 4. `worker-render` runs **one job at a time** (QoS 1).
 
@@ -65,8 +65,8 @@ Dev mocks (default): `TRANSCRIBE_PROVIDER=mock`, `LLM_PROVIDER=mock` → `testda
 
 | Column | Values | Effect |
 | --- | --- | --- |
-| `output_preset_id` | UUID | Last Ship format |
-| `burn_subtitles` | bool | Burn ASS captions into master + clips when Ship |
+| `output_preset_id` | UUID | Last render format |
+| `burn_subtitles` | bool | Burn ASS captions into master + clips when rendering |
 | `master_split` | `""` / `off` / `parts:N` / `durationMs:N` | After master encode, split into parts for TikTok-style upload |
 
 - `parts:5` → 5 equal parts (N ∈ 2…50).
@@ -82,7 +82,7 @@ Dev mocks (default): `TRANSCRIBE_PROVIDER=mock`, `LLM_PROVIDER=mock` → `testda
 
 ### Fingerprint / force
 
-- Same inputs reuse a queued/running/completed render unless `force: true` (Ship always forces a new encode).
+- Same inputs reuse a queued/running/completed render unless `force: true` (Render always forces a new encode).
 
 ## Useful Makefile targets
 

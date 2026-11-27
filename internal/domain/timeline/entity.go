@@ -45,6 +45,7 @@ const (
 type Timeline struct {
 	ID          uuid.UUID
 	ProjectID   uuid.UUID
+	MediaFileID uuid.UUID
 	Version     int
 	Status      Status
 	Fingerprint string
@@ -53,10 +54,11 @@ type Timeline struct {
 	CreatedAt   time.Time
 }
 
-func New(projectID uuid.UUID, version int, fingerprint string, durationMs int64) *Timeline {
+func New(projectID, mediaFileID uuid.UUID, version int, fingerprint string, durationMs int64) *Timeline {
 	return &Timeline{
 		ID:          uuid.New(),
 		ProjectID:   projectID,
+		MediaFileID: mediaFileID,
 		Version:     version,
 		Status:      StatusDraft,
 		Fingerprint: fingerprint,

@@ -186,5 +186,5 @@ func (h *ApplyLLMResultHandler) Handle(ctx context.Context, cmd ApplyLLMResultCo
 	if err != nil {
 		return errors.New("failed to apply llm result")
 	}
-	return nil
+	return mediacmd.TryMarkMediaReady(ctx, h.media, h.outbox, cmd.MediaID)
 }

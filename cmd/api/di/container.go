@@ -161,7 +161,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		getSubtitles,
 		env.S3BucketRenders,
 	)
-	cancelRender := rendercmd.NewCancelHandler(renderWriteRepo)
+	cancelRender := rendercmd.NewCancelHandler(renderWriteRepo, mediaWriteRepo)
 	getRender := queryrender.NewGetHandler(renderReadRepo)
 	listRenders := queryrender.NewListHandler(renderReadRepo)
 	downloadRender := queryrender.NewDownloadHandler(renderReadRepo, storage, env.S3BucketRenders)
@@ -170,7 +170,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	listClips := queryclip.NewListHandler(clipReadRepo)
 	getClip := queryclip.NewGetHandler(clipReadRepo)
 	createClip := clipcmd.NewCreateHandler(clipWriteRepo, mediaWriteRepo)
-	updateClip := clipcmd.NewUpdateHandler(clipWriteRepo, clipReadRepo)
+	updateClip := clipcmd.NewUpdateHandler(clipWriteRepo, clipReadRepo, mediaWriteRepo)
 	analyzeClips := clipcmd.NewAnalyzeHandler(mediaWriteRepo, jobPublisher)
 	listLLMArtifacts := queryllm.NewListHandler(llmArtifactReadRepo)
 

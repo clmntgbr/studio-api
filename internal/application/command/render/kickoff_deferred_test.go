@@ -23,7 +23,7 @@ func (f *fakeRenderReadRepo) FindByID(context.Context, uuid.UUID) (*domainrender
 func (f *fakeRenderReadRepo) FindByFingerprint(context.Context, uuid.UUID, string) (*domainrender.Render, error) {
 	panic("unused")
 }
-func (f *fakeRenderReadRepo) ListByProject(_ context.Context, _ uuid.UUID) ([]domainrender.Render, error) {
+func (f *fakeRenderReadRepo) ListByMedia(_ context.Context, _ uuid.UUID) ([]domainrender.Render, error) {
 	return f.byProject, nil
 }
 
@@ -45,6 +45,9 @@ func (f *fakeRenderWriteKickoff) GetByID(context.Context, uuid.UUID) (*domainren
 }
 func (f *fakeRenderWriteKickoff) FindByFingerprint(context.Context, uuid.UUID, string) (*domainrender.Render, error) {
 	panic("unused")
+}
+func (f *fakeRenderWriteKickoff) HasInFlightByMedia(context.Context, uuid.UUID) (bool, error) {
+	return false, nil
 }
 
 type fakeMediaKickoff struct {
